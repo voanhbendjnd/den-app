@@ -3,6 +3,7 @@ package tech.djnd.sample.app.service;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,19 +16,19 @@ import tech.djnd.sample.app.repository.UserRepository;
 import tech.djnd.sample.app.security.AuthoritiesConstants;
 import tech.djnd.sample.app.service.dto.UserDTO;
 import tech.djnd.sample.app.web.rest.errors.LoginAlreadyUsedException;
+import tech.jhipster.security.RandomUtil;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class UserService {
+    private static final long ACTIVATION_KEY_VALIDITY_DAYS = 3;
     UserRepository userRepository;
     CacheManager cacheManager;
     PasswordEncoder passwordEncoder;
@@ -46,10 +47,53 @@ public class UserService {
         newUser.setPassword(encryptedPassword);
         newUser.setActivated(false);
         Set<Authority> authorities = new HashSet<>();
-        authorityRepository.findById(AuthoritiesConstants.STUDENT).ifPresent(authorities::add);
+        authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
         newUser.setAuthorities(authorities);
         return newUser;
     }
+    /*
+    * activated account register from user
+    * */
+    public Optional<User> activatedRegistration(String key) {
+        log.debug("Activating user for activation key {}", key);
+        return userRepository.findOneByActivationKey(key).map(existingUser -> {
+            existingUser.setActivated(true);
+            existingUser.setActivationKey(null);
+            this.clearUserCaches(existingUser);
+            log.debug("Activated key {}", existingUser);
+            return existingUser;
+        });
+    }
+    public Optional<User> requestPasswordReset(String email) {
+        String normalizedEmail = email.trim().toLowerCase(Locale.ENGLISH);
+        Instant now = Instant.now();
+        return userRepository.findOneByEmail(normalizedEmail).filter(User::getActivated)
+                .filter(user ->{
+                    if(user.getResetDate() != null && user.getResetDate().isAfter(now.minus(60, ChronoUnit.SECONDS))){
+                        return false;
+                    }
+                    return true;
+                })
+                .map(user ->{
+            user.setResetDate(now);
+            user.setResetKey(RandomUtil.generateResetKey());
+            this.clearUserCaches(user);
+            return user;
+        });
+
+    }
+    public Optional<User> completePasswordReset(String newPassword, String resetKey){
+        return userRepository.findOneByResetKey(resetKey)
+                .filter(existingUser -> existingUser.getResetDate().isAfter(Instant.now().minus(1, ChronoUnit.DAYS)))
+                .map(existingUser ->{
+                    existingUser.setPassword(passwordEncoder.encode(newPassword));
+                    existingUser.setResetKey(null);
+                    existingUser.setResetDate(null);
+                    this.clearUserCaches(existingUser);
+                    return existingUser;
+                });
+    }
+
     private boolean removeNoneActivatedUser(User existingUser){
         if(existingUser.getActivated()){
             return false;

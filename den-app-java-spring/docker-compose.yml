@@ -1,10 +1,10 @@
 services:
   mysql-db:
     image: mysql:8.0
-    container_name: mysql-djnd-fgroup-making-local
+    container_name: mysql-den-app-local
     restart: always
     environment:
-      MYSQL_DATABASE: fgroup-making
+      MYSQL_DATABASE: den-app
       MYSQL_ROOT_PASSWORD: 1607
     ports:
       - "3307:3306"
@@ -12,7 +12,7 @@ services:
       - "./mysql_data:/var/lib/mysql"
   redis-happy-farm:
     image: redis:alpine
-    container_name: redis_fgroup-making_local
+    container_name: den-app-local
     restart: always
     ports:
       - "6379:6379"

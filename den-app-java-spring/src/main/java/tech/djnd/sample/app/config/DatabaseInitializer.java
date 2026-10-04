@@ -40,7 +40,7 @@ public class DatabaseInitializer implements CommandLineRunner {
             Authority adminAuthority = new Authority();
             adminAuthority.setName(AuthoritiesConstants.ADMIN);
             Authority userAuthority = new Authority();
-            userAuthority.setName(AuthoritiesConstants.STUDENT);
+            userAuthority.setName(AuthoritiesConstants.USER);
             Authority anonymousAuthority = new Authority();
             anonymousAuthority.setName(AuthoritiesConstants.ANONYMOUS);
             authorities.addAll(List.of(adminAuthority, userAuthority, anonymousAuthority));
@@ -51,7 +51,7 @@ public class DatabaseInitializer implements CommandLineRunner {
             User admin = new User();
             admin.setName("VO ANH BEN");
             admin.setActivated(true);
-            admin.setEmail("admin@gmail.com");
+            admin.setEmail("benva.ce190709@gmail.com");
             admin.setPassword(passwordEncoder.encode("123123"));
             admin.setAuthorities(authorities);
             userRepository.save(admin);
