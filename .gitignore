@@ -1,0 +1,27 @@
+den-app-java-spring/src/main/resources/application.properties
+
+# Gradle cache and build outputs
+.gradle/
+**/.gradle/
+build/
+**/build/
+bin/
+**/bin/
+
+**/mysql_data/
+mysql_data/
+
+# IDE configurations
+.vscode/
+.idea/
+
+# Environment variables
+.env
+.env.*
+!**/.env.example
+
+# Frontend dependencies & build
+**/node_modules/
+node_modules/
+**/dist/
+dist/
