@@ -22,7 +22,7 @@ public class Message extends AbstractAuditingEntity<Long> implements Serializabl
     @NotNull
     @Column(name = "author_id", nullable = false)
     private Long authorId;
-    @Column(name = "content", columnDefinition = "MEDIUMTEXT")
+    @Column(name = "content", columnDefinition = "NVARCHAR(MAX)")
     private String content;
 
     @Override

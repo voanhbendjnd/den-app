@@ -59,6 +59,7 @@ dependencies {
 	implementation("org.hibernate.orm:hibernate-jcache")
 	// Response follow format RFC7807
 	implementation("org.zalando:problem-spring-web-starter:0.29.1")
+	runtimeOnly("com.microsoft.sqlserver:mssql-jdbc")
 }
 
 tasks.withType<Test> {

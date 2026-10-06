@@ -23,7 +23,7 @@ public class Channel extends AbstractAuditingEntity<Long> implements Serializabl
     private Long serverId;
     @NotNull
     @Length(max = 20, min = 2)
-    @Column(name = "name", nullable = false, length = 20)
+    @Column(name = "name", nullable = false, length = 20, columnDefinition = "NVARCHAR(20)")
     private String name;
     int position;
 

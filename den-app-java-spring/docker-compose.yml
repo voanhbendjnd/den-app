@@ -1,15 +1,15 @@
 services:
-  mysql-db:
-    image: mysql:8.0
-    container_name: mysql-den-app-local
+  sqlserver-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver-den-app-local
     restart: always
     environment:
-      MYSQL_DATABASE: den-app
-      MYSQL_ROOT_PASSWORD: 1607
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "1607"
     ports:
-      - "3307:3306"
+      - "1433:1433"
     volumes:
-      - "./mysql_data:/var/lib/mysql"
+      - "./sqlserver_data:/var/opt/mssql"
   redis-happy-farm:
     image: redis:alpine
     container_name: den-app-local

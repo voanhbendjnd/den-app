@@ -19,7 +19,7 @@ public class ServerMember {
     @Column(name = "user_id", nullable = false)
     private Long userId;
     @Length(max = 20, min = 1)
-    @Column(name = "nickname", length = 20, nullable = false)
+    @Column(name = "nickname", length = 20, nullable = false, columnDefinition = "NVARCHAR(20)")
     private String nickname;
 
     public Long getId() {

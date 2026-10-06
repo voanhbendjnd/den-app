@@ -25,3 +25,4 @@ mysql_data/
 node_modules/
 **/dist/
 dist/
+/den-app-java-spring/.gradle

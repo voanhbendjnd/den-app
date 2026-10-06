@@ -37,6 +37,7 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
     @Column(length = 255, unique = true, nullable = false, name = "password_hash")
     private String password;
     @Size(max = 50)
+    @Column(length = 50, columnDefinition = "NVARCHAR(50)")
     private String name;
     @Email
     @Size(min= 5,max = 254)
