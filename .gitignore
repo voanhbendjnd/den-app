@@ -11,6 +11,8 @@ bin/
 **/mysql_data/
 mysql_data/
 
+**/sqlserver_data/
+sqlserver_data/
 # IDE configurations
 .vscode/
 .idea/
