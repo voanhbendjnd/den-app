@@ -1,0 +1,33 @@
+# ==========================================
+# DenHub Server - Local Configuration Template
+# Sao chep file nay thanh application.properties
+# ==========================================
+
+spring.application.name=denhub-server
+
+# Port
+server.port=${SERVER_PORT:8080}
+
+# Database Configuration (Docker SQL Server / MySQL)
+spring.datasource.url=${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=denhubdb;encrypt=false;trustServerCertificate=true}
+spring.datasource.driverClassName=com.microsoft.sqlserver.jdbc.SQLServerDriver
+spring.datasource.username=${DB_USERNAME:sa}
+spring.datasource.password=${DB_PASSWORD:your_password_here}
+
+# JPA / Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+# DenHub JWT Configuration
+denhub.app.name=denhub
+denhub.jwt.base64-secret=${JWT_BASE64_SECRET:your_base64_secret_key_here}
+denhub.jwt.access-token-validity-in-seconds=${JWT_ACCESS_TOKEN_VALIDITY:86400}
+denhub.jwt.refresh-token-validity-in-seconds=${JWT_REFRESH_TOKEN_VALIDITY:604800}
+
+# Client Base URL for Mail activation
+denhub.client.base-url=${CLIENT_BASE_URL:http://localhost:5173}
+denhub.client.allow-localhost=${CLIENT_ALLOW_LOCALHOST:true}
+
+# Mail (Optional / Dev)
+spring.mail.host=localhost
+spring.mail.port=1025

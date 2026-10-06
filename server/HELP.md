@@ -1,7 +1,7 @@
 # Read Me First
 The following was discovered as part of building this project:
 
-* The original package name 'tech.djnd-sample-app' is invalid and this project uses 'tech.djnd_sample_app' instead.
+* DenHub Server backend package: `com.denhub`.
 
 # Getting Started
 

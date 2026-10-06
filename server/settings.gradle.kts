@@ -1,1 +1,1 @@
-rootProject.name = "djnd-sample-app"
+rootProject.name = "denhub-server"
