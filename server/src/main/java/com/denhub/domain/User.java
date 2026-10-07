@@ -62,7 +62,7 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
 
     @Column(name = "reset_date")
     private Instant resetDate = null;
-
+    private String avatar;
     @Column(name ="session_id")
     private String sessionId;
     @JsonIgnore

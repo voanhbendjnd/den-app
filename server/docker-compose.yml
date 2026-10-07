@@ -1,18 +1,7 @@
 services:
-  sqlserver-db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sqlserver-den-app-local
-    restart: always
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "1607"
-    ports:
-      - "1433:1433"
-    volumes:
-      - "./sqlserver_data:/var/opt/mssql"
-  redis-happy-farm:
+  redis-den-hub:
     image: redis:alpine
-    container_name: den-app-local
+    container_name: den-hub-local
     restart: always
     ports:
       - "6379:6379"

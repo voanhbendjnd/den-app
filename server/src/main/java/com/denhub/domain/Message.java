@@ -1,60 +1,69 @@
 package com.denhub.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.springframework.data.annotation.CreatedDate;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.Instant;
 
 @Entity
 @Table(name = "messages")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
-public class Message extends AbstractAuditingEntity<Long> implements Serializable {
+public class Message implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @NotNull
-    @Column(name = "channel_id",  nullable = false)
-    private Long channelId;
-    @NotNull
-    @Column(name = "author_id", nullable = false)
-    private Long authorId;
+    @Column(name = "sender_id", nullable = false)
+    private Long senderId;
+
+    @Column(name = "conversation_id")
+    private Long conversationId;
+
+    @Column(name = "type")
+    private String type;
+
     @Column(name = "content", columnDefinition = "NVARCHAR(MAX)")
     private String content;
 
-    @Override
-    public Long getId() {
-        return id;
-    }
+    @Column(name = "media_url", columnDefinition = "NVARCHAR(1000)")
+    private String mediaUrl;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    @Column(name = "file_name")
+    private String fileName;
 
-    public Long getChannelId() {
-        return channelId;
-    }
+    @Column(name = "file_size")
+    private Long fileSize;
 
-    public void setChannelId(Long channelId) {
-        this.channelId = channelId;
-    }
+    @Column(name = "width")
+    private Integer width;
 
-    public Long getAuthorId() {
-        return authorId;
-    }
+    @Column(name = "height")
+    private Integer height;
 
-    public void setAuthorId(Long authorId) {
-        this.authorId = authorId;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
+    @NotNull
+    @CreatedDate
+    @Column(name = "created_at", updatable = false)
+    @JsonIgnore
+    @Builder.Default
+    private Instant createdAt = Instant.now();
 }
+
