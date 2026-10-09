@@ -1,6 +1,7 @@
 
 bin/
 build/
+uploads/
 /mysql_data
 
 # Environment variables
