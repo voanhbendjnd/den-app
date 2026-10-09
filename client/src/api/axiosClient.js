@@ -22,14 +22,16 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+    const requestUrl = error.config?.url || '';
 
-    if (status === 401) {
-      // Token is invalid or expired — clear auth and redirect to login
+    // If 401 is encountered on a protected endpoint, clear session and redirect.
+    // NEVER redirect on the login endpoint itself so the login page can display the error!
+    if (status === 401 && !requestUrl.includes('/login')) {
       clearTokens();
+      localStorage.removeItem('denhub_user');
       window.location.href = '/login';
     }
 
-    // Let individual callers handle 400, 403, 404, 409, 500, etc.
     return Promise.reject(error);
   }
 );

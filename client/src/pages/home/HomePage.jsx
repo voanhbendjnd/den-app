@@ -1,239 +1,170 @@
-import { useEffect, useState } from 'react';
-import { Row, Col, Card, Typography, List, Badge, Avatar, Tag, Skeleton } from 'antd';
+import { Typography, Row, Col, Button, Avatar, Tag, Empty } from 'antd';
 import {
-  TeamOutlined,
-  CalendarOutlined,
-  BellOutlined,
-  MessageOutlined,
+  PlusOutlined,
+  ThunderboltFilled,
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import roomApi from '../../api/roomApi';
-import meetingApi from '../../api/meetingApi';
-import notificationApi from '../../api/notificationApi';
-import { devRooms, devMeetings, devNotifications } from '../../mocks/devData';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 
-dayjs.extend(relativeTime);
-
-const { Title, Text } = Typography;
-
-function StatCard({ icon, label, value, color }) {
-  return (
-    <Card size="small" style={{ borderRadius: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 8,
-            backgroundColor: `${color}18`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 20,
-            color,
-          }}
-        >
-          {icon}
-        </div>
-        <div>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {label}
-          </Text>
-          <div>
-            <Title level={4} style={{ margin: 0 }}>
-              {value}
-            </Title>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
+const { Title, Text, Paragraph } = Typography;
 
 export default function HomePage() {
   const { currentUser } = useAuth();
-  const [rooms, setRooms] = useState([]);
-  const [meetings, setMeetings] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [roomRes, meetingRes, notifRes] = await Promise.allSettled([
-          roomApi.getRooms({ limit: 5 }),
-          meetingApi.getMeetings({ limit: 3 }),
-          notificationApi.getNotifications({ limit: 5 }),
-        ]);
-
-        setRooms(roomRes.status === 'fulfilled' ? roomRes.value.data?.content || roomRes.value.data || [] : devRooms);
-        setMeetings(meetingRes.status === 'fulfilled' ? meetingRes.value.data?.content || meetingRes.value.data || [] : devMeetings);
-        setNotifications(notifRes.status === 'fulfilled' ? notifRes.value.data?.content || notifRes.value.data || [] : devNotifications);
-      } catch {
-        setRooms(devRooms);
-        setMeetings(devMeetings);
-        setNotifications(devNotifications);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const navigate = useNavigate();
+  const { servers = [], openCreateModal } = useOutletContext() || {};
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      {/* Greeting */}
-      <div style={{ marginBottom: 24 }}>
-        <Title level={3} style={{ margin: 0 }}>
-          {greeting}, {currentUser?.displayName || currentUser?.username} 👋
-        </Title>
-        <Text type="secondary">Here&apos;s what&apos;s happening in your workspace.</Text>
+    <div style={{ padding: '36px 40px', maxWidth: 1100, margin: '0 auto' }}>
+      {/* =========================================================
+          Hero Banner
+         ========================================================= */}
+      <div 
+        className="glass-panel"
+        style={{
+          borderRadius: 20,
+          padding: '36px 36px',
+          marginBottom: 32,
+          position: 'relative',
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(0, 242, 254, 0.05) 100%), #111726',
+          border: '1px solid rgba(99, 102, 241, 0.2)',
+          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.4)',
+        }}
+      >
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Title level={2} style={{ margin: 0, color: '#F1F5F9', fontWeight: 800, fontSize: 28, letterSpacing: '-0.5px' }}>
+            Xin chào, <span className="tech-text-gradient">{currentUser?.displayName || currentUser?.username || 'Bạn'}</span>! 👋
+          </Title>
+
+          <Paragraph style={{ color: '#94A3B8', fontSize: 15, marginTop: 8, marginBottom: 20, maxWidth: 600 }}>
+            Chào mừng bạn đến với DenHub. Bắt đầu bằng cách tạo không gian nhóm của riêng bạn để trao đổi và làm việc chung.
+          </Paragraph>
+
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={() => openCreateModal?.()}
+            style={{
+              height: 44,
+              padding: '0 24px',
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
+              border: 'none',
+              boxShadow: '0 4px 16px rgba(0, 242, 254, 0.3)',
+            }}
+          >
+            Tạo Không Gian (Server) Mới
+          </Button>
+        </div>
       </div>
 
-      {/* Summary row */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 28 }}>
-        <Col xs={24} sm={8}>
-          <StatCard icon={<TeamOutlined />} label="Rooms" value={rooms.length} color="#1677ff" />
-        </Col>
-        <Col xs={24} sm={8}>
-          <StatCard icon={<CalendarOutlined />} label="Upcoming Meetings" value={meetings.filter((m) => m.status === 'UPCOMING').length} color="#52c41a" />
-        </Col>
-        <Col xs={24} sm={8}>
-          <StatCard icon={<BellOutlined />} label="Unread Notifications" value={unreadCount} color="#fa8c16" />
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]}>
-        {/* Recent Rooms */}
-        <Col xs={24} lg={14}>
-          <Card
-            title={
-              <span>
-                <TeamOutlined style={{ marginRight: 8 }} />
-                Recent Rooms
-              </span>
-            }
-            extra={<Link to="/rooms">View all</Link>}
-            style={{ borderRadius: 8 }}
+      {/* =========================================================
+          My Servers Section (Synchronized with Far-Left Dock)
+         ========================================================= */}
+      <div style={{ marginBottom: 36 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div>
+            <Title level={4} style={{ margin: 0, color: '#F1F5F9', fontWeight: 700 }}>
+              Không Gian Của Bạn ({servers.length})
+            </Title>
+            <Text style={{ color: '#64748B', fontSize: 13 }}>
+              Danh sách các Server mà bạn đang quản lý hoặc tham gia
+            </Text>
+          </div>
+          <Button 
+            type="link" 
+            icon={<PlusOutlined />}
+            onClick={() => openCreateModal?.()}
+            style={{ color: '#00F2FE', fontWeight: 600 }}
           >
-            {loading ? (
-              <Skeleton active paragraph={{ rows: 3 }} />
-            ) : (
-              <List
-                dataSource={rooms.slice(0, 5)}
-                renderItem={(room) => (
-                  <List.Item
-                    style={{ padding: '10px 0', cursor: 'pointer' }}
-                    onClick={() => {}}
-                  >
-                    <List.Item.Meta
-                      avatar={
-                        <Avatar
-                          style={{ backgroundColor: '#1677ff' }}
-                          size={36}
-                        >
-                          {room.name?.[0]?.toUpperCase()}
-                        </Avatar>
-                      }
-                      title={
-                        <Link to={`/rooms/${room.slug}`}>
-                          <Text strong>{room.name}</Text>
-                        </Link>
-                      }
-                      description={
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {room.memberCount} members ·{' '}
-                          {dayjs(room.lastActivity).fromNow()}
-                        </Text>
-                      }
-                    />
-                    {room.unreadCount > 0 && (
-                      <Badge count={room.unreadCount} size="small" />
-                    )}
-                  </List.Item>
-                )}
-                locale={{ emptyText: 'No rooms yet.' }}
-              />
-            )}
-          </Card>
-        </Col>
+            + Tạo thêm Server
+          </Button>
+        </div>
 
-        {/* Upcoming Meetings + Notifications */}
-        <Col xs={24} lg={10}>
-          <Card
-            title={
-              <span>
-                <CalendarOutlined style={{ marginRight: 8 }} />
-                Upcoming Meetings
-              </span>
-            }
-            extra={<Link to="/meetings">View all</Link>}
-            style={{ borderRadius: 8, marginBottom: 16 }}
+        {servers.length === 0 ? (
+          <div 
+            className="glass-panel"
+            style={{
+              padding: '48px 24px',
+              borderRadius: 16,
+              textAlign: 'center',
+            }}
           >
-            {loading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
-            ) : (
-              <List
-                dataSource={meetings.filter((m) => m.status === 'UPCOMING').slice(0, 3)}
-                renderItem={(meeting) => (
-                  <List.Item style={{ padding: '8px 0' }}>
-                    <List.Item.Meta
-                      avatar={<Avatar icon={<CalendarOutlined />} size={32} style={{ backgroundColor: '#52c41a' }} />}
-                      title={<Text strong style={{ fontSize: 13 }}>{meeting.title}</Text>}
-                      description={
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {dayjs(meeting.startTime).format('ddd, MMM D · HH:mm')}
-                        </Text>
-                      }
-                    />
-                  </List.Item>
-                )}
-                locale={{ emptyText: 'No upcoming meetings.' }}
-              />
-            )}
-          </Card>
+            <Empty
+              image={<ThunderboltFilled style={{ fontSize: 48, color: '#6366F1' }} />}
+              imageStyle={{ height: 48, marginBottom: 16 }}
+              description={
+                <div>
+                  <Title level={4} style={{ color: '#F1F5F9', margin: '0 0 6px' }}>Bạn chưa có Server nào</Title>
+                  <Text style={{ color: '#94A3B8' }}>
+                    Tạo ngay một server đầu tiên của riêng bạn chỉ với vài cú click!
+                  </Text>
+                </div>
+              }
+            >
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />}
+                style={{ marginTop: 16, fontWeight: 600, background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)', border: 'none' }}
+                onClick={() => openCreateModal?.()}
+              >
+                Tạo Server Đầu Tiên
+              </Button>
+            </Empty>
+          </div>
+        ) : (
+          <Row gutter={[16, 16]}>
+            {servers.map((server) => (
+              <Col xs={24} sm={12} md={8} key={server.id}>
+                <div 
+                  className="glass-card"
+                  style={{
+                    padding: 20,
+                    borderRadius: 16,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <Avatar 
+                      size={50} 
+                      src={server.iconUrl}
+                      style={{ 
+                        background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
+                        fontWeight: 800,
+                        fontSize: 18,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {server.name?.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <div style={{ overflow: 'hidden' }}>
+                      <Title level={5} style={{ margin: 0, color: '#F1F5F9', fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {server.name}
+                      </Title>
+                      <Tag color="cyan" style={{ margin: '4px 0 0', fontSize: 11, borderRadius: 4 }}>
+                        Hoạt động
+                      </Tag>
+                    </div>
+                  </div>
 
-          <Card
-            title={
-              <span>
-                <BellOutlined style={{ marginRight: 8 }} />
-                Notifications
-              </span>
-            }
-            extra={<Link to="/notifications">View all</Link>}
-            style={{ borderRadius: 8 }}
-          >
-            {loading ? (
-              <Skeleton active paragraph={{ rows: 2 }} />
-            ) : (
-              <List
-                dataSource={notifications.filter((n) => !n.read).slice(0, 3)}
-                renderItem={(notif) => (
-                  <List.Item style={{ padding: '8px 0' }}>
-                    <List.Item.Meta
-                      avatar={<Avatar icon={<MessageOutlined />} size={32} style={{ backgroundColor: '#fa8c16' }} />}
-                      title={<Text style={{ fontSize: 13 }}>{notif.title}</Text>}
-                      description={
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {notif.body}
-                        </Text>
-                      }
-                    />
-                  </List.Item>
-                )}
-                locale={{ emptyText: 'No unread notifications.' }}
-              />
-            )}
-          </Card>
-        </Col>
-      </Row>
+                  <div style={{ marginTop: 18, paddingTop: 12, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748B', fontSize: 12 }}>
+                      Mã #{server.id}
+                    </span>
+                    <span style={{ color: '#00F2FE', fontSize: 12, fontWeight: 600 }}>
+                      Sẵn sàng kết nối
+                    </span>
+                  </div>
+                </div>
+              </Col>
+            ))}
+          </Row>
+        )}
+      </div>
     </div>
   );
 }
