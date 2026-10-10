@@ -81,4 +81,25 @@ public class ServerService {
             return response;
         }).toList();
     }
+
+    public void joinServer(Long serverId) {
+        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "server", "notloggedin"));
+
+        User currentUser = userRepository.findOneByEmail(currentUserEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "server", "usernotfound"));
+
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new BadRequestAlertException("Server not found", "server", "servernotfound"));
+
+        if (serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId())) {
+            throw new BadRequestAlertException("User is already a member of this server", "server", "alreadymember");
+        }
+
+        ServerMember member = new ServerMember();
+        member.setServerId(server.getId());
+        member.setUserId(currentUser.getId());
+        member.setNickname(currentUser.getName() != null ? currentUser.getName() : "Member");
+        serverMemberRepository.save(member);
+    }
 }

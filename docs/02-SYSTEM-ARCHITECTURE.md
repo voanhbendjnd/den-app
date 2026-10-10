@@ -159,7 +159,7 @@ Khi có lỗi xảy ra (4xx, 5xx), Backend bắt buộc trả về format:
 | **Server** | `GET` | `/api/v1/servers/{serverId}` | Lấy thông tin chi tiết một Server | `TBD` |
 | **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
-| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `TBD` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
 | **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `TBD` |
 | **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |

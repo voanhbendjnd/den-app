@@ -85,4 +85,33 @@ class ServerResourceTest {
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].name").value("My Server"));
     }
+
+    @Test
+    void joinServer_Success() throws Exception {
+        mockMvc.perform(post("/api/v1/servers/10/join")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void joinServer_Fail_ServerNotFound() throws Exception {
+        org.mockito.Mockito.doThrow(new com.denhub.web.rest.errors.BadRequestAlertException("Server not found", "server", "servernotfound"))
+                .when(serverService).joinServer(10L);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            mockMvc.perform(post("/api/v1/servers/10/join")
+                    .contentType(MediaType.APPLICATION_JSON))
+        ).hasCauseInstanceOf(com.denhub.web.rest.errors.BadRequestAlertException.class);
+    }
+
+    @Test
+    void joinServer_Fail_AlreadyMember() throws Exception {
+        org.mockito.Mockito.doThrow(new com.denhub.web.rest.errors.BadRequestAlertException("Already member", "server", "alreadymember"))
+                .when(serverService).joinServer(10L);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            mockMvc.perform(post("/api/v1/servers/10/join")
+                    .contentType(MediaType.APPLICATION_JSON))
+        ).hasCauseInstanceOf(com.denhub.web.rest.errors.BadRequestAlertException.class);
+    }
 }
