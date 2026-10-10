@@ -283,6 +283,28 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
 
+### [2026-10-10] FEAT-SERVER-JOIN — API Tham gia Server
+Implemented:
+- Cập nhật `ServerMemberRepository.java` với phương thức kiểm tra tồn tại `existsByServerIdAndUserId`.
+- Cập nhật `ServerService.java` thêm phương thức `joinServer` thực hiện nghiệp vụ kiểm tra user, server, đã tham gia chưa và tạo `ServerMember` mới.
+- Cập nhật `ServerResource.java` thêm endpoint `POST /api/v1/servers/{serverId}/join`.
+- Cập nhật các Unit Tests tương ứng trong `ServerServiceTest.java` và `ServerResourceTest.java`.
+
+Backend:
+- `ServerMemberRepository.java`, `ServerService.java`, `ServerResource.java`.
+
+Tests:
+- `.\gradlew.bat test`: PASS 100% (BUILD SUCCESSFUL).
+
+Docs Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Update API `/api/v1/servers/{serverId}/join` sang `IMPLEMENTED`).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated tiến độ).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
 ### [2026-10-09] FEAT-SERVER-CREATE — API Tạo Server và Redesign UI
 Implemented:
 - Viết API `POST /api/v1/servers` cho phép tạo Server mới.
