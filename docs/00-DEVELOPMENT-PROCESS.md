@@ -271,6 +271,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Server/Room** | IN_PROGRESS | IN_PROGRESS | TBD | IN_PROGRESS | IN_PROGRESS | IN_PROGRESS | 2026-10-09 |
+| **Channel** | TODO | IMPLEMENTED | CONFIRMED | IN_PROGRESS | IMPLEMENTED | IN_PROGRESS | 2026-10-10 |
 | **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Message** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Real-time** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
@@ -302,6 +303,42 @@ Docs Updated:
 
 Commit:
 - PENDING (Chờ ủy quyền commit).
+
+---
+
+### [2026-10-10] NV-1.10-FEAT-CHANNEL-CREATE — Làm API tạo Channel + Test (Kỳ Anh)
+Implemented:
+- Viết API `POST /api/v1/channels` cho phép tạo Channel mới trực thuộc Server.
+- Kiểm tra tính hợp lệ dữ liệu: `name` (2 - 20 ký tự, không trống), `serverId` bắt buộc.
+- Kiểm tra quyền: Người tạo phải là Server Owner hoặc là Member trong Server (`existsByServerIdAndUserId`).
+- Chống trùng tên Channel trong cùng một Server (`existsByServerIdAndName`).
+- Tự động sinh `position` theo số lượng channel hiện có trong server (`countByServerId`).
+- Thêm tài liệu Swagger `@Operation`, `@Tag(name = "Channel")`, `@SecurityRequirement(name = "bearerAuth")`.
+
+Frontend:
+- Chưa thay đổi (chờ NV 1.15).
+
+Backend:
+- `ChannelRepository.java` (Created).
+- `ServerMemberRepository.java` (Updated `existsByServerIdAndUserId`).
+- `CreateChannelDTO.java`, `ChannelResponseDTO.java` (Created).
+- `ChannelService.java` (Created).
+- `ChannelResource.java` (Created).
+
+Database:
+- Đã ánh xạ thành công tới bảng `channels` với unique constraint `(name, server_id)`.
+
+Tests:
+- `ChannelServiceTest`: 6 unit tests pass 100%.
+- `ChannelResourceTest`: 3 MockMvc tests pass 100%.
+- Toàn bộ backend test suite (20/20 tests): PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Updated).
+
+Commit:
+- PENDING (Chờ người dùng ủy quyền).
 
 ---
 
