@@ -501,32 +501,61 @@ Implemented:
 
 ---
 
+### [2026-10-10] BE-DOCS-SWAGGER — Cấu hình Swagger/OpenAPI 3 cho Backend
+Implemented:
+- Cấu hình thư viện `springdoc-openapi-starter-webmvc-ui` (v2.6.0) cho dự án Spring Boot 3.
+- Tạo `SwaggerConfig.java` để khai báo metadata (Title, Description, Version) và cấu hình Security Scheme (JWT Bearer Auth).
+- Cập nhật `SecurityConfiguration.java` đưa các endpoint `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` vào `whiteList` và `publicEndpoints` để truy cập Swagger UI không bị chặn lỗi 401.
+- Bổ sung Swagger annotations (`@Tag`, `@Operation`, `@SecurityRequirement`) cho các controllers hiện tại: `AccountResource`, `ServerResource`, `FileResource` để sinh tài liệu tự động, phản ánh đúng DTO/HTTP methods.
+- Viết tài liệu hướng dẫn cho nhóm cách truy cập và sử dụng Swagger UI kèm JWT Auth tại `docs/guide/SWAGGER-GUIDE.md`.
+
+Backend:
+- Bổ sung dependency vào `server/build.gradle.kts`.
+- `SwaggerConfig.java`, `SecurityConfiguration.java`.
+- `AccountResource.java`, `ServerResource.java`, `FileResource.java`.
+
+Tests:
+- `.\gradlew.bat test`: PASS 100%.
+- Kiểm tra OpenAPI schema JSON thành công.
+
+Docs Updated:
+- `docs/guide/SWAGGER-GUIDE.md` (Created).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated tiến độ).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
 Phần này dùng để bàn giao giữa các Developer và AI Coding Agent khi chuyển ca hoặc dừng giữa task:
 
 ```yaml
-Current Task: Tái thiết kế FE phong cách công nghệ riêng biệt (Login, Home, Create Server Wizard) & API Create Server
+Current Task: Cấu hình và tài liệu hóa Swagger/OpenAPI cho Backend
 Status: IMPLEMENTED & VERIFIED
 Completed:
-  - Tạo nhánh feature/create-server-api
-  - Viết Unit Tests `ServerServiceTest`, `ServerResourceTest` (PASS 100%)
-  - Viết BE API `POST /api/v1/servers`
-  - Tái thiết kế hoàn chỉnh Frontend Cyber-Tech (Login, Register, MainLayout, HomePage, CreateServerModal)
-  - Thêm preset mẫu, bộ icon có sẵn và Live Preview trong modal tạo server cho người dùng không rành công nghệ
-  - Build frontend: PASS
+  - Thêm dependency `springdoc-openapi`
+  - Viết file cấu hình Swagger
+  - Annotate các controllers hiện có (Account, Server, File)
+  - Mở whitelist các đường dẫn Swagger trong Spring Security
   - Chạy backend test: PASS
+  - Viết file hướng dẫn sử dụng nhóm
 Remaining:
   - Chờ user duyệt git diff và ủy quyền tạo commit
 Known Issues:
   - Không có
 Next Recommended Step:
-  - Trình bày kết quả trực quan cho User, review git status/diff và hỏi quyền commit nhánh feature/create-server-api
+  - Trình bày kết quả trực quan cho User, hỏi quyền commit
 Files Being Changed:
-  - client/src/
-  - server/src/
+  - server/build.gradle.kts
+  - server/src/main/java/com/denhub/config/SwaggerConfig.java
+  - server/src/main/java/com/denhub/config/SecurityConfiguration.java
+  - server/src/main/java/com/denhub/web/rest/AccountResource.java
+  - server/src/main/java/com/denhub/web/rest/ServerResource.java
+  - server/src/main/java/com/denhub/web/rest/FileResource.java
+  - docs/guide/SWAGGER-GUIDE.md
   - docs/00-DEVELOPMENT-PROCESS.md
-  - docs/02-SYSTEM-ARCHITECTURE.md
 Related Docs:
   - AGENTS.md
   - docs/00-DEVELOPMENT-PROCESS.md
