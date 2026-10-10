@@ -21,7 +21,6 @@ public class Server extends AbstractAuditingEntity<Long> implements Serializable
     @Length(max = 20, min = 1)
     @Column(nullable = false, length = 20, columnDefinition = "NVARCHAR(20)")
     private String name;
-    @Length(max = 255)
     @Column(name = "icon_url", length = 255)
     private String iconUrl;
     @Column(name = "owner_id",  nullable = false)

@@ -2,17 +2,27 @@ const ACCESS_TOKEN_KEY = 'denhub_access_token';
 const REFRESH_TOKEN_KEY = 'denhub_refresh_token';
 
 export function getAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (!token || token === 'undefined' || token === 'null') return null;
+  return token;
 }
 
 export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  const token = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!token || token === 'undefined' || token === 'null') return null;
+  return token;
 }
 
 export function setTokens(accessToken, refreshToken) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  if (refreshToken) {
+  if (accessToken && accessToken !== 'undefined' && accessToken !== 'null') {
+    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  } else {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+  }
+  if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  } else {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 }
 

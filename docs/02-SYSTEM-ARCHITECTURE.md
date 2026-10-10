@@ -152,20 +152,22 @@ Khi có lỗi xảy ra (4xx, 5xx), Backend bắt buộc trả về format:
 | :--- | :---: | :--- | :--- | :---: |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/login` | Đăng nhập và lấy Access Token JWT | `TBD` |
-| **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tin user hiện tại qua token | `TBD` |
+| **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tương user hiện tại qua token | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/logout` | Đăng xuất người dùng | `TBD` |
-| **Room** | `GET` | `/api/v1/rooms` | Lấy danh sách Room mà User là Member | `TBD` |
-| **Room** | `POST` | `/api/v1/rooms` | Tạo một Room mới | `TBD` |
-| **Room** | `GET` | `/api/v1/rooms/{roomId}` | Lấy thông tin chi tiết một Room | `TBD` |
-| **Room** | `PUT` | `/api/v1/rooms/{roomId}` | Cập nhật thông tin Room | `TBD` |
-| **Room** | `DELETE`| `/api/v1/rooms/{roomId}` | Xóa Room | `TBD` |
-| **Room** | `POST` | `/api/v1/rooms/{roomId}/join` | Tham gia vào một Room | `TBD` |
-| **Room** | `POST` | `/api/v1/rooms/{roomId}/leave` | Rời khỏi Room | `TBD` |
-| **Member** | `GET` | `/api/v1/rooms/{roomId}/members` | Lấy danh sách Member của Room | `TBD` |
-| **Member** | `DELETE`| `/api/v1/rooms/{roomId}/members/{userId}` | Kick một Member ra khỏi Room | `TBD` |
-| **Member** | `PUT` | `/api/v1/rooms/{roomId}/members/{userId}/role` | Phân quyền Member trong Room | `TBD` |
-| **Message** | `GET` | `/api/v1/rooms/{roomId}/messages` | Lấy lịch sử Message trong Room (có pagination) | `TBD` |
-| **Message** | `DELETE`| `/api/v1/rooms/{roomId}/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
+| **Server** | `GET` | `/api/v1/servers` | Lấy danh sách Server mà User là Member / Owner | `CONFIRMED` |
+| **Server** | `POST` | `/api/v1/servers` | Tạo một Server mới | `CONFIRMED` |
+| **Server** | `GET` | `/api/v1/servers/{serverId}` | Lấy thông tin chi tiết một Server | `TBD` |
+| **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
+| **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `TBD` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
+| **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `TBD` |
+| **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
+| **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
+| **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message (có pagination) | `TBD` |
+| **Message** | `DELETE`| `/api/v1/servers/{serverId}/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
+| **Media / File** | `POST` | `/api/v1/files/upload` | Tải lên file ảnh (multipart/form-data) nhận URL tĩnh | `CONFIRMED` |
+| **Media / File** | `GET` | `/api/v1/files/{folder}/{filename}` | Phục vụ file ảnh công khai cho trình duyệt | `CONFIRMED` |
 
 ---
 

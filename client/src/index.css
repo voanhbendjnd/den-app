@@ -1,20 +1,43 @@
 /* =============================================
-   DenHub Global CSS
-   CSS variables + global resets only.
-   Ant Design handles most component styling.
+   DenHub Global Cyber-Tech Design System
+   High-Tech, Intuitive & Sleek Dark Aesthetics
 ============================================= */
 
-:root {
-  --color-bg: #f5f5f5;
-  --color-surface: #ffffff;
-  --color-border: #e8e8e8;
-  --color-text: #1a1a1a;
-  --color-text-muted: #8c8c8c;
-  --color-primary: #1677ff;
-  --color-primary-hover: #0958d9;
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-  --sidebar-width: 220px;
-  --header-height: 56px;
+:root {
+  --color-bg-base: #080B11;
+  --color-bg-layout: #0C101A;
+  --color-bg-sidebar: #0F1422;
+  --color-bg-surface: #151D2E;
+  --color-bg-elevated: #1C263B;
+  --color-bg-glass: rgba(21, 29, 46, 0.7);
+
+  --color-primary: #6366F1;
+  --color-primary-hover: #4F46E5;
+  --color-cyan: #00F2FE;
+  --color-cyan-glow: rgba(0, 242, 254, 0.25);
+  --color-emerald: #10B981;
+  --color-emerald-glow: rgba(16, 185, 129, 0.2);
+
+  --color-text-main: #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --color-text-subtle: #64748B;
+
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-focus: rgba(99, 102, 241, 0.5);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+
+  --gradient-brand: linear-gradient(135deg, #6366F1 0%, #00F2FE 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(0, 242, 254, 0.08) 100%);
+  --gradient-card: linear-gradient(180deg, rgba(28, 38, 59, 0.6) 0%, rgba(15, 20, 34, 0.8) 100%);
+
+  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 *,
@@ -26,44 +49,165 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  font-family: var(--font-main);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-main);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-a {
-  color: var(--color-primary);
-  text-decoration: none;
+/* Cyber Matrix Background Texture */
+.tech-grid-bg {
+  background-color: var(--color-bg-base);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
+    radial-gradient(circle at 100% 100%, rgba(0, 242, 254, 0.08) 0%, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
 }
 
-a:hover {
-  color: var(--color-primary-hover);
+/* Glassmorphism Classes */
+.glass-panel {
+  background: var(--color-bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+}
+
+.glass-card {
+  background: var(--gradient-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 15px var(--color-cyan-glow);
+  transform: translateY(-2px);
+}
+
+/* Glowing text and badges */
+.tech-text-gradient {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.tech-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #818CF8;
+}
+
+.tech-badge-cyan {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: rgba(0, 242, 254, 0.3);
+  color: #00F2FE;
+}
+
+.tech-badge-emerald {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34D399;
+}
+
+/* =============================================
+   Ant Design Input & Affix Wrapper Theme Overrides
+   Ensures inputs NEVER render with ugly white backgrounds
+============================================= */
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-password {
+  background-color: #0F1422 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #F1F5F9 !important;
+  border-radius: 10px !important;
+}
+
+.ant-input-affix-wrapper:hover,
+.ant-input:hover {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+}
+
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused,
+.ant-input:focus {
+  border-color: #00F2FE !important;
+  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.2) !important;
+}
+
+.ant-input-affix-wrapper input.ant-input {
+  background-color: transparent !important;
+  color: #F1F5F9 !important;
+}
+
+.ant-input-affix-wrapper .ant-input-prefix {
+  color: #64748B !important;
+  margin-right: 10px !important;
+}
+
+.ant-input-password-icon,
+.ant-input-action-icon {
+  color: #64748B !important;
+}
+
+.ant-input-password-icon:hover,
+.ant-input-action-icon:hover {
+  color: #00F2FE !important;
+}
+
+.ant-input::placeholder,
+.ant-input input::placeholder {
+  color: #475569 !important;
+}
+
+/* =============================================
+   Browser Autofill Fix: Prevents browser from forcing
+   a bright white/yellow background on saved credentials
+============================================= */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0F1422 inset !important;
+  -webkit-text-fill-color: #F1F5F9 !important;
+  caret-color: #F1F5F9 !important;
+  transition: background-color 5000s ease-in-out 0s !important;
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d9d9d9;
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #bfbfbf;
+  background: rgba(99, 102, 241, 0.4);
 }
 
-/* Utility helpers */
-.full-height {
-  height: 100%;
+/* Interactive animations */
+.glow-on-hover {
+  transition: all 0.2s ease-in-out;
 }
-
-.flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.glow-on-hover:hover {
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
 }

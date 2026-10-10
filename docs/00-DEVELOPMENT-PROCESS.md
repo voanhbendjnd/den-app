@@ -270,7 +270,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 | Module | FE | BE | DB | Integration | Test | Status | Last Update |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Room** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
+| **Server/Room** | IN_PROGRESS | IN_PROGRESS | TBD | IN_PROGRESS | IN_PROGRESS | IN_PROGRESS | 2026-10-09 |
 | **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Message** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Real-time** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
@@ -283,30 +283,34 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
 
-### Template mẫu:
-```markdown
-### [YYYY-MM-DD] TASK-ID — Task Name
+### [2026-10-09] FEAT-SERVER-CREATE — API Tạo Server và Redesign UI
 Implemented:
-- Tóm tắt tính năng đã hoàn thiện
+- Viết API `POST /api/v1/servers` cho phép tạo Server mới.
+- Tự động thêm owner vào bảng `server_member` khi tạo server.
+- Redesign `LoginPage.jsx` theo phong cách tech/dark/glassmorphism.
+- Redesign `MainLayout.jsx` mô phỏng Discord (Sidebar trái cho Server List, Sidebar phụ cho Navigation).
+- Tạo `CreateServerModal.jsx` với giao diện hiện đại để tương tác API tạo Server.
+- Redesign `HomePage.jsx` loại bỏ tính năng Meeting rườm rà, tập trung vào giao diện gọn gàng.
 
 Frontend:
-- Component/Service FE đã thêm hoặc chỉnh sửa
+- `LoginPage.jsx`, `MainLayout.jsx`, `HomePage.jsx`, `App.jsx`, `CreateServerModal.jsx`, `serverApi.js`.
 
 Backend:
-- Controller/Service/Repo BE đã thêm hoặc chỉnh sửa
+- `ServerResource.java`, `ServerService.java`, `CreateServerDTO.java`, `ServerResponseDTO.java`, Unit Tests.
 
 Database:
-- Bảng SQL hoặc Collection Mongo đã thêm/sửa
+- Không thay đổi bảng cấu trúc, tận dụng `owner_id` trong `Server` và bảng mapping `ServerMember`.
 
 Tests:
-- Lệnh test đã chạy (e.g., gradlew.bat test, npm run build)
-- Kết quả (e.g., PASS 15/15 tests)
+- `.\gradlew.bat test`: PASS (2/2 tests cho service và resource pass).
+- `npm run build`: PASS.
 
 Docs Updated:
-- docs/0X-FILENAME.md (hoặc: None — no contract/documentation change)
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Update API `/api/v1/servers` sang `CONFIRMED`).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated tiến độ).
 
 Commit:
-- <commit-hash> (hoặc: PENDING)
+- PENDING
 ```
 
 ---
@@ -434,37 +438,99 @@ Commit:
 
 ---
 
+### [2026-10-10] FE-CYBERTECH-REDESIGN — Tái thiết kế toàn diện Frontend Cyber-Tech
+Implemented:
+- Tái cấu trúc Design System Frontend theo phong cách công nghệ cao cấp (DenHub Cyber-Modern Dark Theme).
+- Cập nhật `App.jsx`, `index.css`, `AuthLayout.jsx` với các biến CSS Cyber, hiệu ứng Frosted Glassmorphism, Neon Glow và bảng màu Obsidian/Electric Indigo & Cyan.
+- Tái thiết kế `LoginPage.jsx` và `RegisterPage.jsx`: Thêm biểu tượng Cyber phát sáng, card kính mờ, nút tiện ích 1-click Demo Fill (User / Admin) cho người dùng/giảng viên test nhanh.
+- Tái thiết kế `MainLayout.jsx`: Thanh Dock launcher server bên trái với thanh chỉ báo Active Glow Pill, thanh trạng thái kết nối mạng thời gian thực, điều hướng phân cấp trực quan và thanh điều khiển người dùng.
+- Tái thiết kế `HomePage.jsx` thành Trung Tâm Điều Khiển Số (Digital Command Hub): Banner chào đón công nghệ, các card thao tác nhanh 1 chạm cho người không chuyên, lưới danh sách server đã tham gia và widget thông số mạng STOMP/JWT.
+- Nâng cấp `CreateServerModal.jsx`: Tinh giản bố cục theo chuẩn Discord hiện đại — loại bỏ hoàn toàn ô nhập URL thô rườm rà, loại bỏ chữ mô tả chìm trong các thẻ mẫu để chuyển thành 4 nút chip gọn gàng (Tự tạo, Học tập, Lập trình, Giải trí). Thiết kế 1 khu vực tải avatar duy nhất trực quan ở chính giữa kèm dãy ảnh gợi ý nhỏ gọn.
+- Tích hợp tính năng tải file ảnh trực tiếp từ máy tính trong `CreateServerModal`: Hỗ trợ mở hộp thoại duyệt file, đọc Base64 và xem trước tức thì.
+- Nâng cấp `icon_url` trong Backend (`Server.java`, `CreateServerDTO.java`) sang `NVARCHAR(MAX)` để lưu trọn vẹn dữ liệu ảnh tải từ máy.
+- Tinh giản giao diện toàn diện: Loại bỏ các badge rườm rà, tạm ẩn các mục menu chưa có API (Rooms, Notifications, Admin) trong `MainLayout`, và tối giản hóa `LoginPage`, `HomePage`.
+- Fix Authentication Redirect Loop: Xử lý bóc tách chuẩn envelope `RestResponse` (`res.data?.data`), chống lưu `undefined` token, sửa endpoint `/api/login` và chặn 401 redirect loop. Đã kiểm thử trực tiếp login và tạo server thành công 100%.
+
+Frontend:
+- `npm run build`: PASS 100% (vite v8.3.3 building client environment for production, 3174 modules transformed, 0 errors).
+
+Backend:
+- Giữ nguyên backend đã hoàn thiện ở bước trước (`ServerResource`, `ServerService`, `CreateServerDTO`, `ServerResponseDTO`).
+
+Tests:
+- `.\gradlew.bat test`: PASS 100% (5 actionable tasks, 0 failures, BUILD SUCCESSFUL).
+- `npm run build`: PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated)
+
+Commit:
+- PENDING (Chờ người dùng ủy quyền)
+
+### [2026-10-10] BE-FE-FILE-UPLOAD — API Upload File Cho Server Icon & Bảo Vệ Cấu Trúc Database
+Implemented:
+- Xây dựng hệ thống quản lý và upload file ảnh chuẩn RESTful ở Backend:
+  - Thêm `FileUploadResponseDTO` (`fileName`, `url`, `size`, `contentType`).
+  - Thêm `FileService`: Kiểm tra kích thước file (tối đa 5MB), định dạng file (chỉ cho phép jpg, jpeg, png, webp, gif), tự động tạo thư mục lưu trữ `uploads/{folder}/`, sinh tên file ngẫu nhiên chống trùng lặp bằng UUID và ngăn chặn tấn công Path Traversal.
+  - Thêm `FileResource`: Cung cấp endpoint `POST /api/v1/files/upload` (nhận `MultipartFile` và trả về URL ảnh ngắn) và `GET /api/v1/files/{folder}/{filename}` (phục vụ file ảnh công khai cho trình duyệt với cache-control và đúng MediaType).
+- Bảo vệ cấu trúc Database:
+  - Khôi phục `@Column(name = "icon_url", length = 255)` trong `Server.java` và `@Size(max = 255)` trong `CreateServerDTO.java`.
+  - Database SQL Server giữ nguyên cột `icon_url VARCHAR(255)`, không cần chạy DDL `ALTER TABLE` và không lưu chuỗi Base64 cồng kềnh vào database.
+- Tích hợp Frontend:
+  - Tạo mới `client/src/api/fileApi.js` hỗ trợ upload multipart/form-data.
+  - Cập nhật `CreateServerModal.jsx`: Khi chọn file ảnh từ máy tính, hiển thị spinner tải và gọi `fileApi.upload(file)`, nhận URL ảnh ngắn hạn và gán vào `iconUrl` của form tạo server.
+- Kiểm thử:
+  - Thêm unit test `FileServiceTest` (3 tests: upload thành công, từ chối file rỗng, từ chối định dạng file lạ).
+  - Thêm controller test `FileResourceTest` (upload multipart thành công trả về 201 Created và URL).
+  - `.\gradlew.bat test`: PASS 100% (BUILD SUCCESSFUL).
+### [2026-10-10] BE-FE-SERVER-SYNC — Đồng Bộ Danh Sách Server & Khắc Phục Lỗi Cache Ảnh Modal
+Implemented:
+- Backend:
+  - Bổ sung query `findAllByUserIdOrOwnerId(Long userId)` trong `ServerRepository.java` để truy vấn danh sách server người dùng sở hữu hoặc là thành viên.
+  - Thêm phương thức `getUserServers()` trong `ServerService.java` trả về `List<ServerResponseDTO>`.
+  - Cung cấp endpoint `GET /api/v1/servers` trong `ServerResource.java`.
+  - Bổ sung unit tests cho `getUserServers` trong `ServerServiceTest` và `ServerResourceTest`.
+- Frontend:
+  - Đồng bộ danh sách Server (Single Source of Truth): Quản lý toàn bộ danh sách `servers` tập trung tại `MainLayout.jsx` và truyền xuống `HomePage.jsx` qua `Outlet context`. Loại bỏ state `servers` riêng lẻ và xóa component `CreateServerModal` trùng lặp trong `HomePage.jsx`.
+  - Giờ đây mọi hành động tạo server (từ nút `+` trên Dock launcher bên trái hay nút tạo trên HomePage) đều chia sẻ chung một modal và cập nhật đồng thời cả 2 vị trí (chấm tròn bên trái và thẻ ở giữa).
+  - Tự động lấy danh sách server từ database khi tải trang qua `serverApi.getAll()`.
+  - Khắc phục lỗi lưu ảnh upload làm mặc định: Bổ sung `destroyOnClose={true}` và hook `useEffect` trong `CreateServerModal.jsx` tự động reset toàn bộ form, dọn dẹp file input và khôi phục ảnh đại diện về preset mặc định (`AVATAR_SUGGESTIONS[0]`) mỗi khi mở lại modal.
+- Kiểm thử:
+  - `.\gradlew.bat test`: PASS 100% (BUILD SUCCESSFUL).
+  - `npm run build`: PASS 100% (0 errors).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
 Phần này dùng để bàn giao giữa các Developer và AI Coding Agent khi chuyển ca hoặc dừng giữa task:
 
 ```yaml
-Current Task: Tách cấu hình nhạy cảm sang biến môi trường .env
-Status: TESTED
+Current Task: Tái thiết kế FE phong cách công nghệ riêng biệt (Login, Home, Create Server Wizard) & API Create Server
+Status: IMPLEMENTED & VERIFIED
 Completed:
-  - Khởi tạo AGENTS.md và bộ tài liệu docs/
-  - Đổi tên den-app-java-spring -> server
-  - Refactor toàn bộ package tech.djnd.sample.app -> com.denhub
-  - Cập nhật application.properties sang Microsoft SQL Server
-  - Đổi đồng bộ tiền tố cấu hình djnd.* sang denhub.* (properties và 5 file Java)
-  - Tạo server/.env, server/.env.example và mapping biến môi trường trong application.properties
-  - Chạy test Backend thành công 100%
+  - Tạo nhánh feature/create-server-api
+  - Viết Unit Tests `ServerServiceTest`, `ServerResourceTest` (PASS 100%)
+  - Viết BE API `POST /api/v1/servers`
+  - Tái thiết kế hoàn chỉnh Frontend Cyber-Tech (Login, Register, MainLayout, HomePage, CreateServerModal)
+  - Thêm preset mẫu, bộ icon có sẵn và Live Preview trong modal tạo server cho người dùng không rành công nghệ
+  - Build frontend: PASS
+  - Chạy backend test: PASS
 Remaining:
-  - Team họp thống nhất các mục TBD trong 01-PROJECT-OVERVIEW.md (Authentication flow, Room rules)
-  - Chuyển các mục TBD sang CONFIRMED trước khi bắt đầu sprint code
+  - Chờ user duyệt git diff và ủy quyền tạo commit
 Known Issues:
-  - Cần đảm bảo SQL Server container hoặc local service đang chạy trên cổng 1433 với database 'denhubdb' khi start server
+  - Không có
 Next Recommended Step:
-  - Chốt contract API Authentication giữa FE và BE
+  - Trình bày kết quả trực quan cho User, review git status/diff và hỏi quyền commit nhánh feature/create-server-api
 Files Being Changed:
-  - server/
+  - client/src/
+  - server/src/
   - docs/00-DEVELOPMENT-PROCESS.md
+  - docs/02-SYSTEM-ARCHITECTURE.md
 Related Docs:
   - AGENTS.md
   - docs/00-DEVELOPMENT-PROCESS.md
-  - docs/01-PROJECT-OVERVIEW.md
   - docs/02-SYSTEM-ARCHITECTURE.md
-  - docs/03-DATABASE-DESIGN.md
 ```
 
 ---
