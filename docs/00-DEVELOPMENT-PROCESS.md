@@ -78,8 +78,11 @@ Status: [TODO / IN_PROGRESS]
 - [ ] Database design đã `CONFIRMED` chưa?
 - [ ] Permission đã `CONFIRMED` chưa?
 - [ ] Có dependency với task khác không?
+- [ ] **LẬP IMPLEMENTATION PLAN & XÁC NHẬN (APPROVAL GATE):** Đã lập Implementation Plan đầy đủ các mục và trình bày cho User/Team duyệt chưa?
 
 > [!CAUTION]
+> **QUY ĐỊNH BẮT BUỘC KHÔNG ĐƯỢC BỎ QUA:**  
+> Mọi tác vụ lập trình (Backend, Frontend, Database, Refactoring, Config) **TẤT CẢ** đều BẮT BUỘC phải lập Implementation Plan chi tiết và nhận được sự phê duyệt (`OK`, `Proceed`, `Duyệt`) trước khi tiến hành chỉnh sửa hoặc tạo mới file code.  
 > Nếu task phụ thuộc vào một contract vẫn là `TBD`:  
 > **KHÔNG tự implement theo phỏng đoán.** Dừng lại và yêu cầu team xác nhận trước.
 
@@ -272,8 +275,9 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 | **Authentication** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Room** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Message** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Real-time** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
+| **Message (1-1)** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-07 |
+| **Real-time (1-1)** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-07 |
+
 
 *(Chỉ cập nhật trạng thái khi tính năng đã qua kiểm thử thực tế).*
 
@@ -310,6 +314,61 @@ Commit:
 ```
 
 ---
+
+### [2026-10-08] MULTI-FILE-SAVE — Tích hợp FileService lưu nhiều file/ảnh trong ConversationService và bổ sung quy định lập Plan bắt buộc
+Implemented:
+- Tích hợp FileService.saveAndGetUrls vào ConversationService để lưu nhiều file/ảnh vật lý lên đĩa server storage.
+- Bổ sung phương thức `processAndSendMessagesWithFiles(List<MultipartFile> files, SendMessageReq req, Principal principal)` trong `ConversationService`.
+- Cập nhật `SendMessageReq` và `SendMessageRes` hỗ trợ trường `mediaUrls` (List<String>) phục vụ đính kèm nhiều file đính kèm trong tin nhắn 1-1.
+- Khắc phục `PlaceholderResolutionException` cho `@Value("${denhub.upload-file.base-uri}")` bằng cách thêm fallback mặc định trong `FileService` và bổ sung property vào `src/test/resources/application.properties`.
+- Viết mới Unit Test `processAndSendMessagesWithFiles_MultipleFiles_Success` trong `ConversationServiceTest`.
+- Bổ sung quy định bắt buộc **phải lập Implementation Plan và nhận phê duyệt trước khi triển khai** vào `docs/00-DEVELOPMENT-PROCESS.md`.
+
+Backend:
+- `FileService.java`, `ConversationService.java`, `SendMessageReq.java`, `SendMessageRes.java`, `ConversationServiceTest.java`, `src/test/resources/application.properties`.
+
+Database:
+- Không thay đổi schema (trường `media_url` hỗ trợ lưu danh sách URL phân cách dấu phẩy).
+
+Tests:
+- `.\gradlew.bat test`: PASS 100% (Build Successful).
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Cập nhật quy định lập plan bắt buộc & completed work log)
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Cập nhật DTO contract hỗ trợ mediaUrls)
+
+Commit:
+- PENDING
+
+---
+
+### [2026-10-07] DIRECT-MESSAGE-IMAGE — Implement tin nhắn 1-1 hỗ trợ văn bản và hình ảnh trong ConversationService
+Implemented:
+- Sửa lỗi khởi tạo ConversationMember (gán userId thay vì primary key id).
+- Fix câu lệnh JPQL sai cú pháp trong ConversationRepository và ConversationMemberRepository.
+- Thêm MessageType enum (TEXT, IMAGE, FILE, SYSTEM) và các trường mediaUrl, metadata (fileName, fileSize, width, height) cho Message entity và DTOs.
+- Hoàn thiện ConversationService.processAndSendMessage hỗ trợ lưu tin nhắn TEXT/IMAGE và phát sóng qua STOMP WebSocket topic /topic/conversations/{conversationId}.
+- Viết Unit Tests (ConversationServiceTest) cover các ca gửi tin nhắn văn bản, tin nhắn hình ảnh có metadata, kiểm tra quyền membership và quăng exception khi unauthorized/invalid.
+
+Backend:
+- Message.java, MessageType.java, ConversationService.java, SendMessageReq.java, SendMessageRes.java, ConversationRepository.java, ConversationMemberRepository.java, ConversationServiceTest.java.
+
+Database:
+- Cập nhật bảng conversations, conversation_member, messages trong SQL Server schema.
+
+Tests:
+- `.\gradlew.bat test`: PASS (100% - unit tests passed).
+
+Docs Updated:
+- docs/02-SYSTEM-ARCHITECTURE.md (Cập nhật STOMP destination 1-1)
+- docs/03-DATABASE-DESIGN.md (Cập nhật bảng SQL Server conversations, conversation_member, messages)
+- docs/00-DEVELOPMENT-PROCESS.md (Cập nhật tiến độ & handoff log)
+
+Commit:
+- PENDING
+
+---
+
 
 ### [2026-10-06] CONFIG-ENV-FILE — Tách cấu hình nhạy cảm sang biến môi trường .env
 Implemented:

@@ -16,6 +16,7 @@ import com.denhub.service.dto.ResLoginDTO;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -110,6 +111,31 @@ public class SecurityUtils {
         userToken.setId(userLogin.getId());
         userToken.setEmail(userLogin.getEmail());
         return userToken;
+    }
+
+    public static Optional<Long> getCurrentUserId() {
+        return Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication())
+                .map(Authentication::getPrincipal).filter((principal) -> principal instanceof Jwt)
+                .map((principal) -> (Jwt) principal).map((jwt) -> jwt.getClaim("user"))
+                .filter((userClaim) -> userClaim instanceof Map<?,?>).map((userClaim) -> ((Map<?, ?>) userClaim).get("id"))
+                .flatMap((id) -> {
+                    if (id instanceof Number n) {
+                        return Optional.of(n.longValue());
+                    } else if (id instanceof String s) {
+                        try {
+                            return Optional.of(Long.parseLong(s));
+                        } catch (NumberFormatException var4) {
+                            return Optional.empty();
+                        }
+                    } else {
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    public static Long getCurrentUserIdOrNull() {
+        Optional<Long> userId = getCurrentUserId();
+        return (Long) userId.orElse(null);
     }
 
 }

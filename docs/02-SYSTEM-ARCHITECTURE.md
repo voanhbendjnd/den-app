@@ -188,30 +188,45 @@ Backend Broker     ───[BROADCAST]───> /topic/rooms/{roomId} ──�
 | :--- | :--- | :--- | :---: |
 | **App Destination (SEND)** | `/app/rooms/{roomId}/send` | Client gửi tin nhắn mới lên Room | `TBD` |
 | **Broker Topic (SUBSCRIBE)**| `/topic/rooms/{roomId}` | Client lắng nghe tin nhắn mới trong Room | `TBD` |
+| **App Destination (SEND 1-1)**| `/app/conversations/send` | Client gửi tin nhắn 1-1 (Text / Image) | `CONFIRMED` |
+| **Broker Topic (SUBSCRIBE 1-1)**| `/topic/conversations/{conversationId}` | Client lắng nghe tin nhắn 1-1 real-time | `CONFIRMED` |
 | **User Queue (Private)** | `/user/queue/errors` | Nhận thông báo lỗi cá nhân từ server | `TBD` |
 
-### 6.3 Định dạng WebSocket Payload gửi lên (`PROPOSED`)
+
+### 6.3 Định dạng WebSocket Payload gửi lên 1-1 (`SendMessageReq`) (`CONFIRMED`)
 ```json
 {
-  "content": "Xin chào mọi người trong phòng!",
-  "clientTempId": "uuid-1234-client-generated"
+  "conversationId": 100,
+  "targetUserId": 2,
+  "type": "IMAGE",
+  "content": "Gửi mọi người bộ ảnh tài liệu",
+  "mediaUrl": "denhub-172838392-uuid1.webp,denhub-172838392-uuid2.webp",
+  "mediaUrls": [
+    "denhub-172838392-uuid1.webp",
+    "denhub-172838392-uuid2.webp"
+  ]
 }
 ```
 
-### 6.4 Định dạng WebSocket Message phát sóng xuống Client (`PROPOSED`)
+### 6.4 Định dạng WebSocket Message phát sóng xuống Client (`SendMessageRes`) (`CONFIRMED`)
 ```json
 {
-  "id": "mongo-message-id-6701a2b",
-  "roomId": 101,
+  "messageId": 501,
+  "conversationId": 100,
   "sender": {
-    "userId": 15,
-    "username": "hoangnam",
-    "displayName": "Hoàng Nam",
-    "avatarUrl": "https://..."
+    "userId": 1,
+    "name": "Hoàng Nam",
+    "avatar": "https://..."
   },
-  "content": "Xin chào mọi người trong phòng!",
-  "createdAt": "2026-10-06T10:15:30Z",
-  "type": "CHAT"
+  "type": "IMAGE",
+  "content": "Gửi mọi người bộ ảnh tài liệu",
+  "mediaUrl": "denhub-172838392-uuid1.webp,denhub-172838392-uuid2.webp",
+  "mediaUrls": [
+    "denhub-172838392-uuid1.webp",
+    "denhub-172838392-uuid2.webp"
+  ],
+  "status": "SENT",
+  "createdAt": "2026-10-08T17:10:00Z"
 }
 ```
 

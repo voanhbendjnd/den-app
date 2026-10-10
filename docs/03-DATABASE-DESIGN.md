@@ -161,6 +161,59 @@ erDiagram
 
 ---
 
+### 3.4 Bảng `conversations` (Quản lý Cuộc trò chuyện 1-1 / Nhóm)
+- **Mục đích:** Lưu trữ các cuộc trò chuyện trực tiếp giữa 2 cá nhân hoặc nhóm nhỏ.
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `type` | `VARCHAR(20)` | `NOT NULL`, `DEFAULT 'DIRECT'` | Loại cuộc trò chuyện (`DIRECT`, `GROUP`) |
+| `last_message_id` | `BIGINT` | `NULL` | Tham chiếu ID tin nhắn mới nhất |
+| `created_date` | `DATETIME2` | `NOT NULL`, `DEFAULT GETUTCDATE()` | Thời điểm tạo |
+
+---
+
+### 3.5 Bảng `conversation_member` (Thành viên cuộc trò chuyện 1-1)
+- **Mục đích:** Liên kết User và Conversation 1-1.
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `conversation_id` | `BIGINT` | `NOT NULL`, `FK -> conversations(id)` | Tham chiếu cuộc trò chuyện |
+| `user_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Tham chiếu người dùng |
+| `joined_at` | `DATETIME2` | `NULL`, `DEFAULT GETUTCDATE()` | Thời điểm tham gia |
+| `unread_count` | `INT` | `NOT NULL`, `DEFAULT 0` | Số lượng tin nhắn chưa đọc |
+| `is_muted` | `BIT` | `DEFAULT 0` | Tắt thông báo |
+| `is_deleted` | `BIT` | `DEFAULT 0` | Xóa hội thoại phía user |
+
+*Ràng buộc:*
+- `ux_conversation_member`: `UNIQUE (user_id, conversation_id)`
+
+---
+
+### 3.6 Bảng `messages` (Quản lý Tin nhắn trong SQL Server)
+- **Mục đích:** Lưu trữ nội dung tin nhắn trao đổi 1-1 (Văn bản & Hình ảnh).
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `sender_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Người gửi tin nhắn |
+| `conversation_id` | `BIGINT` | `NULL`, `FK -> conversations(id)` | Cuộc trò chuyện tham chiếu |
+| `type` | `VARCHAR(20)` | `NOT NULL`, `DEFAULT 'TEXT'` | Loại tin nhắn (`TEXT`, `IMAGE`, `FILE`, `SYSTEM`) |
+| `content` | `NVARCHAR(MAX)` | `NULL` | Nội dung văn bản hoặc mô tả ảnh |
+| `media_url` | `NVARCHAR(1000)` | `NULL` | Đường dẫn đến tệp ảnh/tài liệu |
+| `file_name` | `NVARCHAR(255)` | `NULL` | Tên tệp tin đính kèm |
+| `file_size` | `BIGINT` | `NULL` | Kích thước tệp tin (bytes) |
+| `width` | `INT` | `NULL` | Chiều rộng ảnh (pixels) |
+| `height` | `INT` | `NULL` | Chiều cao ảnh (pixels) |
+| `created_at` | `DATETIME2` | `NOT NULL`, `DEFAULT GETUTCDATE()` | Thời điểm gửi |
+
+---
+
+
 ## 4. Thiết kế chi tiết MongoDB (`PROPOSED / TBD`)
 
 ### 4.1 Collection `messages`

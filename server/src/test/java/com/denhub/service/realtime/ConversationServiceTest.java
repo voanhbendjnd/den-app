@@ -10,6 +10,7 @@ import com.denhub.repository.ConversationRepository;
 import com.denhub.repository.MessageRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.service.errors.BadRequestResourceException;
+import com.denhub.service.FileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,8 +18,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +48,9 @@ class ConversationServiceTest {
     private SimpMessagingTemplate simpMessagingTemplate;
 
     @Mock
+    private FileService fileService;
+
+    @Mock
     private Principal principal;
 
     private ConversationService conversationService;
@@ -59,7 +65,8 @@ class ConversationServiceTest {
                 conversationMemberRepository,
                 messageRepository,
                 userRepository,
-                simpMessagingTemplate
+                simpMessagingTemplate,
+                fileService
         );
 
         senderUser = new User();
@@ -188,5 +195,43 @@ class ConversationServiceTest {
         assertThatThrownBy(() -> conversationService.processAndSendMessage(req, null))
                 .isInstanceOf(BadRequestResourceException.class)
                 .hasMessageContaining("Unauthorized user");
+    }
+
+    @Test
+    void processAndSendMessagesWithFiles_MultipleFiles_Success() throws Exception {
+        when(principal.getName()).thenReturn("1");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(senderUser));
+
+        Conversation conversation = new Conversation();
+        conversation.setId(100L);
+        when(conversationRepository.findById(100L)).thenReturn(Optional.of(conversation));
+        when(conversationMemberRepository.existsByConversationIdAndUserId(100L, 1L)).thenReturn(true);
+
+        MultipartFile file1 = mock(MultipartFile.class);
+        MultipartFile file2 = mock(MultipartFile.class);
+        List<MultipartFile> files = List.of(file1, file2);
+
+        when(fileService.saveAndGetUrls(files)).thenReturn(List.of("file1.webp", "file2.webp"));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message m = invocation.getArgument(0);
+            m.setId(600L);
+            return m;
+        });
+
+        SendMessageReq req = SendMessageReq.builder()
+                .conversationId(100L)
+                .content("Here are photos")
+                .build();
+
+        SendMessageRes res = conversationService.processAndSendMessagesWithFiles(files, req, principal);
+
+        assertThat(res).isNotNull();
+        assertThat(res.getMessageId()).isEqualTo(600L);
+        assertThat(res.getType()).isEqualTo("IMAGE");
+        assertThat(res.getMediaUrl()).isEqualTo("file1.webp,file2.webp");
+        assertThat(res.getMediaUrls()).containsExactly("file1.webp", "file2.webp");
+
+        verify(fileService).saveAndGetUrls(files);
+        verify(simpMessagingTemplate).convertAndSend(eq("/topic/conversations/100"), any(SendMessageRes.class));
     }
 }

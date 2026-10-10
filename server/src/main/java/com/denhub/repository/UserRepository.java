@@ -1,6 +1,8 @@
 package com.denhub.repository;
 
+import com.denhub.service.projection.UsernameProjection;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -41,4 +43,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findOneByActivationKey(String key);
     Optional<User> findOneByResetKey(String key);
+
+    @Query(value = """
+        select u.username as username, u.email as email, u.name as name, u.avatar as avatar
+           from User u
+               where u.username like concat('',:q,'%')
+    """)
+    List<UsernameProjection> searchByUsername(@Param("q") String q);
+
 }

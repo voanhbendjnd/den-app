@@ -6,6 +6,8 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
@@ -34,6 +36,7 @@ public class SendMessageRes implements Serializable {
     private String type;
     private String content;
     private String mediaUrl;
+    private List<String> mediaUrls;
 
     @Setter
     @Getter

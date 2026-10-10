@@ -5,6 +5,8 @@ import lombok.*;
 import java.io.Serial;
 import java.io.Serializable;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
@@ -19,6 +21,7 @@ public class SendMessageReq implements Serializable {
     private String type;
     private String content;
     private String mediaUrl;
+    private List<String> mediaUrls;
     private Long replyToMessageId;
     private Metadata metadata;
 

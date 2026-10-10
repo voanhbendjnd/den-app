@@ -11,12 +11,15 @@ import com.denhub.repository.ConversationRepository;
 import com.denhub.repository.MessageRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.service.errors.BadRequestResourceException;
+import com.denhub.service.FileService;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,17 +30,52 @@ public class ConversationService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final FileService fileService;
 
     public ConversationService(ConversationRepository conversationRepository,
                                ConversationMemberRepository conversationMemberRepository,
                                MessageRepository messageRepository,
                                UserRepository userRepository,
-                               SimpMessagingTemplate simpMessagingTemplate) {
+                               SimpMessagingTemplate simpMessagingTemplate,
+                               FileService fileService) {
         this.conversationRepository = conversationRepository;
         this.conversationMemberRepository = conversationMemberRepository;
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
         this.simpMessagingTemplate = simpMessagingTemplate;
+        this.fileService = fileService;
+    }
+
+    public void createConversation(Conversation conversation) {
+
+    }
+
+    /*
+     * Process and send message with multiple files saved directly to server storage
+     */
+    @Transactional
+    public SendMessageRes processAndSendMessagesWithFiles(List<MultipartFile> files, SendMessageReq req, Principal principal) {
+        if (req == null) {
+            req = new SendMessageReq();
+        }
+        if (files != null && !files.isEmpty()) {
+            try {
+                List<String> savedUrls = fileService.saveAndGetUrls(files);
+                req.setMediaUrls(savedUrls);
+                if (req.getMediaUrl() == null || req.getMediaUrl().trim().isEmpty()) {
+                    req.setMediaUrl(String.join(",", savedUrls));
+                }
+                if (req.getType() == null || req.getType().trim().isEmpty()) {
+                    req.setType(MessageType.IMAGE.name());
+                }
+            } catch (Exception e) {
+                if (e instanceof BadRequestResourceException) {
+                    throw (BadRequestResourceException) e;
+                }
+                throw new BadRequestResourceException("Failed to save files: " + e.getMessage(), "conversationManagement", "fileSaveFailed");
+            }
+        }
+        return this.processAndSendMessage(req, principal);
     }
 
     /*
@@ -71,6 +109,11 @@ public class ConversationService {
             conversation = this.getOrCreateDirectConversation(senderId, req.getTargetUserId());
         }
 
+        String mediaUrl = req.getMediaUrl();
+        if ((mediaUrl == null || mediaUrl.trim().isEmpty()) && req.getMediaUrls() != null && !req.getMediaUrls().isEmpty()) {
+            mediaUrl = String.join(",", req.getMediaUrls());
+        }
+
         String messageType = (req.getType() != null && !req.getType().trim().isEmpty())
                 ? req.getType().toUpperCase()
                 : MessageType.TEXT.name();
@@ -80,7 +123,7 @@ public class ConversationService {
                 .conversationId(conversation.getId())
                 .type(messageType)
                 .content(req.getContent())
-                .mediaUrl(req.getMediaUrl())
+                .mediaUrl(mediaUrl)
                 .createdAt(Instant.now())
                 .build();
 
@@ -157,6 +200,11 @@ public class ConversationService {
                     .build();
         }
 
+        List<String> mediaUrlsList = null;
+        if (saveMessage.getMediaUrl() != null && !saveMessage.getMediaUrl().trim().isEmpty()) {
+            mediaUrlsList = Arrays.asList(saveMessage.getMediaUrl().split(","));
+        }
+
         return SendMessageRes.builder()
                 .messageId(saveMessage.getId())
                 .conversationId(conversationId)
@@ -164,6 +212,7 @@ public class ConversationService {
                 .type(saveMessage.getType())
                 .content(saveMessage.getContent())
                 .mediaUrl(saveMessage.getMediaUrl())
+                .mediaUrls(mediaUrlsList)
                 .metadata(metadataDto)
                 .status("SENT")
                 .createdAt(saveMessage.getCreatedAt())
