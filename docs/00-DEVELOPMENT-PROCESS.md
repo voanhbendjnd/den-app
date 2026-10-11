@@ -213,7 +213,7 @@ Phải xác nhận:
 - HTTP method giống nhau.
 - Field name khớp chuẩn (cả camelCase / snake_case).
 - Kiểu dữ liệu (Datatype) tương thích hoàn toàn.
-- Response thành công là DTO trực tiếp, không wrapper; lỗi dùng Problem Details theo RFC 9457 (chi tiết ở mục 4 của tài liệu kiến trúc).
+- Response JSON DTO thành công dùng wrapper hiện có theo mục 4.1 của tài liệu kiến trúc; DTO nằm trong `data`, Axios đọc `response.data.data`. Lỗi vẫn theo contract Problem Details RFC 9457 tại mục 4.3.
 - Error format trả về đúng mã và cấu trúc lỗi.
 - Authorization headers truyền đúng cách.
 
@@ -276,31 +276,113 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 | Module | FE | BE | DB | Integration | Test | Status | Last Update |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-06 |
-| **Server & Invite** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
-| **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Message & Real-time** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
 | **Direct Message (1-1)** | TODO | TODO | TODO | TODO | TODO | TODO | 2026-10-06 |
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
-### Theo dõi riêng phạm vi Duy (2026-10-10)
+### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-11)
 
 | Công việc | Trạng thái | Bằng chứng / bước còn lại |
 | :--- | :--- | :--- |
 | Đồng bộ docs theo prompt | DONE | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database. |
 | Xác minh schema SQL Server | DONE | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database. |
-| Task 1.07 — API gửi tin nhắn + test | IN_PROGRESS | Lượt 1A hoàn thành DTO/Repository/Service và 25 unit tests; cả suite 26 tests PASS. Chưa có Controller, HTTP/security response tests hoặc integration SQL Server. Chờ lượt 1B. |
+| Task 1.07 — API gửi tin nhắn + test | IN_PROGRESS | Đã có DTO/Repository/Service, Controller và 32 tests PASS (25 Service, 6 MockMvc standalone, 1 context H2). Success wrapper đã được chốt và kiểm thử; còn thiếu Security filter/JWT tests và kiểm chứng Problem Details. Chưa kiểm thử ghi SQL Server. |
 | Task 1.07 / lượt 1A | DONE | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B. |
+| Task 1.07 / đồng bộ wrapper thành công | DONE | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE. |
 | Task 1.12 — UI nhập và gửi tin nhắn | TODO | Chờ đợt Backend và xác nhận tiếp tục; tích hợp API cần Duy đồng ý. |
 
 Chỉ đánh dấu `TESTED` khi đã thực sự chạy và vượt qua các kiểm thử phù hợp. Kiểm tra docs không thay thế test code hoặc integration test SQL Server.
 
 ---
 
+### Kiểm tra sau giải xung đột (2026-10-11)
+
+Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trước khi áp dụng stash. Lượt xử lý stash chỉ chỉnh tài liệu, không chạy lại test/build và không xác nhận lại các thay đổi code vừa được khôi phục.
+
+- Đã gộp repository dùng chung, giữ luồng Auth incoming và lịch sử công việc của cả hai nhánh. Server/Channel có test hồi quy PASS; không đồng nghĩa toàn bộ module hoặc tích hợp SQL Server đã hoàn thành.
+- Backend: 58 tests PASS, gồm 6 cases trong MessageResourceIT untracked; frontend build PASS. Chín kiểm tra logic Auth dùng mock hooks/storage/API PASS, chưa kiểm thử trình duyệt/backend thật.
+- MessageResource.java và MessageResourceIT.java đã có ở working tree trước lượt xử lý, còn untracked và được giữ nguyên. Các dòng “chưa có Controller” ngày 2026-10-10 là trạng thái lịch sử của lượt 1A. Wrapper thành công hiện đúng quyết định SUCCESS-WRAPPER; Task 1.07 vẫn IN_PROGRESS vì chưa xác minh đầy đủ Security filter/JWT, Problem Details và ghi SQL Server.
+- PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
+
 ## 11. COMPLETED WORK LOG
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+
+Các entry cũ phản ánh quyết định và verification tại thời điểm ghi. Các nhận xét về DTO trực tiếp hoặc wrapper chưa đồng nhất trong entry ngày 2026-10-10 và MERGE-CONFLICT-RESOLUTION là lịch sử, đã được thay thế bởi quyết định SUCCESS-WRAPPER ngày 2026-10-11 dưới đây. Không áp dụng yêu cầu DTO trực tiếp cũ cho implementation tiếp theo; số test của từng entry chỉ thuộc lượt kiểm tra tương ứng.
+
+### [2026-10-11] STASH-DOCS-CONFLICT — Giữ lịch sử merge và quyết định wrapper
+
+Implemented:
+- Gộp hai vùng Updated upstream / Stashed changes trong tài liệu này; giữ cả MERGE-CONFLICT-RESOLUTION và SUCCESS-WRAPPER cùng các nhật ký khác.
+- Handoff/progress phản ánh contract wrapper hiện có, messageApi dùng channels và các phần Security/Problem Details/SQL Server chưa hoàn tất.
+- Sửa ghi chú cũ mâu thuẫn với mục 4.1 trong docs/02-SYSTEM-ARCHITECTURE.md; không đổi contract hoặc application code.
+
+Tests / Verification:
+- Không thêm/sửa test ứng dụng hoặc chạy lại backend test/frontend build vì lượt này chỉ chỉnh tài liệu. Các số PASS trong log cũ là kết quả lịch sử.
+- `git diff --check -- docs/00-DEVELOPMENT-PROCESS.md docs/02-SYSTEM-ARCHITECTURE.md`: PASS. Kiểm tra bằng Node: không còn marker, code fences cân bằng, 4 ví dụ JSON hợp lệ, 15 link tương đối tồn tại, nhật ký hai bên được giữ đầy đủ.
+- Đã review diff; SHA256 của 170 file ngoài phạm vi và index trước stage không đổi. Chỉ stage hai docs; giữ nguyên stash.
+
+Documentation / Git:
+- Sửa docs/00-DEVELOPMENT-PROCESS.md và docs/02-SYSTEM-ARCHITECTURE.md. Đối chiếu docs/01 và docs/03: không đổi nghiệp vụ/schema.
+- Giữ toàn bộ code/staged changes, hai file Message untracked và stash có sẵn; chưa commit.
+- Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-11] SUCCESS-WRAPPER — Đồng bộ contract theo wrapper hiện có
+
+Authorization / Decisions:
+- Duy yêu cầu giữ response thành công đang bọc; sau khi xem kế hoạch và ví dụ JSON có `error: null`, Duy xác nhận "ok lam di".
+- Phạm vi duyệt: giữ runtime wrapper/Controller, đồng bộ docs, bổ sung test thông báo thành công, chạy test/check và review diff. Không đổi endpoint, DTO nghiệp vụ, Frontend, database hoặc cơ chế bảo mật.
+
+Implemented / Tests Added or Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md`: cập nhật convention, ví dụ JSON gửi tin nhắn, DTO phân trang trong `data`, Axios `response.data.data`, luồng response qua advice và giới hạn kiểm thử hiện có.
+- `docs/01-PROJECT-OVERVIEW.md`: Task 1.07 tham chiếu convention wrapper tại tài liệu kiến trúc.
+- `docs/00-DEVELOPMENT-PROCESS.md`: đồng bộ yêu cầu kiểm thử/mentor, progress và handoff; giữ lịch sử quyết định cũ và nêu rõ đã được thay thế.
+- `server/src/test/java/com/denhub/web/rest/MessageResourceIT.java`: bổ sung kiểm tra thông báo từ `@ApiMessage`, field `error` tồn tại và có giá trị null; giữ assertions HTTP 201, `statusCode` và DTO trong `data`. Vẫn có 6 controller tests, không thêm test trùng lặp.
+
+Verification:
+- Tại `server/`, `.\gradlew.bat test check --no-daemon`: PASS, task `test` thực sự chạy; 32/32 tests, 0 failures/errors/skipped (25 Service, 6 MockMvc standalone, 1 Spring context dùng H2).
+- `git diff --check`: PASS; đã review diff và file test chưa được Git theo dõi. Kiểm tra Markdown/JSON/link bằng PowerShell: code fences cân bằng, 4 ví dụ JSON parse thành công, 20 link tương đối tồn tại. Đối chiếu SHA256 với đầu lượt: chỉ 3 docs và test thuộc phạm vi thay đổi; các file ngoài phạm vi giữ nguyên.
+- Không chạy lại frontend build trong đợt đồng bộ vì không sửa frontend; lần review trước trong cùng phiên đã chạy `npm run build` PASS, có cảnh báo bundle lớn hơn 500 kB. Chưa xác minh thao tác trình duyệt hoặc ghi SQL Server.
+
+Documentation Impact / Remaining:
+- Đã kiểm tra `docs/03-DATABASE-DESIGN.md`: không bị ảnh hưởng, giữ nguyên schema/Entity/giới hạn nội dung.
+- Task 1.07 vẫn IN_PROGRESS: MockMvc standalone dùng Service mock, không chạy Security filter/JWT thật. Test lỗi chỉ kiểm tra status, chưa xác nhận body/content type Problem Details; `SmartAuthenticationEntryPoint` hiện trả JSON tùy chỉnh.
+- PRE-EXISTING ISSUE: `DatabaseInitializer` có mật khẩu tài khoản khởi tạo hardcode trong tracked source. Đã báo Duy; Duy cho tiếp tục kiểm tra và duyệt phạm vi wrapper, giữ nguyên file đó để xử lý riêng. Không ghi giá trị mật khẩu vào tài liệu.
+- Task 1.12 chưa triển khai trong đợt này; `ChatPage` hiện vẫn gửi qua WebSocket, chưa tích hợp POST REST gửi tin nhắn.
+
+Git:
+- Giữ nhánh `feature/group-chat` và các thay đổi có sẵn; chỉ sửa 3 docs và test nêu trên. Chưa commit/merge.
+- Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-11] MERGE-CONFLICT-RESOLUTION — Gộp Group Chat với Server/Channel/Auth
+
+Authorization / Implemented:
+- Người dùng duyệt kế hoạch xử lý 6 file xung đột và yêu cầu giữ code người khác. Giữ nhánh feature/group-chat; xử lý lần merge đang dở giữa 77ee743 và 9cf5989.
+- Giữ 4 truy vấn ChannelRepository của incoming và existsByServerIdAndUserId dùng chung; JpaRepository.findById vẫn phục vụ MessageService.
+- Giữ Auth incoming: /login, /register, cache/JWT khi tải lại, kiểm tra access token và chuẩn hóa user. Bỏ getMe gọi endpoint /api/users/me chưa có backend; không đổi backend authentication/permissions.
+- Gộp tiến độ, nhật ký, handoff và sửa template Markdown; tài liệu kiến trúc phân biệt contract với hiện trạng incoming. Không sửa schema, dependencies, service/controller hoặc hai file Message untracked.
+
+Tests Added / Updated:
+- Không đổi test trong repository: giữ hành vi incoming và tái sử dụng các suite Message/Channel/Server/File.
+- Tạo script kiểm tra tạm ngoài repository: verify-auth.cjs, 9 cases trên logic source với mock React hooks/storage/API (không phải browser test). Bao phủ khởi tạo, cache, JWT fallback, token hết hạn, cache hỏng, login wrapped/direct, thiếu token, logout.
+
+Verification:
+- Tại server/: `.\gradlew.bat test`: PASS 58 tests, 0 failures/errors/skipped; gồm MessageResourceIT có sẵn nhưng untracked. Context dùng H2, các API tests dùng MockMvc; không chứng minh ghi SQL Server hoặc xác thực JWT thực tế.
+- Tại server/: `.\gradlew.bat check`: PASS, tasks UP-TO-DATE sau lần test trên.
+- Tại client/: `npm run build`: PASS; có cảnh báo bundle lớn hơn 500 kB. Chưa có scripts lint/test.
+- Tại repository: `node C:\Users\Admin\AppData\Local\Temp\denhub-conflict-KpXrCC\verify-auth.cjs`: PASS 9/9; chưa kiểm thử browser hoặc gọi backend thật.
+- JVM có cảnh báo deprecated Unsafe từ thư viện; không có test thất bại.
+- `git diff --check`: PASS; đã review diff 6 file, kiểm tra marker và code fences. SHA256 của 166 file ngoài phạm vi không đổi, gồm hai file Message untracked; index trước bước stage vẫn giống đầu lượt. Bốn file code khớp incoming về nội dung, chỉ dọn khoảng trắng cuối dòng trong AuthContext.
+
+Documentation / Remaining:
+- Cập nhật docs/00-DEVELOPMENT-PROCESS.md và docs/02-SYSTEM-ARCHITECTURE.md. Đã đối chiếu docs/01-PROJECT-OVERVIEW.md và docs/03-DATABASE-DESIGN.md, không thay business/schema.
+- Giữ nguyên chênh lệch Owner/Member với Owner/Admin và wrapper Message với DTO trực tiếp để xử lý riêng. Task 1.07 chưa DONE.
+- Không commit; merge commit chờ người dùng ủy quyền. Hai file Message untracked không stage.
+- Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-10] TASK-1.07-1A — Nghiệp vụ gửi tin nhắn và unit tests
 
@@ -385,6 +467,95 @@ Commit:
 
 Push:
 - Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-10] FEAT-SERVER-JOIN — API Tham gia Server
+Implemented:
+- Cập nhật `ServerMemberRepository.java` với phương thức kiểm tra tồn tại `existsByServerIdAndUserId`.
+- Cập nhật `ServerService.java` thêm phương thức `joinServer` thực hiện nghiệp vụ kiểm tra user, server, đã tham gia chưa và tạo `ServerMember` mới.
+- Cập nhật `ServerResource.java` thêm endpoint `POST /api/v1/servers/{serverId}/join`.
+- Cập nhật các Unit Tests tương ứng trong `ServerServiceTest.java` và `ServerResourceTest.java`.
+
+Backend:
+- `ServerMemberRepository.java`, `ServerService.java`, `ServerResource.java`.
+
+Tests:
+- `.\gradlew.bat test`: PASS 100% (BUILD SUCCESSFUL).
+
+Docs Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Update API `/api/v1/servers/{serverId}/join` sang `IMPLEMENTED`).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated tiến độ).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
+### [2026-10-10] NV-1.10-FEAT-CHANNEL-CREATE — Làm API tạo Channel + Test (Kỳ Anh)
+Implemented:
+- Viết API `POST /api/v1/channels` cho phép tạo Channel mới trực thuộc Server.
+- Kiểm tra tính hợp lệ dữ liệu: `name` (2 - 20 ký tự, không trống), `serverId` bắt buộc.
+- Kiểm tra quyền: Người tạo phải là Server Owner hoặc là Member trong Server (`existsByServerIdAndUserId`).
+- Chống trùng tên Channel trong cùng một Server (`existsByServerIdAndName`).
+- Tự động sinh `position` theo số lượng channel hiện có trong server (`countByServerId`).
+- Thêm tài liệu Swagger `@Operation`, `@Tag(name = "Channel")`, `@SecurityRequirement(name = "bearerAuth")`.
+
+Frontend:
+- Chưa thay đổi (chờ NV 1.15).
+
+Backend:
+- `ChannelRepository.java` (Created).
+- `ServerMemberRepository.java` (Updated `existsByServerIdAndUserId`).
+- `CreateChannelDTO.java`, `ChannelResponseDTO.java` (Created).
+- `ChannelService.java` (Created).
+- `ChannelResource.java` (Created).
+
+Database:
+- Đã ánh xạ thành công tới bảng `channels` với unique constraint `(name, server_id)`.
+
+Tests:
+- `ChannelServiceTest`: 6 unit tests pass 100%.
+- `ChannelResourceTest`: 3 MockMvc tests pass 100%.
+- Toàn bộ backend test suite (20/20 tests): PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Updated).
+
+Commit:
+- PENDING (Chờ người dùng ủy quyền).
+
+---
+
+### [2026-10-09] FEAT-SERVER-CREATE — API Tạo Server và Redesign UI
+Implemented:
+- Viết API `POST /api/v1/servers` cho phép tạo Server mới.
+- Tự động thêm owner vào bảng `server_member` khi tạo server.
+- Redesign `LoginPage.jsx` theo phong cách tech/dark/glassmorphism.
+- Redesign `MainLayout.jsx` mô phỏng Discord (Sidebar trái cho Server List, Sidebar phụ cho Navigation).
+- Tạo `CreateServerModal.jsx` với giao diện hiện đại để tương tác API tạo Server.
+- Redesign `HomePage.jsx` loại bỏ tính năng Meeting rườm rà, tập trung vào giao diện gọn gàng.
+
+Frontend:
+- `LoginPage.jsx`, `MainLayout.jsx`, `HomePage.jsx`, `App.jsx`, `CreateServerModal.jsx`, `serverApi.js`.
+
+Backend:
+- `ServerResource.java`, `ServerService.java`, `CreateServerDTO.java`, `ServerResponseDTO.java`, Unit Tests.
+
+Database:
+- Không thay đổi bảng cấu trúc, tận dụng `owner_id` trong `Server` và bảng mapping `ServerMember`.
+
+Tests:
+- `.\gradlew.bat test`: PASS (2/2 tests cho service và resource pass).
+- `npm run build`: PASS.
+
+Docs Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Update API `/api/v1/servers` sang `CONFIRMED`).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated tiến độ).
+
+Commit:
+- PENDING
+
+---
 
 ### Template mẫu:
 ```markdown
@@ -599,55 +770,134 @@ Commit:
 
 ---
 
+### [2026-10-10] FE-CYBERTECH-REDESIGN — Tái thiết kế toàn diện Frontend Cyber-Tech
+Implemented:
+- Tái cấu trúc Design System Frontend theo phong cách công nghệ cao cấp (DenHub Cyber-Modern Dark Theme).
+- Cập nhật `App.jsx`, `index.css`, `AuthLayout.jsx` với các biến CSS Cyber, hiệu ứng Frosted Glassmorphism, Neon Glow và bảng màu Obsidian/Electric Indigo & Cyan.
+- Tái thiết kế `LoginPage.jsx` và `RegisterPage.jsx`: Thêm biểu tượng Cyber phát sáng, card kính mờ, nút tiện ích 1-click Demo Fill (User / Admin) cho người dùng/giảng viên test nhanh.
+- Tái thiết kế `MainLayout.jsx`: Thanh Dock launcher server bên trái với thanh chỉ báo Active Glow Pill, thanh trạng thái kết nối mạng thời gian thực, điều hướng phân cấp trực quan và thanh điều khiển người dùng.
+- Tái thiết kế `HomePage.jsx` thành Trung Tâm Điều Khiển Số (Digital Command Hub): Banner chào đón công nghệ, các card thao tác nhanh 1 chạm cho người không chuyên, lưới danh sách server đã tham gia và widget thông số mạng STOMP/JWT.
+- Nâng cấp `CreateServerModal.jsx`: Tinh giản bố cục theo chuẩn Discord hiện đại — loại bỏ hoàn toàn ô nhập URL thô rườm rà, loại bỏ chữ mô tả chìm trong các thẻ mẫu để chuyển thành 4 nút chip gọn gàng (Tự tạo, Học tập, Lập trình, Giải trí). Thiết kế 1 khu vực tải avatar duy nhất trực quan ở chính giữa kèm dãy ảnh gợi ý nhỏ gọn.
+- Tích hợp tính năng tải file ảnh trực tiếp từ máy tính trong `CreateServerModal`: Hỗ trợ mở hộp thoại duyệt file, đọc Base64 và xem trước tức thì.
+- Nâng cấp `icon_url` trong Backend (`Server.java`, `CreateServerDTO.java`) sang `NVARCHAR(MAX)` để lưu trọn vẹn dữ liệu ảnh tải từ máy.
+- Tinh giản giao diện toàn diện: Loại bỏ các badge rườm rà, tạm ẩn các mục menu chưa có API (Rooms, Notifications, Admin) trong `MainLayout`, và tối giản hóa `LoginPage`, `HomePage`.
+- Fix Authentication Redirect Loop: Xử lý bóc tách chuẩn envelope `RestResponse` (`res.data?.data`), chống lưu `undefined` token, sửa endpoint `/api/login` và chặn 401 redirect loop. Đã kiểm thử trực tiếp login và tạo server thành công 100%.
+
+Frontend:
+- `npm run build`: PASS 100% (vite v8.3.3 building client environment for production, 3174 modules transformed, 0 errors).
+
+Backend:
+- Giữ nguyên backend đã hoàn thiện ở bước trước (`ServerResource`, `ServerService`, `CreateServerDTO`, `ServerResponseDTO`).
+
+Tests:
+- `.\gradlew.bat test`: PASS 100% (5 actionable tasks, 0 failures, BUILD SUCCESSFUL).
+- `npm run build`: PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated)
+
+Commit:
+- PENDING (Chờ người dùng ủy quyền)
+
+### [2026-10-10] BE-FE-FILE-UPLOAD — API Upload File Cho Server Icon & Bảo Vệ Cấu Trúc Database
+Implemented:
+- Xây dựng hệ thống quản lý và upload file ảnh chuẩn RESTful ở Backend:
+  - Thêm `FileUploadResponseDTO` (`fileName`, `url`, `size`, `contentType`).
+  - Thêm `FileService`: Kiểm tra kích thước file (tối đa 5MB), định dạng file (chỉ cho phép jpg, jpeg, png, webp, gif), tự động tạo thư mục lưu trữ `uploads/{folder}/`, sinh tên file ngẫu nhiên chống trùng lặp bằng UUID và ngăn chặn tấn công Path Traversal.
+  - Thêm `FileResource`: Cung cấp endpoint `POST /api/v1/files/upload` (nhận `MultipartFile` và trả về URL ảnh ngắn) và `GET /api/v1/files/{folder}/{filename}` (phục vụ file ảnh công khai cho trình duyệt với cache-control và đúng MediaType).
+- Bảo vệ cấu trúc Database:
+  - Khôi phục `@Column(name = "icon_url", length = 255)` trong `Server.java` và `@Size(max = 255)` trong `CreateServerDTO.java`.
+  - Database SQL Server giữ nguyên cột `icon_url VARCHAR(255)`, không cần chạy DDL `ALTER TABLE` và không lưu chuỗi Base64 cồng kềnh vào database.
+- Tích hợp Frontend:
+  - Tạo mới `client/src/api/fileApi.js` hỗ trợ upload multipart/form-data.
+  - Cập nhật `CreateServerModal.jsx`: Khi chọn file ảnh từ máy tính, hiển thị spinner tải và gọi `fileApi.upload(file)`, nhận URL ảnh ngắn hạn và gán vào `iconUrl` của form tạo server.
+- Kiểm thử:
+  - Thêm unit test `FileServiceTest` (3 tests: upload thành công, từ chối file rỗng, từ chối định dạng file lạ).
+  - Thêm controller test `FileResourceTest` (upload multipart thành công trả về 201 Created và URL).
+  - `.\gradlew.bat test`: PASS 100% (BUILD SUCCESSFUL).
+### [2026-10-10] BE-FE-SERVER-SYNC — Đồng Bộ Danh Sách Server & Khắc Phục Lỗi Cache Ảnh Modal
+Implemented:
+- Backend:
+  - Bổ sung query `findAllByUserIdOrOwnerId(Long userId)` trong `ServerRepository.java` để truy vấn danh sách server người dùng sở hữu hoặc là thành viên.
+  - Thêm phương thức `getUserServers()` trong `ServerService.java` trả về `List<ServerResponseDTO>`.
+  - Cung cấp endpoint `GET /api/v1/servers` trong `ServerResource.java`.
+  - Bổ sung unit tests cho `getUserServers` trong `ServerServiceTest` và `ServerResourceTest`.
+- Frontend:
+  - Đồng bộ danh sách Server (Single Source of Truth): Quản lý toàn bộ danh sách `servers` tập trung tại `MainLayout.jsx` và truyền xuống `HomePage.jsx` qua `Outlet context`. Loại bỏ state `servers` riêng lẻ và xóa component `CreateServerModal` trùng lặp trong `HomePage.jsx`.
+  - Giờ đây mọi hành động tạo server (từ nút `+` trên Dock launcher bên trái hay nút tạo trên HomePage) đều chia sẻ chung một modal và cập nhật đồng thời cả 2 vị trí (chấm tròn bên trái và thẻ ở giữa).
+  - Tự động lấy danh sách server từ database khi tải trang qua `serverApi.getAll()`.
+  - Khắc phục lỗi lưu ảnh upload làm mặc định: Bổ sung `destroyOnClose={true}` và hook `useEffect` trong `CreateServerModal.jsx` tự động reset toàn bộ form, dọn dẹp file input và khôi phục ảnh đại diện về preset mặc định (`AVATAR_SUGGESTIONS[0]`) mỗi khi mở lại modal.
+- Kiểm thử:
+  - `.\gradlew.bat test`: PASS 100% (BUILD SUCCESSFUL).
+  - `npm run build`: PASS 100% (0 errors).
+
+---
+
+### [2026-10-10] BE-DOCS-SWAGGER — Cấu hình Swagger/OpenAPI 3 cho Backend
+Implemented:
+- Cấu hình thư viện `springdoc-openapi-starter-webmvc-ui` (v2.6.0) cho dự án Spring Boot 3.
+- Tạo `SwaggerConfig.java` để khai báo metadata (Title, Description, Version) và cấu hình Security Scheme (JWT Bearer Auth).
+- Cập nhật `SecurityConfiguration.java` đưa các endpoint `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` vào `whiteList` và `publicEndpoints` để truy cập Swagger UI không bị chặn lỗi 401.
+- Bổ sung Swagger annotations (`@Tag`, `@Operation`, `@SecurityRequirement`) cho các controllers hiện tại: `AccountResource`, `ServerResource`, `FileResource` để sinh tài liệu tự động, phản ánh đúng DTO/HTTP methods.
+- Viết tài liệu hướng dẫn cho nhóm cách truy cập và sử dụng Swagger UI kèm JWT Auth tại `docs/guide/SWAGGER-GUIDE.md`.
+
+Backend:
+- Bổ sung dependency vào `server/build.gradle.kts`.
+- `SwaggerConfig.java`, `SecurityConfiguration.java`.
+- `AccountResource.java`, `ServerResource.java`, `FileResource.java`.
+
+Tests:
+- `.\gradlew.bat test`: PASS 100%.
+- Kiểm tra OpenAPI schema JSON thành công.
+
+Docs Updated:
+- `docs/guide/SWAGGER-GUIDE.md` (Created).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated tiến độ).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
-Phần này dùng để bàn giao giữa các Developer và AI Coding Agent khi chuyển ca hoặc dừng giữa task:
-
 ```yaml
-Current Task: Task 1.07 — Lượt 1A (DTO, Repository, Service và unit tests)
-Status: DONE lượt 1A; Task 1.07 IN_PROGRESS; chờ Duy trả lời kiến thức và Tiếp tục
+Current Task: Gộp tài liệu sau xung đột khi áp dụng stash (2026-10-11)
+Status: Đã gộp lịch sử merge và SUCCESS-WRAPPER; chưa commit; Task 1.07 vẫn IN_PROGRESS
 Completed:
-  - Đã đọc yêu cầu của Duy và bốn tài liệu cốt lõi
-  - Đã ghi contract DTO trực tiếp, HTTP status và RFC 9457
-  - Đã ghi phạm vi Backend trước, Frontend sau và yêu cầu mentor
-  - Đã đối chiếu một số Entity, Repository, wrapper, error handler và Axios hiện có
-  - Các thay đổi ngoài phạm vi 1A được giữ nguyên; kiểm tra docs và diff đạt
-  - Đã kiểm tra JWT dùng email làm subject; UserRepository có truy vấn theo email
-  - Đã chạy lại baseline H2 với 1 test PASS và trình kế hoạch Backend chia lượt 1A, 1B
-  - Đã truy vấn SQL Server thực tế; messages.content là NVARCHAR(MAX), nullable, không có CHECK/trigger giới hạn 4000
-  - Duy giao agent chọn giới hạn; đã triển khai validation tối đa 4000 đơn vị UTF-16 và giữ nguyên database
-  - Đã thêm DTO, ChannelRepository, truy vấn membership, MessageService và 25 unit tests
-  - compileJava/test/check PASS; 26 tests trong suite, gồm 1 context test H2 có sẵn
+  - Lượt trước đã gộp repository Message/Channel/Server và Auth incoming; 58 tests, check, build và 9 kiểm tra logic Auth PASS tại lượt đó
+  - Lượt wrapper có DTO/Service, MessageResource và 6 MockMvc standalone tests; log ghi 32 tests PASS trong phạm vi lúc kiểm tra
+  - MessageResponse có JsonFormat; messageApi.js đã dùng channels; giữ nguyên code được khôi phục từ stash
+  - Contract hiện tại giữ wrapper thành công với error null theo docs/02 mục 4.1; không quay lại DTO trực tiếp
+  - Giữ lịch sử Message 1A, Server/Channel/File/Swagger, giải merge và đồng bộ wrapper
 Remaining:
-  - Duy trả lời 3 câu kiểm tra kiến thức, agent nhận xét và chờ Tiếp tục
-  - Trình phạm vi lượt 1B (Controller, HTTP tests, wrapper và lỗi dùng chung), chờ duyệt trước khi sửa shared files
-  - Hoàn thành HTTP 201, JSON DTO trực tiếp và Problem Details kể cả lỗi do Security filter
-  - Chưa chạy integration test ghi SQL Server; không coi mock/H2 là kiểm chứng SQL Server
+  - Merge commit cần người dùng ủy quyền riêng
+  - Trình kế hoạch Security filter/JWT tests và body/content type Problem Details trước khi sửa shared handlers
+  - Chưa kiểm thử ghi SQL Server; mock/H2 không chứng minh integration SQL Server
+  - Task 1.12 và tích hợp UI nhập/gửi tin nhắn chờ Duy xác nhận
 Known Issues:
-  - Entity và SQL Server vẫn dùng server_member/created_date khác một số phần thiết kế; đã ghi chênh lệch trong docs, không thay schema
-  - ResFormatResponse vẫn bọc success response; ExceptionTranslator dùng Zalando Problem
-  - messageApi.js hiện gọi đường dẫn rooms thay vì channels
-  - Ba tài liệu được nhắc trong log cũ không có trong docs tại lần kiểm tra này (DEN_APP_SYSTEM_SPECIFICATION.md, DECISION_LOG.md, DOCUMENT_CONSISTENCY_REPORT.md)
-Next Recommended Step:
-  - Chờ Tiếp tục rồi lập kế hoạch lượt 1B, không tự làm module khác hoặc Frontend
-Files Being Changed:
-  - client/src/api/authApi.js
-  - client/src/contexts/AuthContext.jsx
-  - server/src/main/java/com/denhub/service/dto/SendMessageRequest.java
-  - server/src/main/java/com/denhub/service/dto/MessageResponse.java
-  - server/src/main/java/com/denhub/repository/ChannelRepository.java
-  - server/src/main/java/com/denhub/repository/ServerMemberRepository.java
-  - server/src/main/java/com/denhub/service/MessageService.java
-  - server/src/test/java/com/denhub/service/MessageServiceTest.java
+  - MessageResource.java và MessageResourceIT.java vẫn untracked; không stage trong lượt này
+  - SmartAuthenticationEntryPoint còn trả JSON tùy chỉnh; test lỗi mới kiểm tra status
+  - Channel hiện cho Owner/Member tạo kênh, contract là Owner/Admin
+  - Các route /api/v1 và Auth còn khác danh mục chuẩn; không sửa route trong lượt này
+  - server_member/created_date khác một số phần thiết kế; không thay schema
+  - ChatPage vẫn gửi qua WebSocket; chưa tích hợp REST dù messageApi.js đã dùng channels
+  - PRE-EXISTING ISSUE mật khẩu khởi tạo hardcode được ghi trong log SUCCESS-WRAPPER; giữ nguyên để xử lý riêng, không hiển thị giá trị
+  - Các tài liệu tham chiếu DEN_APP_SYSTEM_SPECIFICATION.md, DECISION_LOG.md, DOCUMENT_CONSISTENCY_REPORT.md được ghi nhận còn thiếu
+Files Changed In This Task:
   - docs/00-DEVELOPMENT-PROCESS.md
   - docs/02-SYSTEM-ARCHITECTURE.md
-  - docs/03-DATABASE-DESIGN.md
+Verification Scope:
+  - Chỉ kiểm tra tài liệu, marker, Git diff và bảo toàn file/index ngoài phạm vi
+  - Không thêm/sửa test ứng dụng, không chạy lại test/build hoặc kiểm thử browser/SQL Server
 Git:
-  - Branch quan sát được là feature/group-chat, agent không chuyển branch
-  - Các thay đổi có sẵn được giữ nguyên; không commit, push hoặc merge
+  - feature/group-chat; giữ các thay đổi staged và untracked có sẵn
+  - Giữ stash, HEAD và MERGE_HEAD; không commit/push hoặc chuyển branch
+Next Recommended Step:
+  - Người dùng review kết quả và quyết định merge commit
+  - Phần Security/Problem Details và Task 1.12 cần kế hoạch riêng
 Related Docs:
   - AGENTS.md
-  - docs/00-DEVELOPMENT-PROCESS.md
   - docs/01-PROJECT-OVERVIEW.md
   - docs/02-SYSTEM-ARCHITECTURE.md
   - docs/03-DATABASE-DESIGN.md
@@ -841,11 +1091,11 @@ Sau duyệt kế hoạch, triển khai API và test trong khoảng 5–10 file m
 
 Test hành vi bằng JUnit 5 / Mockito và MockMvc phù hợp:
 
-- Gửi thành công, đúng `senderId`, `channelId`, `content`, HTTP `201` và JSON DTO trực tiếp.
+- Gửi thành công với HTTP `201`, `statusCode` khớp HTTP status, thông báo thành công và `error: null`; DTO trong `data` có đúng `senderId`, `channelId`, `content` theo wrapper tại mục 4.1 của tài liệu kiến trúc.
 - Nội dung null, rỗng, toàn khoảng trắng hoặc quá dài: `400`.
 - Channel không tồn tại: `404`; chưa đăng nhập/token không hợp lệ: `401`; không thuộc Server: `403`.
 - Không lưu Message khi validation hoặc permission thất bại; người gửi được lấy từ xác thực, không do client chọn.
-- Kiểm tra response thực tế qua advice/security hiện có để phát hiện wrapper hoặc sai error contract.
+- Kiểm tra response thực tế qua advice/security hiện có để xác nhận wrapper thành công đúng contract và phát hiện sai error contract.
 
 Mock dependency khi Auth/Server/Channel/Member chưa sẵn sàng. Không hardcode sender hoặc bypass bảo mật trong production. Báo rõ mock unit test, MockMvc test và integration test thật trên SQL Server; mock/H2 không chứng minh SQL Server đã hoạt động.
 
@@ -859,7 +1109,7 @@ Với từng file được tạo/sửa: ghi đường dẫn và dòng code thự
 
 Liên hệ với source vừa triển khai: `@RestController`, `@RequestMapping`, `@PostMapping`, `@PathVariable`, `@RequestBody`, `@Valid`, `@Service`, `@Repository`, `@Entity`, `@Id`, Dependency Injection, Spring Data JPA, Hibernate, DTO mapping, `ResponseEntity`, Spring Security, JWT, JUnit 5 và Mockito. Chỉ giải thích `@ManyToOne` / `@Transactional` như code đang dùng khi thực sự có sử dụng.
 
-Giải thích REST API, JSON, Request DTO/Response DTO, lý do không trả Entity, các HTTP status trong kiến trúc, Problem Details, Axios `response.data` và convention bỏ wrapper của DenHub. Phân biệt convention dự án với tiêu chuẩn HTTP, không khẳng định wrapper bị REST cấm.
+Giải thích REST API, JSON, Request DTO/Response DTO, lý do không trả Entity, các HTTP status trong kiến trúc, Problem Details và convention wrapper thành công của DenHub. Với Axios hiện tại, `response.data` là wrapper và `response.data.data` là DTO nghiệp vụ. Phân biệt convention dự án với tiêu chuẩn HTTP, không khẳng định wrapper bị REST cấm.
 
 Mô tả đường đi “Hello mọi người!” vào Channel 5 từ request, Security, validation, Service, Repository, SQL Server tới DTO/response; chỉ rõ dữ liệu đang ở đâu từng bước. Dùng ID như ví dụ giảng dạy, không hardcode production.
 

@@ -108,7 +108,7 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 
 | Task | Kết quả cần đạt | Giới hạn |
 | :--- | :--- | :--- |
-| **1.07 — API gửi tin nhắn + test** | Gửi tin nhắn vào Channel qua REST, kiểm tra nội dung và membership, lưu SQL Server, trả DTO trực tiếp; test validation, authentication, authorization và response. | Không làm lịch sử, sửa/xóa hoặc WebSocket. |
+| **1.07 — API gửi tin nhắn + test** | Gửi tin nhắn vào Channel qua REST, kiểm tra nội dung và membership, lưu SQL Server, trả DTO trong wrapper thành công theo mục 4.1 của tài liệu kiến trúc; test validation, authentication, authorization và response. | Không làm lịch sử, sửa/xóa hoặc WebSocket. |
 | **1.12 — UI nhập và gửi tin nhắn** | Ô nhập và nút Send, thao tác bàn phím, loading/error, giữ nội dung khi lỗi, cập nhật UI sau thành công. | Chỉ bắt đầu sau xác nhận tiếp tục của Duy; tích hợp API khi sẵn sàng và được Duy đồng ý. |
 
 - Backend làm trước; Frontend làm ở đợt riêng. Mỗi đợt giải thích code, chuẩn bị interview và kiểm tra mức độ hiểu trước khi chuyển tiếp.

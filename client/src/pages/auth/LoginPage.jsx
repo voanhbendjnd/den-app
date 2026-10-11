@@ -1,6 +1,11 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, Typography, Alert, Divider } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Typography, Alert, Divider } from 'antd';
+import { 
+  UserOutlined, 
+  LockOutlined, 
+  ThunderboltFilled, 
+  ArrowRightOutlined
+} from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -9,6 +14,7 @@ const { Title, Text } = Typography;
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -19,79 +25,177 @@ export default function LoginPage() {
       await login(values);
       navigate('/');
     } catch (err) {
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        'Login failed. Please check your credentials.';
+      const status = err.response?.status;
+      let msg = 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin!';
+      
+      if (status === 401 || err.response?.data?.detail?.includes('Bad credentials') || err.response?.data?.title?.includes('Bad credentials')) {
+        msg = 'Email hoặc mật khẩu không chính xác. Vui lòng thử lại!';
+      } else if (err.response?.data?.message) {
+        msg = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        msg = err.response.data.error;
+      }
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const fillDemoAccount = (email, password) => {
+    form.setFieldsValue({ username: email, password: password });
+    setError(null);
+  };
+
   return (
-    <Card
-      style={{
-        width: 400,
-        borderRadius: 8,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-      }}
-      styles={{ body: { padding: '36px 40px' } }}
-    >
+    <div style={{
+      width: '100%',
+      maxWidth: 440,
+      margin: '24px auto',
+      padding: '0 16px',
+      zIndex: 10,
+    }}>
+      {/* Brand Header */}
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <Title level={3} style={{ margin: 0, color: '#1677ff' }}>
-          DenHub
+        <div style={{
+          width: 56,
+          height: 56,
+          margin: '0 auto 12px',
+          background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
+          borderRadius: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 8px 24px rgba(0, 242, 254, 0.35)',
+        }}>
+          <ThunderboltFilled style={{ fontSize: 28, color: '#fff' }} />
+        </div>
+        
+        <Title level={2} style={{ margin: 0, color: '#fff', fontWeight: 800, letterSpacing: '-0.5px' }}>
+          Den<span style={{ color: '#00F2FE' }}>Hub</span>
         </Title>
-        <Text type="secondary" style={{ fontSize: 14 }}>
-          Sign in to your account
+        <Text style={{ color: '#94A3B8', fontSize: 14 }}>
+          Không gian làm việc & giao tiếp nhóm
         </Text>
       </div>
 
-      {error && (
-        <Alert
-          message={error}
-          type="error"
-          showIcon
-          style={{ marginBottom: 20 }}
-          closable
-          onClose={() => setError(null)}
-        />
-      )}
+      {/* Login Glass Card */}
+      <div 
+        className="glass-panel"
+        style={{
+          padding: '32px 28px',
+          borderRadius: 18,
+          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        <div style={{ marginBottom: 20 }}>
+          <Title level={4} style={{ margin: 0, color: '#F1F5F9', fontWeight: 700 }}>
+            Đăng nhập
+          </Title>
+          <Text style={{ color: '#64748B', fontSize: 13 }}>
+            Nhập thông tin tài khoản để truy cập hệ thống.
+          </Text>
+        </div>
 
-      <Form layout="vertical" onFinish={handleSubmit} size="large">
-        <Form.Item
-          name="username"
-          rules={[{ required: true, message: 'Please enter your username' }]}
-        >
-          <Input prefix={<UserOutlined />} placeholder="Username" autoComplete="username" />
-        </Form.Item>
-
-        <Form.Item
-          name="password"
-          rules={[{ required: true, message: 'Please enter your password' }]}
-        >
-          <Input.Password
-            prefix={<LockOutlined />}
-            placeholder="Password"
-            autoComplete="current-password"
-          />
-        </Form.Item>
-
-        <Form.Item style={{ marginBottom: 12 }}>
-          <Button type="primary" htmlType="submit" loading={loading} block>
-            Sign In
+        {/* Quick Demo Fill Button */}
+        <div style={{
+          background: 'rgba(99, 102, 241, 0.08)',
+          border: '1px solid rgba(99, 102, 241, 0.2)',
+          borderRadius: 10,
+          padding: '10px 12px',
+          marginBottom: 18,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <span style={{ color: '#94A3B8', fontSize: 12 }}>Tài khoản thử nghiệm:</span>
+          <Button 
+            size="small" 
+            onClick={() => fillDemoAccount('haohoangth809@gmail.com', 'admin@123')}
+            style={{ 
+              fontSize: 12, 
+              background: 'rgba(0, 242, 254, 0.1)', 
+              borderColor: 'rgba(0, 242, 254, 0.3)',
+              color: '#00F2FE',
+              fontWeight: 600,
+              borderRadius: 6,
+            }}
+          >
+            Điền nhanh tài khoản mẫu
           </Button>
-        </Form.Item>
-      </Form>
+        </div>
 
-      <Divider style={{ margin: '8px 0 16px' }} />
+        {error && (
+          <Alert
+            message={error}
+            type="error"
+            showIcon
+            style={{ marginBottom: 18, borderRadius: 10, background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.25)' }}
+            closable
+            onClose={() => setError(null)}
+          />
+        )}
 
-      <div style={{ textAlign: 'center' }}>
-        <Text type="secondary" style={{ fontSize: 13 }}>
-          Don&apos;t have an account?{' '}
-          <Link to="/register">Register</Link>
-        </Text>
+        <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
+          <Form.Item
+            name="username"
+            label={<Text style={{ color: '#94A3B8', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Email Đăng Nhập</Text>}
+            rules={[{ required: true, message: 'Vui lòng nhập Email của bạn' }]}
+          >
+            <Input 
+              prefix={<UserOutlined style={{ color: '#64748B' }}/>} 
+              placeholder="Ví dụ: haohoangth809@gmail.com" 
+              autoComplete="username"
+              style={{ height: 42 }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            label={<Text style={{ color: '#94A3B8', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Mật Khẩu</Text>}
+            rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
+          >
+            <Input.Password
+              prefix={<LockOutlined style={{ color: '#64748B' }}/>}
+              placeholder="Nhập mật khẩu"
+              autoComplete="current-password"
+              style={{ height: 42 }}
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginTop: 20, marginBottom: 10 }}>
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              loading={loading} 
+              block 
+              style={{ 
+                height: 44, 
+                fontSize: 15, 
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
+                border: 'none',
+                boxShadow: '0 4px 16px rgba(99, 102, 241, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <span>Vào DenHub</span>
+              <ArrowRightOutlined />
+            </Button>
+          </Form.Item>
+        </Form>
+
+        <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.08)', margin: '16px 0' }} />
+
+        <div style={{ textAlign: 'center' }}>
+          <Text style={{ color: '#94A3B8', fontSize: 13 }}>
+            Chưa có tài khoản?{' '}
+            <Link to="/register" style={{ color: '#00F2FE', fontWeight: 600 }}>Tạo tài khoản mới</Link>
+          </Text>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }

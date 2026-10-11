@@ -30,6 +30,8 @@ import com.denhub.service.errors.InvalidPasswordException;
 import com.denhub.web.rest.vm.KeyAndPasswordVM;
 import com.denhub.web.rest.vm.LoginVM;
 import com.denhub.web.rest.vm.ManagedUserVM;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -39,6 +41,7 @@ import java.util.Optional;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Account", description = "API liên quan đến tài khoản và đăng nhập")
 public class AccountResource {
     final UserService userService;
     final AuthenticationManagerBuilder authenticationManagerBuilder;
@@ -54,6 +57,7 @@ public class AccountResource {
         }
     }
     @GetMapping(path = "/activate")
+    @Operation(summary = "Kích hoạt tài khoản", description = "Kích hoạt tài khoản người dùng thông qua mã xác nhận.")
     public void activateAccount(@RequestParam(value = "key") String key) {
         Optional<User> user = userService.activatedRegistration(key);
         if(user.isEmpty()){
@@ -61,6 +65,7 @@ public class AccountResource {
         }
     }
     @PostMapping(path = "/account/rest-password/init")
+    @Operation(summary = "Yêu cầu khôi phục mật khẩu", description = "Gửi link reset mật khẩu vào email của người dùng.")
     public void requestPasswordReset(@RequestBody @Email @Size(min = 5, max = 254) String email){
         Optional<User> user = userService.requestPasswordReset(email);
         if(user.isPresent()){
@@ -72,6 +77,7 @@ public class AccountResource {
     }
 
     @PostMapping(path = "/account/reset-password/finish")
+    @Operation(summary = "Hoàn tất khôi phục mật khẩu", description = "Đặt lại mật khẩu mới dựa vào token reset.")
     public void finishPasswordRest(@RequestBody KeyAndPasswordVM keyAndPasswordVM){
         if(isPasswordLengthInvalid(keyAndPasswordVM.getNewPassword())){
             throw new InvalidPasswordException();
@@ -87,6 +93,7 @@ public class AccountResource {
     * vm: username, password
     * */
     @PostMapping("/login")
+    @Operation(summary = "Đăng nhập", description = "Xác thực người dùng và nhận về Access Token cùng Refresh Token (cookie).")
     public ResponseEntity<ResLoginDTO> loginWithEmail(@Valid @RequestBody LoginVM vm) {
         String normalizedEmail = vm.getUsername().trim().toLowerCase(Locale.ENGLISH);
         // check password
