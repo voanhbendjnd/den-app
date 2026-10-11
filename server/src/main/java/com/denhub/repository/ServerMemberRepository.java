@@ -6,4 +6,5 @@ import com.denhub.domain.ServerMember;
 
 @Repository
 public interface ServerMemberRepository extends JpaRepository<ServerMember,Long> {
+    boolean existsByServerIdAndUserId(Long serverId, Long userId);
 }

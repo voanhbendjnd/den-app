@@ -65,7 +65,7 @@ Task: [Tên task cụ thể]
 Module: [Auth / Room / Member / Message / Real-time]
 Related Business Rule: [Mục nào trong 01-PROJECT-OVERVIEW.md]
 Related API: [Endpoint nào trong 02-SYSTEM-ARCHITECTURE.md]
-Related Database: [Bảng SQL / Mongo collection trong 03-DATABASE-DESIGN.md]
+Related Database: [Bảng SQL Server trong 03-DATABASE-DESIGN.md]
 Related WebSocket: [Destination nào trong 02-SYSTEM-ARCHITECTURE.md]
 Affected Frontend: [Các component/page bị ảnh hưởng]
 Affected Backend: [Các controller/service/repo bị ảnh hưởng]
@@ -82,6 +82,12 @@ Status: [TODO / IN_PROGRESS]
 > [!CAUTION]
 > Nếu task phụ thuộc vào một contract vẫn là `TBD`:  
 > **KHÔNG tự implement theo phỏng đoán.** Dừng lại và yêu cầu team xác nhận trước.
+
+### Kế hoạch và approval gate
+
+Sau khi đọc docs, tiến độ/handoff, source, tests và Git status/branch, trình kế hoạch gồm: Task, Current State, Related Documentation, Files Expected to Change (mục đích từng file), Backend, Frontend, Database, API/WebSocket, Security/Permission, Test Plan (test và lệnh thực tế), Documentation Impact, Risks/Open Questions.
+
+**DỪNG và chờ người dùng duyệt kế hoạch trước khi sửa application code, schema, API contract, cài dependency hoặc refactor.** Nếu kế hoạch thay đổi đáng kể, trình lại và chờ duyệt lại. Không coi im lặng là đồng ý. Với đợt docs 2026-10-10, Duy đã trực tiếp yêu cầu đồng bộ tài liệu theo prompt; việc này không tự phê duyệt kế hoạch triển khai Backend hoặc Frontend.
 
 ---
 
@@ -207,7 +213,7 @@ Phải xác nhận:
 - HTTP method giống nhau.
 - Field name khớp chuẩn (cả camelCase / snake_case).
 - Kiểu dữ liệu (Datatype) tương thích hoàn toàn.
-- Response format đúng chuẩn Envelope.
+- Response thành công là DTO trực tiếp, không wrapper; lỗi dùng Problem Details theo RFC 9457 (chi tiết ở mục 4 của tài liệu kiến trúc).
 - Error format trả về đúng mã và cấu trúc lỗi.
 - Authorization headers truyền đúng cách.
 
@@ -264,24 +270,121 @@ Sau khi hoàn thành code, **BẮT BUỘC** kiểm tra xem tài liệu trong `/d
 
 ## 10. CURRENT PROJECT PROGRESS
 
-Bảng này phản ánh chính xác trạng thái thực tế của code trong dự án.  
+Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 *(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh).*
 
 | Module | FE | BE | DB | Integration | Test | Status | Last Update |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Authentication** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Room** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Message** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Real-time** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
+| **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-06 |
+| **Server & Invite** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Message & Real-time** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Direct Message (1-1)** | TODO | TODO | TODO | TODO | TODO | TODO | 2026-10-06 |
 
-*(Chỉ cập nhật trạng thái khi tính năng đã qua kiểm thử thực tế).*
+Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
+
+### Theo dõi riêng phạm vi Duy (2026-10-10)
+
+| Công việc | Trạng thái | Bằng chứng / bước còn lại |
+| :--- | :--- | :--- |
+| Đồng bộ docs theo prompt | DONE | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database. |
+| Xác minh schema SQL Server | DONE | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database. |
+| Task 1.07 — API gửi tin nhắn + test | IN_PROGRESS | Lượt 1A hoàn thành DTO/Repository/Service và 25 unit tests; cả suite 26 tests PASS. Chưa có Controller, HTTP/security response tests hoặc integration SQL Server. Chờ lượt 1B. |
+| Task 1.07 / lượt 1A | DONE | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B. |
+| Task 1.12 — UI nhập và gửi tin nhắn | TODO | Chờ đợt Backend và xác nhận tiếp tục; tích hợp API cần Duy đồng ý. |
+
+Chỉ đánh dấu `TESTED` khi đã thực sự chạy và vượt qua các kiểm thử phù hợp. Kiểm tra docs không thay thế test code hoặc integration test SQL Server.
 
 ---
 
 ## 11. COMPLETED WORK LOG
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+
+### [2026-10-10] TASK-1.07-1A — Nghiệp vụ gửi tin nhắn và unit tests
+
+Authorization / Decisions:
+- Theo kế hoạch Backend đã trình và yêu cầu tiếp tục của Duy, sau khi kiểm tra SQL Server, Duy giao agent chọn giới hạn phù hợp.
+- Chọn tối đa 4000 đơn vị UTF-16 ở request, giữ nguyên schema `NVARCHAR(MAX)`, nội dung hợp lệ giữ nguyên; response timestamp dùng `Instant` UTC.
+- Giữ điểm dừng sau lượt 1A để Duy học và xác nhận trước lượt 1B; không coi Task 1.07 đã hoàn tất.
+
+Implemented:
+- Thêm `SendMessageRequest`, `MessageResponse`, `ChannelRepository`, `MessageService`.
+- Thêm `existsByServerIdAndUserId` vào `ServerMemberRepository`; tái sử dụng Message Entity/Repository, UserRepository và SecurityUtils hiện có.
+- Service lấy email từ Security Context, từ chối anonymous/principal chưa xác thực, tra User đang activated để lấy sender ID, validate request, tìm Channel, kiểm tra membership đúng Server, lưu và map DTO trong transaction.
+- Validation từ chối null/rỗng/khoảng trắng Unicode/nội dung quá dài; không trim hoặc cắt nội dung. Chưa tạo Message Controller hoặc sửa shared response/security handlers.
+
+Tests Added / Updated:
+- Thêm `server/src/test/java/com/denhub/service/MessageServiceTest.java`: 25 cases với JUnit 5, Mockito, Validator thật và JWT fixture trong Security Context.
+- Bao phủ nội dung/sender/channel/timestamp trả về, biên 4000/4001 với emoji, whitespace Unicode, request/path ID null, missing/anonymous/unauthenticated principal, subject trống, User không tồn tại/inactive, Channel không tồn tại, không có membership và lỗi lưu.
+- Kiểm tra Repository không bị gọi khi validation/authentication thất bại và không save khi quyền hoặc Channel không hợp lệ.
+
+Verification (thực thi tại `server/`):
+- `.\gradlew.bat test --tests com.denhub.service.MessageServiceTest --no-daemon`: lần đầu FAIL 1/23 do `@NotBlank` không chặn EM SPACE trong phiên bản Validator hiện có. Đã thêm `@Pattern` Unicode và hai cases whitespace khác, chạy lại PASS 25/25.
+- `.\gradlew.bat compileJava test check --no-daemon`: PASS, suite có 26 tests (25 MessageService + 1 DenHubApplicationTests), 0 failures/errors/skipped.
+- Spring context test dùng H2; các Repository trong MessageServiceTest là mock. Chưa kiểm thử HTTP `201`, Problem Details, chữ ký JWT, rollback transaction thực tế hoặc ghi dữ liệu SQL Server.
+- `git diff --check -- docs server/src`: PASS; đã kiểm tra code fences, JSON, link docs và review các file thuộc task. Các file ngoài danh sách sửa giữ nguyên SHA256 so với đầu lượt.
+
+Documentation Impact:
+- Cập nhật `docs/00-DEVELOPMENT-PROCESS.md` (progress/log/handoff), `docs/02-SYSTEM-ARCHITECTURE.md` (contract và hiện trạng 1A), `docs/03-DATABASE-DESIGN.md` (giới hạn request và mô tả kiểu cột đã xác minh).
+- Đã kiểm tra `docs/01-PROJECT-OVERVIEW.md`: phạm vi/nghiệp vụ hiện có vẫn phù hợp, không cần sửa trong lượt 1A.
+
+Remaining / Git:
+- Lượt 1B còn Controller, HTTP/security tests, DTO trực tiếp qua wrapper hiện có và Problem Details qua error handlers/Security filter; phải trình phạm vi cụ thể trước khi sửa shared files.
+- Chưa làm Frontend, lịch sử, sửa/xóa hoặc WebSocket; không đổi Entity, database, dependencies, branch, không commit/merge.
+- Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-10] SCHEMA-MESSAGE-CONTENT — Xác minh trước khi chốt validation
+
+Implemented:
+- Theo lựa chọn của Duy, kiểm tra schema SQL Server bằng truy vấn metadata chỉ đọc, dùng cấu hình kết nối hiện có.
+- Xác nhận `dbo.messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK constraint hoặc trigger giới hạn 4000.
+- Ghi nhận tên bảng/cột thực tế và việc chưa có FK của Message/Channel/ServerMember tại thời điểm kiểm tra.
+- Giới hạn request vẫn chưa chốt; không suy ra rằng Duy đã đồng ý 4000.
+
+Tests / Verification:
+- `sqlcmd -S $dbServer -d $dbName -U $dbSettings['DB_USERNAME'] -C -b -l 5 -t 15 -W -s '|' -w 1000 -Q $schemaQuery`: PASS; chỉ truy vấn system catalog, không đọc hàng dữ liệu người dùng. Mật khẩu truyền qua biến môi trường của tiến trình và không ghi ra log.
+- Baseline trước lượt kiểm tra schema: `.\gradlew.bat test --no-daemon --rerun-tasks` tại `server/`: PASS, 1 test `DenHubApplicationTests`, 0 lỗi, dùng H2; chưa phải test API gửi tin nhắn.
+- Không tạo/cập nhật test ứng dụng trong lượt kiểm tra schema; chưa chạy integration test gửi tin nhắn trên SQL Server.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md`, `docs/02-SYSTEM-ARCHITECTURE.md`, `docs/03-DATABASE-DESIGN.md`.
+
+Git / Database:
+- Chưa commit; không đổi branch, source, dependency, schema hoặc dữ liệu. Không khởi động ứng dụng với `ddl-auto=update` để kiểm tra database.
+- Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-10] DOCS-DUY-GROUP-CHAT — Đồng bộ theo prompt Task 1.07 / 1.12
+
+Implemented:
+- Theo yêu cầu trực tiếp của Duy, cập nhật convention Response DTO trực tiếp, HTTP status và Problem Details RFC 9457.
+- Ghi phạm vi API gửi tin nhắn, MessageInput, điều kiện tích hợp, tests và quy trình Backend trước / Frontend sau với phần mentor, interview, kiểm tra kiến thức.
+- Đồng bộ approval gate, commit cần cho phép riêng và cấm agent push với AGENTS.md.
+- Ghi rõ chênh lệch docs/source, các điểm cần quyết định và tài liệu tham chiếu hiện bị thiếu; không tuyên bố API hoặc database đã được kiểm thử.
+- Loại giá trị mật khẩu khỏi bản tài liệu hiện tại, không thay credential hoặc viết lại lịch sử Git.
+
+Frontend / Backend / Database:
+- Không sửa source, dependencies, schema hoặc migration. Giữ các thay đổi ngoài docs đã có từ trước.
+
+Tests / Verification:
+- Không tạo/cập nhật test ứng dụng: đợt này chỉ sửa tài liệu.
+- `git diff --check -- docs`: lần đầu báo trailing whitespace, đã sửa cách viết xuống dòng Markdown và chạy lại PASS.
+- Kiểm tra bằng PowerShell: code fences cân bằng, ví dụ JSON parse được bằng `ConvertFrom-Json`, link tương đối có đích tồn tại, contract cũ đã được thay, các file ngoài docs giữ nguyên SHA256 so với đầu đợt: PASS.
+- Đã review diff so với bản đầu đợt để phân biệt thay đổi của agent với thay đổi có sẵn.
+- Backend compile/test, Frontend build/test và integration SQL Server: CHƯA CHẠY, vì chưa triển khai application code trong đợt này.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md`
+- `docs/01-PROJECT-OVERVIEW.md`
+- `docs/02-SYSTEM-ARCHITECTURE.md`
+- `docs/03-DATABASE-DESIGN.md`
+
+Commit:
+- Chưa commit; branch `feature/group-chat`, agent không chuyển branch.
+
+Push:
+- Not pushed — AI agents are not allowed to push DenHub.
 
 ### Template mẫu:
 ```markdown
@@ -296,7 +399,7 @@ Backend:
 - Controller/Service/Repo BE đã thêm hoặc chỉnh sửa
 
 Database:
-- Bảng SQL hoặc Collection Mongo đã thêm/sửa
+- Bảng SQL Server đã thêm/sửa
 
 Tests:
 - Lệnh test đã chạy (e.g., gradlew.bat test, npm run build)
@@ -308,6 +411,40 @@ Docs Updated:
 Commit:
 - <commit-hash> (hoặc: PENDING)
 ```
+
+---
+
+### [2026-10-06] DOCS-CANONICAL-SPEC — Đồng bộ đặc tả hệ thống chuẩn & giải quyết xung đột nghiệp vụ
+Implemented:
+- Kiểm tra toàn diện toàn bộ tài liệu và codebase FE/BE.
+- Tạo `docs/DOCUMENT_CONSISTENCY_REPORT.md` phân loại các điểm xung đột giữa tài liệu và mã nguồn.
+- Tạo `docs/DECISION_LOG.md` ghi nhận 12 quyết định kỹ thuật và kiến trúc cốt lõi.
+- Xây dựng tài liệu đặc tả chuẩn xác thực tế `docs/DEN_APP_SYSTEM_SPECIFICATION.md` với 20 đề mục chi tiết, 23 Use Cases và ma trận phân quyền.
+- Đồng bộ chuẩn hóa toàn bộ `01-PROJECT-OVERVIEW.md`, `02-SYSTEM-ARCHITECTURE.md`, `03-DATABASE-DESIGN.md` sang mô hình chuẩn: User -> Server -> Channel -> Message và duy nhất Microsoft SQL Server.
+
+Frontend:
+- Xác định và đánh dấu các module Out-of-Scope (Meetings) cần decouple trong sprint tới.
+
+Backend:
+- Giữ nguyên cấu trúc thực thể JPA hiện hữu (`Server`, `Channel`, `ServerMember`, `Message`, `User`) khớp với đặc tả chuẩn.
+
+Database:
+- Thống nhất toàn bộ schema trên Microsoft SQL Server, loại bỏ hoàn toàn MongoDB khỏi thiết kế.
+
+Tests:
+- Markdown validation & contract consistency check: PASS
+
+Docs Updated:
+- `docs/DOCUMENT_CONSISTENCY_REPORT.md` (Created)
+- `docs/DECISION_LOG.md` (Created)
+- `docs/DEN_APP_SYSTEM_SPECIFICATION.md` (Created)
+- `docs/01-PROJECT-OVERVIEW.md` (Updated)
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Updated)
+- `docs/03-DATABASE-DESIGN.md` (Updated)
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated)
+
+Commit:
+- PENDING
 
 ---
 
@@ -358,7 +495,7 @@ Implemented:
 - Cập nhật cấu hình datasource trong `server/src/main/resources/application.properties` từ H2 sang Microsoft SQL Server.
 - Cấu hình driver `com.microsoft.sqlserver.jdbc.SQLServerDriver`, dialect `org.hibernate.dialect.SQLServerDialect`.
 - Cấu hình kết nối tới SQL Server local (`localhost:1433`, database `denhubdb`, user `sa`).
-- Đồng bộ mật khẩu `sa` (`123456`) trên SQL Server cục bộ và xác thực đăng nhập thành công.
+- Đã cấu hình thông tin xác thực SQL Server cục bộ và ghi nhận kiểm tra đăng nhập ở đợt này; giá trị mật khẩu đã được loại khỏi tài liệu ngày 2026-10-10. Không thay đổi credential thực tế hoặc lịch sử Git trong đợt docs.
 - Tắt H2 console (`spring.h2.console.enabled=false`).
 - Cập nhật template mẫu trong `server/src/main/resources/application.properties.example`.
 - Giữ nguyên cấu hình H2 in-memory độc lập cho test suite trong `server/src/test/resources/application.properties`.
@@ -368,6 +505,34 @@ Backend:
 
 Tests:
 - `.\gradlew.bat test`: PASS (1/1 test passed)
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated)
+
+Commit:
+- PENDING
+
+---
+
+### [2026-10-09] FIX-MEMORY — Tối ưu tài nguyên Gradle và khắc phục sự cố sập JVM OOM
+Implemented:
+- Dọn dẹp hơn 70 crash dump logs (`hs_err_pid*.log`, `replay_pid*.log`) do tràn RAM hệ thống.
+- Bổ sung cấu hình JVM args (`-Xms256m -Xmx768m -XX:MaxMetaspaceSize=256m -XX:+UseSerialGC`) và giới hạn `org.gradle.workers.max=2`, `idletimeout=60000` trong `gradle.properties` và `server/gradle.properties` để tránh cạn kiệt RAM trên CPU đa luồng.
+- Cập nhật `.gitignore` để bỏ qua các file `hs_err_pid*.log` và `replay_pid*.log`.
+- Dừng toàn bộ các Gradle daemon nhàn rỗi ngậm RAM.
+
+Frontend:
+- Không thay đổi.
+
+Backend:
+- Cập nhật cấu hình build tool `gradle.properties` và `server/gradle.properties`.
+
+Database:
+- Không thay đổi.
+
+Tests:
+- `.\server\gradlew.bat --stop`: PASS
+- `.\server\gradlew.bat -p server help`: PASS (1 actionable task executed, build thành công trong 7s, không phát sinh crash log)
 
 Docs Updated:
 - `docs/00-DEVELOPMENT-PROCESS.md` (Updated)
@@ -439,26 +604,47 @@ Commit:
 Phần này dùng để bàn giao giữa các Developer và AI Coding Agent khi chuyển ca hoặc dừng giữa task:
 
 ```yaml
-Current Task: Tách cấu hình nhạy cảm sang biến môi trường .env
-Status: TESTED
+Current Task: Task 1.07 — Lượt 1A (DTO, Repository, Service và unit tests)
+Status: DONE lượt 1A; Task 1.07 IN_PROGRESS; chờ Duy trả lời kiến thức và Tiếp tục
 Completed:
-  - Khởi tạo AGENTS.md và bộ tài liệu docs/
-  - Đổi tên den-app-java-spring -> server
-  - Refactor toàn bộ package tech.djnd.sample.app -> com.denhub
-  - Cập nhật application.properties sang Microsoft SQL Server
-  - Đổi đồng bộ tiền tố cấu hình djnd.* sang denhub.* (properties và 5 file Java)
-  - Tạo server/.env, server/.env.example và mapping biến môi trường trong application.properties
-  - Chạy test Backend thành công 100%
+  - Đã đọc yêu cầu của Duy và bốn tài liệu cốt lõi
+  - Đã ghi contract DTO trực tiếp, HTTP status và RFC 9457
+  - Đã ghi phạm vi Backend trước, Frontend sau và yêu cầu mentor
+  - Đã đối chiếu một số Entity, Repository, wrapper, error handler và Axios hiện có
+  - Các thay đổi ngoài phạm vi 1A được giữ nguyên; kiểm tra docs và diff đạt
+  - Đã kiểm tra JWT dùng email làm subject; UserRepository có truy vấn theo email
+  - Đã chạy lại baseline H2 với 1 test PASS và trình kế hoạch Backend chia lượt 1A, 1B
+  - Đã truy vấn SQL Server thực tế; messages.content là NVARCHAR(MAX), nullable, không có CHECK/trigger giới hạn 4000
+  - Duy giao agent chọn giới hạn; đã triển khai validation tối đa 4000 đơn vị UTF-16 và giữ nguyên database
+  - Đã thêm DTO, ChannelRepository, truy vấn membership, MessageService và 25 unit tests
+  - compileJava/test/check PASS; 26 tests trong suite, gồm 1 context test H2 có sẵn
 Remaining:
-  - Team họp thống nhất các mục TBD trong 01-PROJECT-OVERVIEW.md (Authentication flow, Room rules)
-  - Chuyển các mục TBD sang CONFIRMED trước khi bắt đầu sprint code
+  - Duy trả lời 3 câu kiểm tra kiến thức, agent nhận xét và chờ Tiếp tục
+  - Trình phạm vi lượt 1B (Controller, HTTP tests, wrapper và lỗi dùng chung), chờ duyệt trước khi sửa shared files
+  - Hoàn thành HTTP 201, JSON DTO trực tiếp và Problem Details kể cả lỗi do Security filter
+  - Chưa chạy integration test ghi SQL Server; không coi mock/H2 là kiểm chứng SQL Server
 Known Issues:
-  - Cần đảm bảo SQL Server container hoặc local service đang chạy trên cổng 1433 với database 'denhubdb' khi start server
+  - Entity và SQL Server vẫn dùng server_member/created_date khác một số phần thiết kế; đã ghi chênh lệch trong docs, không thay schema
+  - ResFormatResponse vẫn bọc success response; ExceptionTranslator dùng Zalando Problem
+  - messageApi.js hiện gọi đường dẫn rooms thay vì channels
+  - Ba tài liệu được nhắc trong log cũ không có trong docs tại lần kiểm tra này (DEN_APP_SYSTEM_SPECIFICATION.md, DECISION_LOG.md, DOCUMENT_CONSISTENCY_REPORT.md)
 Next Recommended Step:
-  - Chốt contract API Authentication giữa FE và BE
+  - Chờ Tiếp tục rồi lập kế hoạch lượt 1B, không tự làm module khác hoặc Frontend
 Files Being Changed:
-  - server/
+  - client/src/api/authApi.js
+  - client/src/contexts/AuthContext.jsx
+  - server/src/main/java/com/denhub/service/dto/SendMessageRequest.java
+  - server/src/main/java/com/denhub/service/dto/MessageResponse.java
+  - server/src/main/java/com/denhub/repository/ChannelRepository.java
+  - server/src/main/java/com/denhub/repository/ServerMemberRepository.java
+  - server/src/main/java/com/denhub/service/MessageService.java
+  - server/src/test/java/com/denhub/service/MessageServiceTest.java
   - docs/00-DEVELOPMENT-PROCESS.md
+  - docs/02-SYSTEM-ARCHITECTURE.md
+  - docs/03-DATABASE-DESIGN.md
+Git:
+  - Branch quan sát được là feature/group-chat, agent không chuyển branch
+  - Các thay đổi có sẵn được giữ nguyên; không commit, push hoặc merge
 Related Docs:
   - AGENTS.md
   - docs/00-DEVELOPMENT-PROCESS.md
@@ -494,6 +680,8 @@ git diff --staged
 Mỗi commit **CHỈ ĐƯỢC CHỨA MỘT LOGICAL CHANGE DUY NHẤT.**  
 Không gom nhiều task hoặc các thay đổi không liên quan vào một commit lớn.
 
+Agent chỉ được commit khi người dùng cho phép riêng, sau khi implementation, tests, verification, docs, tiến độ và diff review hoàn tất. Nếu chưa được cho phép, báo sẵn sàng commit rồi dừng. Không tự merge hoặc chuyển branch.
+
 ### Quy chuẩn đặt tên commit (Conventional Commits):
 
 #### ✅ GOOD:
@@ -516,20 +704,10 @@ Không gom nhiều task hoặc các thay đổi không liên quan vào một com
 
 ## 15. PUSH RULE
 
-Trước khi chạy `git push`, phải kiểm tra đủ các điều kiện:
-
-- [ ] Đã đọc các tài liệu liên quan trong `/docs`.
-- [ ] Task đã hoàn thành trọn vẹn theo yêu cầu.
-- [ ] Toàn bộ automated tests đã PASS.
-- [ ] Dự án build thành công không lỗi (`npm run build`, `.\gradlew.bat check`).
-- [ ] Các tài liệu `/docs` liên quan đã được đồng bộ.
-- [ ] Section `Current Project Progress` đã được cập nhật.
-- [ ] Git diff đã được review cẩn thận.
-- [ ] Không có secret, credential hoặc file rác trong commit.
-- [ ] Commit message rõ ràng, đúng chuẩn quy ước.
-
 > [!CAUTION]
-> **Nếu thiếu dù chỉ 1 mục: TUYỆT ĐỐI KHÔNG PUSH.**
+> **AI AGENTS KHÔNG ĐƯỢC PUSH**, kể cả khi tests pass hoặc đã được phép commit. Không dùng lệnh hay công cụ tương đương để upload commit, force push hoặc thay đổi remote branch. Trách nhiệm của agent kết thúc ở local; con người tự thực hiện push theo quy trình nhóm.
+
+Báo cáo cuối phải ghi: `Not pushed — AI agents are not allowed to push DenHub.`
 
 ---
 
@@ -545,15 +723,15 @@ Mỗi AI Coding Agent khi nhận task **BẮT BUỘC** tuân thủ tuần tự 1
 6. **STEP 6:** Inspect toàn bộ mã nguồn liên quan trực tiếp đến task.
 7. **STEP 7:** So sánh tài liệu `/docs` với implementation hiện tại của codebase.
 8. **STEP 8:** Nếu phát hiện conflict $\longrightarrow$ **STOP NGAY LẬP TỨC** và báo cáo conflict cho team.
-9. **STEP 9:** Nếu contract đã rõ ràng (`CONFIRMED`) $\longrightarrow$ Bắt đầu implement task.
-10. **STEP 10:** Chạy automated tests liên quan.
+9. **STEP 9:** Khi contract rõ ràng, trình kế hoạch theo mục 3, dừng và chờ người dùng duyệt. Chỉ sau đó mới implement đúng phạm vi đã duyệt.
+10. **STEP 10:** Viết/cập nhật test hành vi phù hợp rồi chạy automated tests liên quan và compile/build cần thiết.
 11. **STEP 11:** Fix lỗi phát sinh và chạy lại test cho đến khi PASS 100%.
 12. **STEP 12:** Cập nhật tài liệu `/docs` nếu có thay đổi liên quan.
 13. **STEP 13:** Cập nhật bảng `Current Project Progress`.
 14. **STEP 14:** Cập nhật `Completed Work Log` hoặc `Current Work / Handoff`.
 15. **STEP 15:** Review kỹ lưỡng `git diff`.
-16. **STEP 16:** Tạo commit với format chuẩn.
-17. **STEP 17:** Chỉ push khi toàn bộ điều kiện push trong [Push Rule](#15-push-rule) đã đạt.
+16. **STEP 16:** Chỉ tạo commit với format chuẩn nếu người dùng đã cho phép riêng và mọi kiểm tra bắt buộc đã đạt.
+17. **STEP 17:** Báo kết quả chính xác và dừng; không push. Với Duy, thực hiện thêm phần giải thích và kiểm tra kiến thức tại mục 20.
 
 ---
 
@@ -572,6 +750,8 @@ Agent phải **STOP** và chủ động hỏi/xác nhận từ team nếu gặp 
 - Cần xóa hoặc thay đổi lớn cấu trúc dữ liệu đã có.
 - Cần thay đổi kiến trúc lớn của hệ thống.
 - Test bị fail mà nguyên nhân không thuộc task hoặc chưa xác định được rõ ràng.
+- Có thay đổi chưa commit ngoài dự kiến hoặc phát hiện secret trong tracked files.
+- Cần thay đổi đáng kể kế hoạch đã được duyệt hoặc đụng module của thành viên khác.
 
 *(Tuyệt đối không giải quyết bằng cách tự suy đoán).*
 
@@ -591,7 +771,13 @@ UNDERSTAND CURRENT STATUS
     ↓
 CHECK CONTRACT
     ↓
+CREATE IMPLEMENTATION PLAN
+    ↓
+WAIT FOR USER APPROVAL
+    ↓
 IMPLEMENT
+    ↓
+WRITE / UPDATE TESTS
     ↓
 TEST
     ↓
@@ -605,9 +791,9 @@ UPDATE PROGRESS / HANDOFF
     ↓
 REVIEW GIT DIFF
     ↓
-COMMIT
+COMMIT ONLY IF AUTHORIZED
     ↓
-PUSH
+STOP — NO PUSH
 ```
 
 ---
@@ -621,6 +807,7 @@ Trước khi kết thúc bất kỳ phiên làm việc nào:
 - [ ] Đã đọc `02-SYSTEM-ARCHITECTURE.md`
 - [ ] Đã đọc `03-DATABASE-DESIGN.md`
 - [ ] Đã hiểu rõ `Current Project Progress`
+- [ ] Kế hoạch implementation đã được người dùng duyệt
 - [ ] Task không vi phạm bất kỳ contract nào
 - [ ] Implementation đã hoàn thành
 - [ ] Build pass
@@ -631,5 +818,65 @@ Trước khi kết thúc bất kỳ phiên làm việc nào:
 - [ ] Work Log / Handoff đã được cập nhật
 - [ ] Git diff đã được review
 - [ ] Không có secret hoặc debug code
-- [ ] Commit chỉ chứa logical change
-- [ ] Đủ điều kiện và sẵn sàng push
+- [ ] Nếu có commit: đã được cho phép riêng và chỉ chứa logical change
+- [ ] Không push, merge hoặc tự chuyển branch
+
+---
+
+## 20. Quy trình Coding Agent + Mentor cho Duy
+
+Áp dụng cho Module 4 — Task 1.07 và 1.12. Mục tiêu là Duy tự viết lại và giải thích được code khi bảo vệ SBA301 hoặc phỏng vấn Java Backend / Full-stack.
+
+### 20.1 Kiểm tra trước khi code
+
+- Đọc cấu trúc Backend/Frontend, tiến độ/handoff/log, Git status và branch; kiểm tra thay đổi của developer khác.
+- Kiểm tra Message Entity/Repository/Service/Controller/DTO, bảng `messages`, `users`, `channels`, membership, Spring Security/JWT và error handler.
+- Kiểm tra Axios, React Router, component và state hiện có. Tái sử dụng code; không tạo trùng hoặc đổi kiến trúc tùy tiện.
+- Liệt kê file dự kiến tạo/sửa, mục đích từng file và dependencies chưa sẵn sàng. Trình kế hoạch và chờ duyệt theo mục 3.
+- Không sửa module của Ben, Hoàng, Vinh, Kỳ Anh; không tự thay database, commit, push, merge hoặc chuyển branch.
+
+### 20.2 Đợt 1 — Backend
+
+Sau duyệt kế hoạch, triển khai API và test trong khoảng 5–10 file mỗi đợt. Nếu cần hơn 10 file, chia nhỏ và chờ xác nhận giữa các lần; không bỏ tests/docs để lách giới hạn.
+
+Test hành vi bằng JUnit 5 / Mockito và MockMvc phù hợp:
+
+- Gửi thành công, đúng `senderId`, `channelId`, `content`, HTTP `201` và JSON DTO trực tiếp.
+- Nội dung null, rỗng, toàn khoảng trắng hoặc quá dài: `400`.
+- Channel không tồn tại: `404`; chưa đăng nhập/token không hợp lệ: `401`; không thuộc Server: `403`.
+- Không lưu Message khi validation hoặc permission thất bại; người gửi được lấy từ xác thực, không do client chọn.
+- Kiểm tra response thực tế qua advice/security hiện có để phát hiện wrapper hoặc sai error contract.
+
+Mock dependency khi Auth/Server/Channel/Member chưa sẵn sàng. Không hardcode sender hoặc bypass bảo mật trong production. Báo rõ mock unit test, MockMvc test và integration test thật trên SQL Server; mock/H2 không chứng minh SQL Server đã hoạt động.
+
+Các lệnh dự kiến từ thư mục `server/`: `.\gradlew.bat compileJava`, `.\gradlew.bat test`; chạy `.\gradlew.bat check` khi cần full check. Báo chính xác lệnh thực thi và `PASS / FAIL / CHƯA CHẠY`. Fix lỗi thuộc phạm vi rồi chạy lại; ghi `PRE-EXISTING ISSUE` nếu lỗi không thuộc task, không tự sửa module khác.
+
+Sau verification: đồng bộ docs, cập nhật tiến độ/handoff, review diff, giải thích code, đưa 5 câu interview kèm đáp án và hỏi 3 câu kiểm tra kiến thức. **DỪNG, chờ Duy trả lời và nói “Tiếp tục” trước đợt Frontend.** Nhận xét, sửa câu trả lời sai; nếu Duy chưa hiểu, giải thích lại bằng ví dụ đơn giản hơn.
+
+### 20.3 Nội dung giải thích Backend bắt buộc
+
+Với từng file được tạo/sửa: ghi đường dẫn và dòng code thực tế, nhiệm vụ, lý do cần, tầng kiến trúc, import/annotation quan trọng, từng method nhận gì–xử lý gì–trả gì, lý do chọn cách làm, file được gọi, ảnh hưởng nếu xóa và rủi ro bảo mật. File test/docs cũng cần giải thích đúng vai trò, không ép chúng vào tầng runtime.
+
+Liên hệ với source vừa triển khai: `@RestController`, `@RequestMapping`, `@PostMapping`, `@PathVariable`, `@RequestBody`, `@Valid`, `@Service`, `@Repository`, `@Entity`, `@Id`, Dependency Injection, Spring Data JPA, Hibernate, DTO mapping, `ResponseEntity`, Spring Security, JWT, JUnit 5 và Mockito. Chỉ giải thích `@ManyToOne` / `@Transactional` như code đang dùng khi thực sự có sử dụng.
+
+Giải thích REST API, JSON, Request DTO/Response DTO, lý do không trả Entity, các HTTP status trong kiến trúc, Problem Details, Axios `response.data` và convention bỏ wrapper của DenHub. Phân biệt convention dự án với tiêu chuẩn HTTP, không khẳng định wrapper bị REST cấm.
+
+Mô tả đường đi “Hello mọi người!” vào Channel 5 từ request, Security, validation, Service, Repository, SQL Server tới DTO/response; chỉ rõ dữ liệu đang ở đâu từng bước. Dùng ID như ví dụ giảng dạy, không hardcode production.
+
+### 20.4 Đợt 2 — Frontend
+
+Chỉ bắt đầu sau xác nhận của Duy; kiểm tra React và trình kế hoạch file, chờ duyệt trước khi implement. Mỗi đợt tối đa khoảng 5–10 file. Yêu cầu UI và điều kiện tích hợp API nằm ở mục 8 của tài liệu kiến trúc.
+
+Kiểm tra UI: input hợp lệ/không hợp lệ, Enter/Shift+Enter, loading/disable chống gửi trùng, giữ nội dung và hiển thị lỗi khi thất bại, xóa input và báo component cha khi thành công, đổi Channel, JWT và các lỗi `400/401/403/404`. Nếu chưa tích hợp được, dùng mock kiểm tra UI độc lập và báo giới hạn.
+
+Từ thư mục `client/`, chạy `npm run build`; chỉ chạy lint/test nếu scripts tương ứng tồn tại. `package.json` tại lần kiểm tra 2026-10-10 có `dev`, `build`, `preview`, chưa có script lint/test. Kiểm tra route, API, loading/error, authorization, form và console trình duyệt; không nhận đã kiểm tra browser nếu chưa thực hiện. Hướng dẫn Duy chạy `npm run dev` và mở địa chỉ Vite thực tế in ra.
+
+Giải thích từng file/component với dòng code thực tế: Component, props, state, `useState`, controlled input, `onChange`, event handler, Enter/Shift+Enter, Promise, `async/await`, Axios/JSON/JWT, loading/error, thời điểm xóa input, tránh hardcode ID, quan hệ cha–con. Khi API thành công nhưng UI chưa cập nhật, hướng dẫn kiểm tra response mapping, callback về cha và cập nhật state.
+
+Mô tả luồng từ gõ chữ đến React state, Send, Axios, Backend lưu, DTO trả về và UI cập nhật bằng source DenHub. Sau đó đưa 5 câu interview kèm đáp án, hỏi 3 câu kiểm tra kiến thức, chờ trả lời và nhận xét. **DỪNG, chờ “Tiếp tục”; không tự chuyển sang task khác.**
+
+### 20.5 Báo cáo cuối mỗi đợt
+
+Giải thích bằng tiếng Việt dễ hiểu, giữ thuật ngữ kỹ thuật; comment code bằng tiếng Anh khi cần. Báo: Implemented, Tests Added/Updated, Verification (lệnh và kết quả thật), Documentation, Remaining Issues, Git Status và Push. Không dùng kết quả test của log cũ để nhận PASS cho phiên hiện tại.
+
+Luôn ghi: `Not pushed — AI agents are not allowed to push DenHub.`

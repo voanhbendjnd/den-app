@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import authApi from '../api/authApi';
 import { setTokens, clearTokens, getAccessToken } from '../utils/token';
-import { isTokenExpired } from '../utils/auth';
+import { isTokenExpired, getCurrentUserFromToken } from '../utils/auth';
 
 export const AuthContext = createContext(null);
 
@@ -16,10 +16,16 @@ export function AuthProvider({ children }) {
       if (token && !isTokenExpired(token)) {
         try {
           const res = await authApi.getMe();
-          setCurrentUser(res.data);
+          const user = res.data?.data || res.data;
+          setCurrentUser(user);
         } catch {
-          clearTokens();
-          setCurrentUser(null);
+          const decoded = getCurrentUserFromToken();
+          if (decoded) {
+            setCurrentUser(decoded.user || decoded);
+          } else {
+            clearTokens();
+            setCurrentUser(null);
+          }
         }
       } else {
         clearTokens();
@@ -32,7 +38,8 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (credentials) => {
     const res = await authApi.login(credentials);
-    const { accessToken, refreshToken, user } = res.data;
+    const payload = res.data?.data || res.data;
+    const { accessToken, refreshToken, user } = payload;
     setTokens(accessToken, refreshToken);
     setCurrentUser(user);
     return user;
