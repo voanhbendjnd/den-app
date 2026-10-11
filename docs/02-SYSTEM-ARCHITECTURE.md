@@ -150,9 +150,11 @@ Khi có lỗi xảy ra (4xx, 5xx), Backend bắt buộc trả về format:
 
 | Phân hệ | Phương thức | Endpoint | Chức năng dự kiến | Trạng thái |
 | :--- | :---: | :--- | :--- | :---: |
+| **Search** | `GET` | `/api/users/search?username={q}` | Tìm kiếm danh sách người dùng theo username | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/requests` | Gửi yêu cầu kết bạn (hoặc chấp nhận nếu đã có pended req) | `CONFIRMED` |
+| **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
+| **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
-| **Auth** | `POST` | `/api/v1/auth/login` | Đăng nhập và lấy Access Token JWT | `TBD` |
-| **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tin user hiện tại qua token | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/logout` | Đăng xuất người dùng | `TBD` |
 | **Room** | `GET` | `/api/v1/rooms` | Lấy danh sách Room mà User là Member | `TBD` |
 | **Room** | `POST` | `/api/v1/rooms` | Tạo một Room mới | `TBD` |
@@ -190,6 +192,8 @@ Backend Broker     ───[BROADCAST]───> /topic/rooms/{roomId} ──�
 | **Broker Topic (SUBSCRIBE)**| `/topic/rooms/{roomId}` | Client lắng nghe tin nhắn mới trong Room | `TBD` |
 | **App Destination (SEND 1-1)**| `/app/conversations/send` | Client gửi tin nhắn 1-1 (Text / Image) | `CONFIRMED` |
 | **Broker Topic (SUBSCRIBE 1-1)**| `/topic/conversations/{conversationId}` | Client lắng nghe tin nhắn 1-1 real-time | `CONFIRMED` |
+| **User Queue (Friendship Recv)**| `/user/queue/friend-requests/received` | Nhận thông báo có lời mời kết bạn mới | `CONFIRMED` |
+| **User Queue (Friendship Accept)**| `/user/queue/friend-requests/accepted` | Nhận thông báo lời mời kết bạn được chấp nhận | `CONFIRMED` |
 | **User Queue (Private)** | `/user/queue/errors` | Nhận thông báo lỗi cá nhân từ server | `TBD` |
 
 

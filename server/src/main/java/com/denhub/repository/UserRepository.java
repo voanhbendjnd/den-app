@@ -45,7 +45,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findOneByResetKey(String key);
 
     @Query(value = """
-        select u.username as username, u.email as email, u.name as name, u.avatar as avatar
+        select u.id as id, u.username as username, u.email as email, u.name as name, u.avatar as avatar
            from User u
                where u.username like concat('',:q,'%')
     """)

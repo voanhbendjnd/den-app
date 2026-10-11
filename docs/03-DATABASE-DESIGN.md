@@ -213,6 +213,24 @@ erDiagram
 
 ---
 
+### 3.7 Bảng `friendships` (Quản lý Quan hệ Bạn bè)
+- **Mục đích:** Lưu trữ quan hệ bạn bè và trạng thái lời mời kết bạn.
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `user_one_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Min(UserId1, UserId2) |
+| `user_two_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Max(UserId1, UserId2) |
+| `status` | `VARCHAR(20)` | `NOT NULL`, `DEFAULT 'PENDING'` | Trạng thái (`PENDING`, `ACCEPT`, `BLOCKED`) |
+| `action_user_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | ID người thực hiện hành động gần nhất |
+| `created_date` | `DATETIME2` | `NOT NULL`, `DEFAULT GETUTCDATE()` | Thời điểm tạo |
+
+*Ràng buộc & Index:*
+- `ux_friendship`: `UNIQUE (user_one_id, user_two_id)`
+
+---
+
 
 ## 4. Thiết kế chi tiết MongoDB (`PROPOSED / TBD`)
 

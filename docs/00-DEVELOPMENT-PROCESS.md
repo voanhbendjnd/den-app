@@ -277,6 +277,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 | **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Message (1-1)** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-07 |
 | **Real-time (1-1)** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-07 |
+| **Search User & Friendship** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-10 |
 
 
 *(Chỉ cập nhật trạng thái khi tính năng đã qua kiểm thử thực tế).*
@@ -312,6 +313,56 @@ Docs Updated:
 Commit:
 - <commit-hash> (hoặc: PENDING)
 ```
+
+### [2026-10-11] FIX-AUTH-GET-ACCOUNT — Bổ sung endpoint GET /api/account và chuẩn hóa luồng xác thực đăng nhập bằng Email
+Implemented:
+- Thêm phương thức `getUserWithAuthorities()` trong `UserService` để nạp User cùng Authorities theo Email.
+- Thêm endpoint `GET /api/account` (và alias `/api/users/me`) trong `AccountResource` để trả về thông tin người dùng đang đăng nhập (`ResLoginDTO.UserLogin`).
+- Chuẩn hóa cấu hình `SecurityConfiguration` bổ sung đầy đủ các URL alias public của auth và prefix `/api/`.
+- Khóa chặt quy tắc chỉ cho phép đăng nhập bằng Email theo yêu cầu dự án.
+- Viết Unit Test `DomainUserDetailsServiceTest` kiểm thử luồng xác thực bằng Email.
+
+Backend:
+- `AccountResource.java`, `UserService.java`, `SecurityConfiguration.java`, `DomainUserDetailsService.java`, `DomainUserDetailsServiceTest.java`.
+
+Tests:
+- `.\gradlew.bat test`: PASS 100% (Build successful).
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md`
+- `docs/02-SYSTEM-ARCHITECTURE.md`
+
+Commit:
+- PENDING
+
+---
+
+### [2026-10-10] FIX-SEARCH-USER-FRIENDSHIP — Sửa lỗi và chuẩn hóa luồng Search Username và Kết bạn
+Implemented:
+- Khắc phục lỗi `@Id` và `@GeneratedValue` còn thiếu trong `Friendship` entity, sửa tên cột trong `@UniqueConstraint` từ `user_id, friend_id` thành `user_one_id, user_two_id`.
+- Đảo ngược logic kiểm tra rỗng sai (`!username.isBlank()`) trong `SearchUserService.searchByUsername` thành `username.isBlank()`.
+- Thêm trường `u.id as id` vào JPQL Query `searchByUsername` trong `UserRepository`.
+- Refactor `SearchUserController` sang `@RestController` chuẩn REST convention tại `/api/users/search`.
+- Refactor `FriendshipController` trả về `ResponseEntity<Void>`, bổ sung validation `@Valid` trên `@RequestBody FriendshipVM`.
+- Cập nhật WebSocket destination tin nhắn kết bạn sang `/queue/friend-requests/...` trong `NotificationFriendshipRequest`.
+- Bổ sung Unit Tests đầy đủ cho `SearchUserServiceTest` và `FriendshipServiceTest`.
+
+Backend:
+- `Friendship.java`, `UserRepository.java`, `SearchUserService.java`, `SearchUserController.java`, `FriendshipVM.java`, `FriendshipController.java`, `FriendshipService.java`, `NotificationFriendshipRequest.java`, `SearchUserServiceTest.java`, `FriendshipServiceTest.java`.
+
+Database:
+- Bảng `friendships` (SQL Server) cập nhật đúng cấu trúc `@Id` tự tăng và ràng buộc unique constraint.
+
+Tests:
+- `.\gradlew.bat test`: PASS 100% (13/13 unit & integration tests passed).
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md`
+- `docs/02-SYSTEM-ARCHITECTURE.md`
+- `docs/03-DATABASE-DESIGN.md`
+
+Commit:
+- PENDING
 
 ---
 

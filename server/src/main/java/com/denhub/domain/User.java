@@ -12,6 +12,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.hibernate.validator.constraints.Length;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -45,7 +46,8 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
     @NotNull
     private String email;
     @NotNull
-    @Column(name = "username", unique = true, nullable = false)
+    @Length(max = 100)
+    @Column(name = "username", unique = true, nullable = false, length = 100)
     private String username;
     @NotNull
     @Column(nullable = false)
