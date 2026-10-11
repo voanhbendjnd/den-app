@@ -169,7 +169,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - AccountResource có POST /api/login; Auth frontend gọi /login và /register với base URL /api. Chưa tìm thấy backend GET /api/users/me; Auth khôi phục cache/JWT theo incoming, không gọi endpoint này. JWT decode trên frontend không xác minh chữ ký; backend vẫn chịu trách nhiệm xác thực/phân quyền.
 - ServerResource dùng /api/v1/servers (GET, POST, POST /{serverId}/join); ChannelResource dùng POST /api/v1/channels; FileResource dùng /api/v1/files. Đây là chênh lệch với mục 5, không tự đổi route trong lần giải conflict.
 - ChannelService cho Owner hoặc Member tạo kênh, khác Owner/Admin tại mục 5.3. Giữ hành vi incoming theo phạm vi được duyệt; cần quyết định riêng trước khi đổi permission.
-- ResFormatResponse bọc success response đúng quyết định SUCCESS-WRAPPER tại mục 4.1/7.1. Hai file MessageResource.java và MessageResourceIT.java còn untracked; test kiểm tra $.data.* phù hợp wrapper. Task 1.07 chưa hoàn tất do còn thiếu kiểm thử Security filter/JWT, Problem Details và ghi SQL Server.
+- ResFormatResponse bọc success response đúng quyết định SUCCESS-WRAPPER tại mục 4.1/7.1. MessageResource.java còn untracked có sẵn; MessageResourceIT.java đã tracked. Security/JWT/Problem Details và H2 đã PASS theo mục 7.5; còn ghi SQL Server thật chưa xác minh.
 - Backend 58 tests và frontend build PASS thuộc lượt gộp code trước khi áp dụng stash. Lượt gộp tài liệu sau stash không chạy lại test/build; các kết quả lịch sử không xác nhận lại toàn bộ working tree hiện tại hoặc các chênh lệch còn lại.
 
 ---
@@ -292,7 +292,7 @@ Chỉ gửi tin nhắn văn bản trong task này; không làm lịch sử, sử
 
 ### 7.3 Hiện trạng cần xử lý khi lập kế hoạch (2026-10-11)
 
-Đây là hiện trạng lượt 1A và phần lượt 1B đã có ngày 2026-10-11, gồm Controller/test untracked; xem thêm mục 4.5.
+Đây là hiện trạng lịch sử trước lượt hoàn tất ngày 2026-10-11. Kết quả hiện tại ở mục 7.5; không dùng các ô còn thiếu test dưới đây để suy ra trạng thái mới nhất.
 
 | Thành phần đã kiểm tra | Hiện trạng / tác động |
 | :--- | :--- |
@@ -310,9 +310,60 @@ Các thành phần và giới hạn trên dùng để lập kế hoạch phần 
 
 `MessageService.sendMessage(channelId, request)` thực hiện trong `@Transactional`: xác định email từ Security Context, validate request, tra User, tra Channel, kiểm tra membership của chính Server chứa Channel, rồi `MessageRepository.save` và map DTO từ Entity trả về.
 
-Service dùng `ResponseStatusException` của Spring với `400`, `401`, `403`, `404`; chưa tạo handler mới. Exception mang status/reason không có nghĩa HTTP Problem Details đã được kiểm chứng. Lượt 1B đã có MockMvc kiểm tra `201` và wrapper thành công, validation nội dung rỗng/quá dài trả `400`, Service mock ném lỗi `401`/`403`/`404`. Còn thiếu kiểm thử JWT qua Security filter và xác nhận body/content type `application/problem+json`; Task 1.07 vẫn `IN_PROGRESS`.
+Service dùng `ResponseStatusException` của Spring với `400`, `401`, `403`, `404`; tái sử dụng handler hiện có. Lượt 1B ban đầu chỉ có MockMvc standalone kiểm tra status; lượt hoàn tất đã bổ sung Security/JWT/H2 và xác nhận body/content type ở mục 7.5.
 
 Unit tests hiện dùng Validator thật, Repository mock và Security Context chứa JWT fixture đã xác thực. Chúng không xác minh chữ ký JWT, HTTP response, transaction rollback thực tế hoặc việc ghi vào SQL Server. Spring context test dùng H2 riêng theo cấu hình test hiện có.
+
+### 7.5 Hoàn tất POST trong phạm vi code/H2 (2026-10-11)
+
+Duy đã duyệt hoàn tất POST và bổ sung sửa audit riêng của Message. Contract request/201/wrapper ở mục 7.1 giữ nguyên; không đổi SecurityConfiguration, quyền, FE hoặc WebSocket.
+
+- `MessageSecurityIT` chạy HTTP/MockMvc → Security/JWT ký thật → Controller → Service → Repository/JPA/H2. Không mock Service/Repository, không bypass filter; fixtures nằm trong transaction test và rollback. Test flush/clear trước khi đọc lại Message để kiểm tra lưu trữ thay vì chỉ kiểm tra DTO.
+- 26 tests xác nhận 201/wrapper, content nguyên văn, JWT sender, channel, audit email 53/254, đúng biên 4000 UTF-16; token thiếu/malformed/sai chữ ký/hết hạn, session sai, inactive, không thuộc nhóm dù có ROLE_ADMIN, membership nhóm khác, channel không tồn tại, nội dung không hợp lệ. Lỗi 400/401/403/404 đều có Problem Details và không lưu thêm tin.
+- JWT sai qua `SmartAuthenticationEntryPoint` nay trả `application/problem+json`, `type/title/status/detail` và giữ `error/message/code/publicApi/redirect/redirectUrl`; thêm `WWW-Authenticate: Bearer`. ObjectMapper escape dấu nháy/xuống dòng đúng JSON, kể cả thông báo activation. Có regression trên API khác với token sai.
+- Thiếu JWT vẫn theo handler Problem có sẵn, không giả định có legacy fields hoặc WWW-Authenticate giống entry point. Không thay chính sách session hoặc các trường hợp public endpoint.
+- `ExceptionTranslator.process` vẫn giữ nhánh 4xx; nhánh 5xx bỏ detail/cause/extensions nội bộ, dùng detail “Đã xảy ra lỗi hệ thống”, giữ status/type/title/path và message `error.http.<status>`. Regression 500 dùng lỗi DB giả lập xác nhận không trả SQL/cause; regression 404 xác nhận detail nghiệp vụ vẫn giữ nguyên.
+- `Message` override created_by/last_modified_by dài 254, khắc phục lỗi 500 đã phát hiện với email 53 ký tự mà không cắt email. Script review riêng và giới hạn áp dụng xem docs/03 mục 4.3; không đổi mapping audit của User/Server/Channel.
+
+Verification từ `server/`: `.\gradlew.bat test --tests com.denhub.web.rest.MessageSecurityIT --no-daemon` **PASS 26/26**, tiếp đó `.\gradlew.bat compileJava test check --no-daemon` **PASS 85/85**, không fail/error/skip. Lần fail ban đầu được giữ trong log MESSAGE-SECURITY-INITIAL của docs/00.
+
+**Giới hạn:** H2 không chứng minh SQL Server thật; script SQL chỉ review tĩnh, chưa chạy hoặc áp dụng. Không có migration tự động được thêm. Code còn uncommitted; UI đang dở được giữ nguyên. GET Channel/lịch sử (ID giảm dần, before exclusive, limit 1–100 mặc định 30) lưu tạm hoãn ở docs/00 mục 12; chưa triển khai trong lượt này.
+
+### 7.6 Giải thích lượt hoàn tất cho Duy
+
+Các đường dẫn dưới đây tính từ repository root; dòng được đối chiếu sau khi sửa. Tests/docs/script phục vụ kiểm chứng và vận hành, không phải controller runtime.
+
+| File / dòng | Vai trò và thay đổi |
+| :--- | :--- |
+| `server/src/main/java/com/denhub/domain/Message.java:12` | Tầng persistence: `@Entity`/`@Table` map messages, `@Id` sinh khóa. `@AttributeOverrides` đổi riêng mapping hai field kế thừa; nếu bỏ sẽ trở lại 50 và email dài lại gây lỗi. Getter/setter và ID scalar giữ nguyên, không thêm `@ManyToOne`. |
+| `server/src/main/java/com/denhub/config/SmartAuthenticationEntryPoint.java:28` | Constructor nhận ObjectMapper qua Dependency Injection. `commence` ở dòng 33 nhận request/response/AuthenticationException, chọn thông báo/code/redirect hiện có, tạo ProblemDetail, serialize vào response 401. Không xác thực token tại đây: filter đã từ chối trước đó. Bỏ serializer sẽ mất escape JSON an toàn; bỏ legacy fields có thể làm client cũ hỏng. |
+| `server/src/main/java/com/denhub/web/rest/errors/ExceptionTranslator.java:32` | `@ControllerAdvice` xử lý lỗi chung qua Zalando. `process` nhận Problem response và request, giữ metadata, phân nhánh 5xx tại dòng 53 để tránh lộ SQL; 4xx giữ validation/business detail. Các method handleLogin/Email/Session giữ nguyên, gọi create để trả Problem. Bỏ nhánh 5xx có thể trả chi tiết DB cho client. |
+| `server/src/test/java/com/denhub/web/rest/MessageSecurityIT.java:54` | `@SpringBootTest`/`@AutoConfigureMockMvc` dùng app context và filters thật, `@Transactional` rollback fixture. `setUp` tạo User/Server/Channel/membership; các ca dòng 101–265 gọi HTTP và kiểm tra DB/error. Helper `request` tạo POST JSON; `token` ký JWT test; `problem` kiểm tra cấu trúc; `assertNoMessageSaved` flush/clear/count. Không dùng Mockito trong suite này. Nếu bỏ sẽ mất coverage xuyên tầng và regression email dài. |
+| `server/src/test/java/com/denhub/web/rest/MessageResourceIT.java:55` | Standalone MockMvc với Mockito Service; setUp đăng ký Jackson Problem modules giống serializer cần thiết. Test 404 dòng 147 giữ chi tiết nghiệp vụ; test DB 500 dòng 164 giả lập exception chứa SQL/cause và kiểm tra chúng không lộ. Đây không phải chứng minh DB rollback thật. |
+| `server/scripts/sql/2026-10-11-message-audit-email.sql:1` | Script thủ công, mặc định preview. Nhận database đã chọn và cờ ApplyChanges; kiểm metadata, dựng ALTER chỉ khi cần mở rộng, xuất SQL, áp dụng trong transaction nếu người vận hành bật cờ. Không chứa credential, không được app tự chạy. Bỏ script sẽ thiếu bước đồng bộ DB cũ dù JPA/H2 đã pass. |
+| `docs/00-DEVELOPMENT-PROCESS.md` mục 10–12 | Tiến độ, log kết quả thật, duyệt phạm vi và handoff/API hoãn. Không thay runtime; bỏ cập nhật dễ khiến người sau làm lại hoặc coi SQL Server đã kiểm chứng. |
+| `docs/02-SYSTEM-ARCHITECTURE.md` mục 7.5–7.6 | Ghi hành vi lỗi, coverage/giới hạn và giải thích source; không thay request hoặc quyền. |
+| `docs/03-DATABASE-DESIGN.md` mục 4.3 | Ghi quyết định audit, phạm vi riêng messages và script chưa áp dụng; tránh nhầm annotation với schema production đã cập nhật. |
+
+**Luồng ví dụ “Hello mọi người!” vào Channel 5:** client gửi JSON `{content: ...}` qua REST POST kèm Bearer JWT. Security kiểm chữ ký/hạn/session rồi lưu danh tính vào SecurityContext. `MessageResource` dùng `@RestController`, `@RequestMapping`, `@PostMapping`, `@PathVariable` đọc 5, `@RequestBody` đọc DTO và `@Valid` chặn nội dung sai. `MessageService` (`@Service`, constructor injection, `@Transactional`) lấy email từ JWT, tra User/Channel/membership rồi gọi Spring Data JPA Repository. Repository interface kế thừa JpaRepository được Spring tạo bean; không cần tự viết SQL hoặc thêm `@Repository` nếu source không có. Hibernate map `Message` sang bảng, auditor lấy email để ghi cùng dữ liệu. Trong test là H2; môi trường thực cấu hình SQL Server nhưng chưa kiểm thử ở lượt này. Service map Entity sang MessageResponse, Controller trả `ResponseEntity` 201 và ResFormatResponse bọc trong data. ID 5 chỉ là ví dụ, không hardcode trong production.
+
+Request DTO chỉ có content để client không chọn người gửi; Response DTO chỉ lộ các field được chốt thay vì trả cả Entity/audit. JSON là định dạng trao đổi, REST là cách thiết kế giao tiếp qua tài nguyên/HTTP. 201 là tạo thành công, 400 input sai, 401 chưa xác thực hợp lệ, 403 thiếu quyền membership, 404 không có channel. Problem Details mô tả lỗi; wrapper success là convention riêng của DenHub, không phải điều REST cấm. Với Axios, `response.data` là wrapper, `response.data.data` là DTO. Transaction Service phục vụ tính nhất quán DB; transaction test rollback fixture không chứng minh đã commit trên SQL Server.
+
+**5 câu interview và đáp án:**
+
+1. Vì sao thêm test Security khi đã có Service test? Unit test có thể tự gắn Authentication; chỉ test qua filter với token ký thật mới kiểm chữ ký/hạn/session và entry point.
+2. Vì sao override audit ở Message? Field kế thừa dài 50 không đủ email 254; override sửa đúng phạm vi Message, không đổi schema mọi Entity.
+3. JWT hợp lệ có đủ quyền gửi không? Không; Service còn kiểm User active, Channel tồn tại và membership đúng Server. ROLE_ADMIN trong token không bỏ qua membership hiện tại.
+4. Vì sao dùng ObjectMapper thay String.format cho lỗi? Serializer escape ký tự theo JSON và trả Problem Details nhất quán, vẫn giữ extensions cho client cũ.
+5. 85 tests pass có chứng minh SQL Server không? Không; suite DB dùng H2 và rollback. Còn phải review/apply script, chạy kiểm thử SQL Server riêng.
+
+**3 câu kiểm tra cho Duy trước task tiếp theo:**
+
+1. Client gửi thêm senderId khác thì ai quyết định tác giả thật, tại tầng nào?
+2. Vì sao 2000 emoji `😀` được chấp nhận còn thêm một chữ `a` bị 400?
+3. Vì sao JPA/H2 pass nhưng database SQL Server cũ vẫn cần được kiểm tra hai cột audit?
+
+Dừng tại phạm vi POST; chờ Duy trả lời và yêu cầu tiếp tục trước API GET hoặc frontend.
 
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 

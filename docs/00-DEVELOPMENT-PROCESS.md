@@ -290,7 +290,7 @@ Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trướ
 | :--- | :--- | :--- |
 | Đồng bộ docs theo prompt | DONE | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database. |
 | Xác minh schema SQL Server | DONE | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database. |
-| Task 1.07 — API gửi tin nhắn + test | IN_PROGRESS | Đã có DTO/Repository/Service, Controller và 32 tests PASS (25 Service, 6 MockMvc standalone, 1 context H2). Success wrapper đã được chốt và kiểm thử; còn thiếu Security filter/JWT tests và kiểm chứng Problem Details. Chưa kiểm thử ghi SQL Server. |
+| Task 1.07 — API gửi tin nhắn + test | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE. |
 | Task 1.07 / lượt 1A | DONE | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B. |
 | Task 1.07 / đồng bộ wrapper thành công | DONE | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE. |
 | Task 1.12 — UI nhập và gửi tin nhắn | IN_PROGRESS | Duy duyệt làm UI trước ngày 2026-10-11. Đã có GroupChatPage và MessageInput; 5 Node tests, 9 browser tests dùng mock PASS, build PASS. Chưa nối gửi thật; chờ dữ liệu Channel và xác nhận tích hợp. |
@@ -306,7 +306,7 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 - Đã gộp repository dùng chung, giữ luồng Auth incoming và lịch sử công việc của cả hai nhánh. Server/Channel có test hồi quy PASS; không đồng nghĩa toàn bộ module hoặc tích hợp SQL Server đã hoàn thành.
 - Backend: 58 tests PASS, gồm 6 cases trong MessageResourceIT untracked; frontend build PASS. Chín kiểm tra logic Auth dùng mock hooks/storage/API PASS, chưa kiểm thử trình duyệt/backend thật.
-- MessageResource.java và MessageResourceIT.java đã có ở working tree trước lượt xử lý, còn untracked và được giữ nguyên. Các dòng “chưa có Controller” ngày 2026-10-10 là trạng thái lịch sử của lượt 1A. Wrapper thành công hiện đúng quyết định SUCCESS-WRAPPER; Task 1.07 vẫn IN_PROGRESS vì chưa xác minh đầy đủ Security filter/JWT, Problem Details và ghi SQL Server.
+- MessageResource.java vẫn untracked có sẵn; MessageResourceIT.java đã được tracked từ commit ngoài lượt này. Các dòng “chưa có Controller” ngày 2026-10-10 là lịch sử lượt 1A. Security/JWT, Problem Details và H2 đã kiểm thử trong MESSAGE-SECURITY-COMPLETE; còn ghi SQL Server thật chưa xác minh.
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
@@ -314,6 +314,44 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
 
 Các entry cũ phản ánh quyết định và verification tại thời điểm ghi. Các nhận xét về DTO trực tiếp hoặc wrapper chưa đồng nhất trong entry ngày 2026-10-10 và MERGE-CONFLICT-RESOLUTION là lịch sử, đã được thay thế bởi quyết định SUCCESS-WRAPPER ngày 2026-10-11 dưới đây. Không áp dụng yêu cầu DTO trực tiếp cũ cho implementation tiếp theo; số test của từng entry chỉ thuộc lượt kiểm tra tương ứng.
+
+### [2026-10-11] REFACTOR-RECORDS-TO-CLASSES — Chuyển đổi record sang standard Java class (Lombok)
+
+- Duy yêu cầu chuyển đổi các class record thành class Java thông thường và duyệt Phương án A (dùng Lombok).
+- Đã chuyển đổi 3 file: `SendMessageRequest.java`, `MessageResponse.java`, và `CustomUserDetails.java` sang standard Java class sử dụng Lombok (`@Getter`, `@Setter`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@EqualsAndHashCode`, `@ToString`, `@FieldDefaults`).
+- Giữ nguyên các accessor methods tương thích ngược (`content()`, `id()`, `channelId()`, `senderId()`, `createdAt()`, `user()`) để bảo toàn 100% API contract và không làm gián đoạn các bài test hiện có.
+- Verification:
+  - `.\gradlew.bat test --tests com.denhub.service.MessageServiceTest --no-daemon`: PASS (25/25 tests).
+  - `.\gradlew.bat test --tests com.denhub.web.rest.MessageResourceIT --no-daemon`: PASS (7/7 tests).
+  - `.\gradlew.bat test --tests com.denhub.web.rest.MessageSecurityIT --no-daemon`: PASS (26/26 tests).
+  - `.\gradlew.bat compileJava test check --no-daemon`: PASS 100% (85/85 tests PASS, 0 failures, 0 errors).
+  - Tại `client/`: `npm run build`: PASS 100% (0 errors).
+- Git: Chưa stage/commit/push; branch `feature/group-chat`. Chờ ủy quyền riêng nếu commit.
+
+### [2026-10-11] MESSAGE-SECURITY-COMPLETE — Hoàn tất phạm vi POST/H2 và chuẩn bị SQL review
+
+- Duy duyệt bổ sung audit/schema qua “làm tiếp đi”; giữ phạm vi POST và kế hoạch GET ở mục 12 tạm hoãn.
+- `Message` override riêng created_by/last_modified_by lên 254; không đổi AbstractAuditingEntity hoặc các module khác. Script SQL Server trong `server/scripts/sql/2026-10-11-message-audit-email.sql` mặc định preview, chưa chạy trên database thật.
+- `SmartAuthenticationEntryPoint` trả 401 Problem Details bằng ObjectMapper, giữ error/message/code/publicApi/redirect/redirectUrl, thêm WWW-Authenticate: Bearer. Không sửa SecurityConfiguration/quyền/session. Thiếu JWT vẫn dùng handler Problem hiện có.
+- `ExceptionTranslator` che detail/cause/extensions nội bộ của lỗi 5xx bằng thông báo chung; giữ status/type/title/path/message và nhánh 4xx. Không trả SQL nội bộ cho client; không thay thành lỗi 400.
+- `MessageSecurityIT`: 26 tests, JWT encoder/filters/Service/JPA/H2 thật, không mock repository; 201/wrapper/content/channel/sender/audit, biên email 254, UTF-16/Unicode, các lỗi 400/401/403/404 và không lưu khi bị từ chối. Fixtures rollback; H2 không chứng minh SQL Server.
+- `MessageResourceIT`: 7 tests; đăng ký Problem Jackson modules cho standalone, bổ sung regression lỗi DB 500 không lộ SQL/cause và kiểm tra 404 giữ chi tiết nghiệp vụ. Service vẫn mock trong suite này.
+- Verification thực chạy từ `server/`: `.\gradlew.bat test --tests com.denhub.web.rest.MessageSecurityIT --no-daemon` **PASS 26/26**, sau đó `.\gradlew.bat compileJava test check --no-daemon` **PASS 85/85**, 0 failures/errors/skipped. Các lỗi ở log INITIAL đã xử lý, không xóa bằng chứng lần chạy thất bại. Còn warning thư viện Lombok/Ehcache sun.misc.Unsafe; không nâng dependencies.
+- Docs/00 cập nhật tiến độ/log/handoff; docs/02 cập nhật kết quả, handler và giải thích code; docs/03 cập nhật quyết định audit và script. Đã kiểm tra docs/01: không thay nghiệp vụ. Không kiểm thử lại FE vì không sửa FE trong lượt này.
+- Giới hạn: script SQL Server chỉ review tĩnh, chưa chạy; chưa kiểm thử POST trên SQL Server thật. Audit 50 ở User/Server/Channel vẫn ngoài phạm vi. API đọc kênh/lịch sử, Member và nối UI chưa triển khai ở lượt này.
+- Git: feature/group-chat, HEAD `573ea69`; 9 file thuộc lượt backend/docs/script. Rà diff và diff --check, giữ nguyên UI/MessageResource có sẵn; không stage/commit/push. Cần ủy quyền commit riêng. Hướng dẫn code, 5 câu interview và 3 câu kiểm tra ở docs/02 mục 7.6; dừng trước task tiếp theo.
+
+### [2026-10-11] MESSAGE-SECURITY-INITIAL — Lưu kế hoạch và kiểm thử xuyên luồng ban đầu (lịch sử, đã xử lý ở log trên)
+
+- Duy chuyển ưu tiên sang hoàn tất POST gửi Message, lưu kế hoạch đọc Channel/lịch sử ở mục 12 để làm sau.
+- Thêm `server/src/test/java/com/denhub/web/rest/MessageSecurityIT.java`: Spring Boot context, MockMvc với filters thật, JWT ký bằng encoder hiện có, Repository/JPA/H2 thật; fixtures rollback sau mỗi test. Chưa sửa production code trong lượt này.
+- Lệnh thực chạy từ `server/`: `.\gradlew.bat test --tests com.denhub.web.rest.MessageSecurityIT --no-daemon` — **FAIL: 25 tests, 14 pass, 11 fail**. Full `.\gradlew.bat compileJava test check --no-daemon` **CHƯA CHẠY**; không lấy PASS của lượt trước làm kết quả hiện tại.
+- **PRE-EXISTING ISSUE:** 4 ca gửi thành công (`savesMessageFromJwtAndReturnsWrappedDto` ×3 và `clientCannotChooseSender`) trả 500. Fixture email hợp lệ dài 53 ký tự; auditor lấy toàn bộ email nhưng `AbstractAuditingEntity.created_by` và `last_modified_by` chỉ dài 50, trong khi User cho phép email tới 254. H2 báo `Value too long for column CREATED_BY CHARACTER VARYING(50)`. Lỗi nằm ở mapping audit có trước task; không đổi schema hoặc rút ngắn fixture để che lỗi. Response 500 hiện còn đưa chi tiết SQL ra ngoài qua handler chung; cần ghi nhận khi hoàn thiện lỗi.
+- 5 failures về định dạng: malformed/signature/expired/session JWT trả application/json; ca trực tiếp activation entry point cũng chưa trả Problem Details. Đây là phần shared handler đã có trong kế hoạch POST.
+- 2 failures còn lại thuộc kỳ vọng test cần chỉnh: thiếu JWT đã trả Problem Details qua handler khác, chưa có WWW-Authenticate và legacy fields. Khi tiếp tục, regression legacy fields ở API khác cần dùng token sai để thực sự đi qua SmartAuthenticationEntryPoint; không suy ra mọi 401 hiện đã có legacy fields.
+- **Điểm dừng:** AGENTS.md mục 9/15/27 yêu cầu dừng với lỗi có sẵn ngoài phạm vi và thay đổi kế hoạch/schema. Đề xuất bổ sung phạm vi chỉ cho Message: override độ dài hai cột audit của `messages` lên 254, chuẩn bị SQL Server script để người dùng review/chạy riêng, không tự thay DB thật. Giữ identity audit là email, không đổi sender/permission/API. Cần Duy quyết định trước khi triển khai.
+- Files bổ sung dự kiến nếu duyệt: `domain/Message.java`, SQL script trong `server/` theo lựa chọn triển khai của nhóm, `docs/03-DATABASE-DESIGN.md`; tiếp tục files handler/test/docs trong kế hoạch POST. Tests sẽ giữ email 53 ký tự và bổ sung biên email 254, rồi chạy full command; không sửa audit của User/Server/Channel trong phạm vi đề xuất này.
+- Docs/01 đã đối chiếu: không đổi nghiệp vụ. Docs/03 đã đối chiếu: chưa thay contract/schema khi chưa duyệt. Docs/02 ghi hiện trạng kiểm thử. Git diff đã rà; không stage/commit/push, không sửa UI đang dở; HEAD `573ea69`.
 
 ### [2026-10-11] GROUP-CHAT-UI — Khung nhóm và ô nhập trước tích hợp API
 
@@ -889,6 +927,32 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Ưu tiên đã duyệt ngày 2026-10-11 — hoàn tất gửi Message trước
+
+Duy yêu cầu lưu kế hoạch mở rộng Group API vào docs và thực hiện kế hoạch hoàn tất API gửi tin nhắn trước. Đây là phạm vi được duyệt cho lượt hiện tại; chưa được phép commit.
+
+**Handoff mới nhất:** Duy đã duyệt bổ sung audit bằng “làm tiếp đi”. Phạm vi POST/H2 hoàn tất, 85/85 tests và compileJava/check PASS; handlers và audit Message đã sửa. Script SQL Server mặc định preview đã chuẩn bị, chưa thực thi. Xem log MESSAGE-SECURITY-COMPLETE, docs/02 mục 7.5–7.6 và docs/03 mục 4.3. Chưa commit; không tự chuyển sang GET hoặc FE.
+
+- **Hiện trạng khi lập kế hoạch:** POST gửi Message đã có Controller, Service, DTO, Repository và test standalone/unit; lúc đó còn thiếu test xuyên Security/JWT tới JPA và xác nhận Problem Details. Phần thiếu đã hoàn tất theo handoff mới nhất ở trên; UI đang có thay đổi chưa commit được giữ nguyên.
+- **Contract giữ nguyên:** `POST /api/channels/{channelId}/messages`, request chỉ `content`, sender lấy từ JWT, thành công `201` với DTO trong `data`.
+- **Backend / API / bảo mật:** bổ sung test HTTP → Security/JWT → Controller → Service → JPA/H2; sửa shared authentication/error handler để đạt `400/401/403/404` và `application/problem+json`, giữ các field lỗi tương thích; che SQL trong 5xx. Phạm vi bổ sung đã duyệt: tăng hai cột audit của Message lên 254 và chuẩn bị script review riêng. Không đổi quyền, frontend hoặc WebSocket; chưa áp dụng schema thật.
+- **Files thực tế:** `MessageResourceIT.java`, `MessageSecurityIT.java`, `SmartAuthenticationEntryPoint.java`, `ExceptionTranslator.java`, `Message.java`, `server/scripts/sql/2026-10-11-message-audit-email.sql`, `docs/00`, `docs/02`, `docs/03` — tổng 9 file.
+- **Test plan:** xác nhận nội dung, JWT sender, channel, dữ liệu lưu; thiếu/sai/hết hạn JWT, session sai, inactive, không thuộc nhóm, channel không tồn tại, nội dung null/rỗng/Unicode whitespace/quá 4000 UTF-16 đều không lưu Message. Kiểm tra định dạng lỗi shared handler ở API khác. Chạy từ `server/`: `.\gradlew.bat compileJava test check --no-daemon`; sửa lỗi thuộc phạm vi và chạy lại.
+- **Tài liệu liên quan:** nghiệp vụ `docs/01` mục 6, kiến trúc `docs/02` mục 7, dữ liệu `docs/03` mục 4. Cập nhật tiến độ/log/handoff trong `docs/00` và kết quả/contract lỗi trong `docs/02`.
+- **Giới hạn:** H2 không chứng minh ghi SQL Server thật. Shared handler có thể tác động API khác nên cần regression tests. Git HEAD kiểm tra đầu lượt là `573ea69`; các commit trước đó không do agent tạo trong lượt này.
+
+### Kế hoạch Group API lưu lại — TẠM HOÃN theo yêu cầu Duy
+
+Chỉ tiếp tục sau khi hoàn tất lượt gửi Message và Duy yêu cầu tiếp tục; các mục dưới đây chưa được coi là đã triển khai.
+
+1. API danh sách Channel của Server: `GET /api/servers/{serverId}/channels`; tái sử dụng Entity/DTO/Repository hiện có, kiểm tra JWT và membership; đồng bộ với UI sau khi backend sẵn sàng.
+2. API lịch sử: `GET /api/channels/{channelId}/messages?before={id}&limit=30`. Duy đã chốt **ID giảm dần**, `before` lấy **ID nhỏ hơn** con trỏ, mặc định `limit=30`, chỉ nhận `1–100`. Giữ response phân trang trong `data` theo docs/02 mục 4.2; rà lại DTO/contract trước khi code.
+3. Files dự kiến: Channel/Message Resource, Service, Repository; DTO phân trang Message nếu chưa có; tests tương ứng; docs/00 và docs/02. Không cần đổi schema theo kế hoạch hiện tại.
+4. Tests: JWT/membership, không đọc tin của nhóm khác, thứ tự giảm dần, biên `before`, trang rỗng, giới hạn `1/100`, từ chối limit ngoài khoảng và cursor không hợp lệ; chạy backend test/check.
+5. Các phần Member, chi tiết Server và tạo `general` còn cần đối chiếu contract/DTO/quyền trước khi lập đợt riêng; không tự thêm endpoint hoặc quy tắc chưa chốt. FE, WebSocket và SQL Server integration không nằm trong lượt POST hiện tại.
+
+### Handoff UI trước khi đổi ưu tiên (lịch sử)
 
 ```yaml
 Current Task: UI Group chat trước tích hợp API (2026-10-11)
