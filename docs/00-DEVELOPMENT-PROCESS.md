@@ -271,7 +271,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Server/Room** | IN_PROGRESS | IN_PROGRESS | TBD | IN_PROGRESS | IN_PROGRESS | IN_PROGRESS | 2026-10-09 |
-| **Channel** | TODO | IMPLEMENTED | CONFIRMED | IN_PROGRESS | IMPLEMENTED | IN_PROGRESS | 2026-10-10 |
+| **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | 2026-10-11 |
 | **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Message** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Real-time** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
@@ -283,6 +283,35 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 ## 11. COMPLETED WORK LOG
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+
+### [2026-10-11] NV-1.15-FEAT-CHANNEL-UI — Làm UI tạo Channel, kết nối API (Kỳ Anh)
+Implemented:
+- Tạo `client/src/api/channelApi.js` hỗ trợ gọi các endpoint quản lý Channel (`create`, `getByServerId`).
+- Xây dựng component `CreateChannelModal.jsx` theo phong cách Cyber-Modern Dark Theme:
+  - Input tên kênh kèm tiền tố `#` (chuẩn Discord/Slack), tự động format kebab-case.
+  - Hàng chip gợi ý kênh thông dụng 1 chạm (`# general`, `# dev-chat`, `# thong-bao`, `# hoi-dap`, `# tai-lieu`).
+  - Validation client (2 - 20 ký tự, không để trống).
+  - Bắt lỗi nghiệp vụ trực tiếp từ server (`namealreadyexists`, `forbidden`...) và hiển thị thông báo Alert/Toast trực quan.
+- Tích hợp vào `MainLayout.jsx` (quản lý state modal và truyền `openCreateChannelModal` qua `Outlet context`).
+- Bổ sung nút bấm `+ Kênh Mới` trên từng thẻ Server tại `HomePage.jsx` để người dùng kích hoạt tạo kênh cho server bất kỳ.
+
+Frontend:
+- `channelApi.js` (Created).
+- `CreateChannelModal.jsx` (Created).
+- `MainLayout.jsx` (Updated).
+- `HomePage.jsx` (Updated).
+
+Tests:
+- `npm run build`: PASS 100% (3177 modules transformed, 0 errors).
+- Kiểm thử tích hợp UI trên dev server: PASS.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+
+Commit:
+- PENDING (Chờ người dùng ủy quyền).
+
+---
 
 ### [2026-10-10] NV-1.10-FEAT-CHANNEL-CREATE — Làm API tạo Channel + Test (Kỳ Anh)
 Implemented:

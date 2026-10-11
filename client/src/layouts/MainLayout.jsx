@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import CreateServerModal from '../components/common/CreateServerModal';
+import CreateChannelModal from '../components/common/CreateChannelModal';
 import serverApi from '../api/serverApi';
 
 const { Sider, Content } = Layout;
@@ -21,6 +22,8 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateChannelModalOpen, setIsCreateChannelModalOpen] = useState(false);
+  const [targetChannelServer, setTargetChannelServer] = useState(null);
   const [servers, setServers] = useState([]);
 
   useEffect(() => {
@@ -361,7 +364,16 @@ export default function MainLayout() {
          ========================================================= */}
       <Layout style={{ marginLeft: 312, background: 'var(--color-bg-base)', minHeight: '100vh' }}>
         <Content style={{ position: 'relative', height: '100vh', overflowY: 'auto' }}>
-          <Outlet context={{ servers, setServers, openCreateModal: () => setIsCreateModalOpen(true), refreshServers: fetchServers }} />
+          <Outlet context={{ 
+            servers, 
+            setServers, 
+            openCreateModal: () => setIsCreateModalOpen(true), 
+            openCreateChannelModal: (server) => {
+              setTargetChannelServer(server);
+              setIsCreateChannelModalOpen(true);
+            },
+            refreshServers: fetchServers 
+          }} />
         </Content>
       </Layout>
 
@@ -371,6 +383,19 @@ export default function MainLayout() {
         onClose={() => setIsCreateModalOpen(false)} 
         onSuccess={(newServer) => {
           setServers(prev => [newServer, ...prev.filter(s => s.id !== newServer.id)]);
+        }}
+      />
+
+      {/* Create Channel Modal */}
+      <CreateChannelModal
+        open={isCreateChannelModalOpen}
+        server={targetChannelServer}
+        onClose={() => {
+          setIsCreateChannelModalOpen(false);
+          setTargetChannelServer(null);
+        }}
+        onSuccess={() => {
+          fetchServers();
         }}
       />
     </Layout>
