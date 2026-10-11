@@ -279,7 +279,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 | **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
 | **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
-| **Message & Real-time** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Message & Real-time** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | IN_PROGRESS | IN_PROGRESS | 2026-10-11 |
 | **Direct Message (1-1)** | TODO | TODO | TODO | TODO | TODO | TODO | 2026-10-06 |
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
@@ -293,7 +293,8 @@ Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trướ
 | Task 1.07 — API gửi tin nhắn + test | IN_PROGRESS | Đã có DTO/Repository/Service, Controller và 32 tests PASS (25 Service, 6 MockMvc standalone, 1 context H2). Success wrapper đã được chốt và kiểm thử; còn thiếu Security filter/JWT tests và kiểm chứng Problem Details. Chưa kiểm thử ghi SQL Server. |
 | Task 1.07 / lượt 1A | DONE | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B. |
 | Task 1.07 / đồng bộ wrapper thành công | DONE | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE. |
-| Task 1.12 — UI nhập và gửi tin nhắn | TODO | Chờ đợt Backend và xác nhận tiếp tục; tích hợp API cần Duy đồng ý. |
+| Task 1.12 — UI nhập và gửi tin nhắn | IN_PROGRESS | Duy duyệt làm UI trước ngày 2026-10-11. Đã có GroupChatPage và MessageInput; 5 Node tests, 9 browser tests dùng mock PASS, build PASS. Chưa nối gửi thật; chờ dữ liệu Channel và xác nhận tích hợp. |
+| Task 1.12 / khung Group và ô nhập độc lập | DONE | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE. |
 
 Chỉ đánh dấu `TESTED` khi đã thực sự chạy và vượt qua các kiểm thử phù hợp. Kiểm tra docs không thay thế test code hoặc integration test SQL Server.
 
@@ -313,6 +314,34 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
 
 Các entry cũ phản ánh quyết định và verification tại thời điểm ghi. Các nhận xét về DTO trực tiếp hoặc wrapper chưa đồng nhất trong entry ngày 2026-10-10 và MERGE-CONFLICT-RESOLUTION là lịch sử, đã được thay thế bởi quyết định SUCCESS-WRAPPER ngày 2026-10-11 dưới đây. Không áp dụng yêu cầu DTO trực tiếp cũ cho implementation tiếp theo; số test của từng entry chỉ thuộc lượt kiểm tra tương ứng.
+
+### [2026-10-11] GROUP-CHAT-UI — Khung nhóm và ô nhập trước tích hợp API
+
+Authorization / Scope:
+- Duy yêu cầu làm giao diện Group theo ảnh tham khảo Discord, xác nhận API chưa hoàn tất, cho giữ nguyên công việc đang dở và duyệt kế hoạch bằng "ok".
+- Cho phép làm UI trước phần Backend còn lại: chỉ dùng API danh sách server hiện có; composer trên trang nhóm bị khóa khi chưa có Channel. Không nối gửi thật, không thêm API/quyền/schema/WebSocket hoặc dependency.
+
+Implemented:
+- `MainLayout.jsx`: link nhóm mở `/servers/:serverId`, so khớp ID chính xác, trạng thái tải/lỗi/thử lại và bỏ qua response cũ; truyền state bằng Outlet context. Giữ sidebar tổng quan cho các route cũ.
+- `AppRoutes.jsx`: route GroupChatPage nằm trong ProtectedRoute hiện có.
+- `GroupChatPage.jsx`, `group-chat.css`: thanh nhóm, cột kênh, vùng trò chuyện/ô nhập, panel thành viên; Drawer trên màn hình hẹp, trạng thái dữ liệu chưa sẵn sàng và nhóm không có trong danh sách. Không tạo kênh/thành viên/tin nhắn mẫu trong ứng dụng.
+- `MessageInput.jsx`, `utils/messageInput.js`: controlled input, Enter/Shift+Enter và IME, giới hạn UTF-16/Unicode whitespace, khóa gửi trùng bằng ref, giữ nguyên nội dung, chờ thành công mới xóa, lỗi an toàn và callback về cha có channelId. Đổi kênh reset draft; kết quả cũ không xóa draft kênh mới.
+
+Tests Added / Verification:
+- `client/tests/messageInput.test.mjs`: 5 tests validation, emoji boundary, ánh xạ lỗi an toàn.
+- `client/tests/group-chat.browser.test.mjs`: 9 tests trên Edge headless/Playwright với Vite và fixture chỉ tồn tại trong test. Kiểm tra route, reload/chuyển nhóm, loading/error/retry, chưa đăng nhập, drawer và viewport 320/375/768/1024/1440, bàn phím, Unicode, thành công/thất bại, pending/duplicate và đổi kênh. Chặn API bằng mock; không gửi token fixture hoặc dữ liệu lên Backend.
+- Tại `client/`: `npm run build`: PASS; `node --test tests/messageInput.test.mjs`: PASS 5/5.
+- Tại `client/`: đặt `NODE_PATH` tới Node packages có sẵn của workspace runtime, `GROUP_UI_ARTIFACT_DIR` tới thư mục tạm ngoài repository, rồi `node --test tests/group-chat.browser.test.mjs`: PASS 9/9. Không cài package. Browser test dùng Edge mặc định, có thể đổi qua `PLAYWRIGHT_CHANNEL`.
+- Lượt browser đầu timeout do bộ test bắt nhầm cả module `/src/api/` bằng glob quá rộng; đã giới hạn interception vào đường dẫn bắt đầu `/api/` và chạy lại PASS. Font Google được thay bằng CSS rỗng trong test để không phụ thuộc mạng; ảnh QA dùng font fallback.
+- Đã xem ảnh desktop/mobile, kiểm tra không tràn ngang và không có JavaScript pageerror trong các case liên quan. PRE-EXISTING ISSUE: cảnh báo Ant Design Spin `tip` và Modal `destroyOnClose` ở component dùng chung; không sửa ngoài phạm vi. Build vẫn cảnh báo chunk >500 kB như log trước.
+- Không chạy Backend tests hoặc kiểm thử SQL Server trong đợt chỉ sửa Frontend; không dùng kết quả cũ để nhận PASS Backend. Không có script npm test/lint trong package.json.
+
+Documentation / Remaining / Git:
+- Cập nhật docs/00 progress/log/handoff và docs/02 mục 8.1–8.3 (phạm vi, component, kiểm thử, hướng dẫn học). Đối chiếu docs/01 mục 3/6 và docs/03: không đổi nghiệp vụ hoặc dữ liệu.
+- API danh sách Channel/Member/lịch sử còn thiếu; tạo Server chưa tự tạo general theo contract. Task 1.07 còn Security/JWT/Problem Details/SQL Server. ChatPage cũ và WebSocket cũ giữ nguyên, không được coi là tích hợp cho route mới.
+- Agent không stage/commit/merge/push hoặc chuyển nhánh. Khi bắt đầu có 47 file staged và merge đang dở; lúc rà cuối HEAD đã thành `ee2290e`, index rỗng và MERGE_HEAD không còn do thay đổi bên ngoài lượt UI. Các thay đổi UI vẫn chưa commit; hai file Message untracked giữ nguyên.
+- Rà hash 172 file có sẵn: chỉ 4 file thuộc phạm vi UI/docs thay đổi; 168 file còn lại giữ nguyên nội dung. Có thêm 6 file UI/test, tổng phạm vi 10 file. Đã review diff và `git diff --check` PASS; không có fixture test trong production bundle.
+- Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-11] STASH-DOCS-CONFLICT — Giữ lịch sử merge và quyết định wrapper
 
@@ -862,19 +891,21 @@ Commit:
 ## 12. CURRENT WORK / HANDOFF
 
 ```yaml
-Current Task: Gộp tài liệu sau xung đột khi áp dụng stash (2026-10-11)
-Status: Đã gộp lịch sử merge và SUCCESS-WRAPPER; chưa commit; Task 1.07 vẫn IN_PROGRESS
+Current Task: UI Group chat trước tích hợp API (2026-10-11)
+Status: Hoàn tất phạm vi UI đã duyệt; Task 1.07 và 1.12 vẫn IN_PROGRESS, chưa nối gửi thật
 Completed:
+  - GroupChatPage tại /servers/:serverId dùng danh sách server có sẵn; bố cục responsive và MessageInput kiểm thử độc lập
+  - 5 Node tests, 9 browser tests dùng mock và frontend build PASS trong lượt UI; đã xem ảnh desktop/mobile
   - Lượt trước đã gộp repository Message/Channel/Server và Auth incoming; 58 tests, check, build và 9 kiểm tra logic Auth PASS tại lượt đó
   - Lượt wrapper có DTO/Service, MessageResource và 6 MockMvc standalone tests; log ghi 32 tests PASS trong phạm vi lúc kiểm tra
   - MessageResponse có JsonFormat; messageApi.js đã dùng channels; giữ nguyên code được khôi phục từ stash
   - Contract hiện tại giữ wrapper thành công với error null theo docs/02 mục 4.1; không quay lại DTO trực tiếp
   - Giữ lịch sử Message 1A, Server/Channel/File/Swagger, giải merge và đồng bộ wrapper
 Remaining:
-  - Merge commit cần người dùng ủy quyền riêng
+  - Review/commit phần UI cần người dùng ủy quyền riêng; merge trước đã được hoàn tất bên ngoài lượt này tại ee2290e
   - Trình kế hoạch Security filter/JWT tests và body/content type Problem Details trước khi sửa shared handlers
   - Chưa kiểm thử ghi SQL Server; mock/H2 không chứng minh integration SQL Server
-  - Task 1.12 và tích hợp UI nhập/gửi tin nhắn chờ Duy xác nhận
+  - Task 1.12 còn tích hợp thật sau khi API sẵn sàng và Duy duyệt; hiện chưa có API đọc Channel/Member/lịch sử
 Known Issues:
   - MessageResource.java và MessageResourceIT.java vẫn untracked; không stage trong lượt này
   - SmartAuthenticationEntryPoint còn trả JSON tùy chỉnh; test lỗi mới kiểm tra status
@@ -882,20 +913,32 @@ Known Issues:
   - Các route /api/v1 và Auth còn khác danh mục chuẩn; không sửa route trong lượt này
   - server_member/created_date khác một số phần thiết kế; không thay schema
   - ChatPage vẫn gửi qua WebSocket; chưa tích hợp REST dù messageApi.js đã dùng channels
+  - Route GroupChatPage mới không dùng ChatPage/WebSocket cũ; chưa có Channel thì composer bị khóa
+  - ServerService chưa tự tạo general; không tự giả định kênh tồn tại hoặc hardcode ID khi nối UI
+  - PRE-EXISTING ISSUE frontend: cảnh báo Spin tip, Modal destroyOnClose và build chunk lớn
   - PRE-EXISTING ISSUE mật khẩu khởi tạo hardcode được ghi trong log SUCCESS-WRAPPER; giữ nguyên để xử lý riêng, không hiển thị giá trị
   - Các tài liệu tham chiếu DEN_APP_SYSTEM_SPECIFICATION.md, DECISION_LOG.md, DOCUMENT_CONSISTENCY_REPORT.md được ghi nhận còn thiếu
 Files Changed In This Task:
+  - client/src/layouts/MainLayout.jsx
+  - client/src/routes/AppRoutes.jsx
+  - client/src/pages/chat/GroupChatPage.jsx
+  - client/src/pages/chat/group-chat.css
+  - client/src/components/chat/MessageInput.jsx
+  - client/src/utils/messageInput.js
+  - client/tests/messageInput.test.mjs
+  - client/tests/group-chat.browser.test.mjs
   - docs/00-DEVELOPMENT-PROCESS.md
   - docs/02-SYSTEM-ARCHITECTURE.md
 Verification Scope:
-  - Chỉ kiểm tra tài liệu, marker, Git diff và bảo toàn file/index ngoài phạm vi
-  - Không thêm/sửa test ứng dụng, không chạy lại test/build hoặc kiểm thử browser/SQL Server
+  - Frontend build, 5 Node tests, 9 browser tests dùng API/callback mock; không kiểm thử Backend/JWT/SQL Server thật
+  - Kiểm tra tài liệu và diff; bảo toàn các file/index ngoài phạm vi
 Git:
-  - feature/group-chat; giữ các thay đổi staged và untracked có sẵn
-  - Giữ stash, HEAD và MERGE_HEAD; không commit/push hoặc chuyển branch
+  - feature/group-chat; HEAD hiện là ee2290e, index rỗng, không còn MERGE_HEAD tại lần rà cuối
+  - Agent không stage/commit/merge/push, chuyển branch hoặc thao tác stash; các thay đổi UI và hai file Message còn uncommitted
 Next Recommended Step:
-  - Người dùng review kết quả và quyết định merge commit
-  - Phần Security/Problem Details và Task 1.12 cần kế hoạch riêng
+  - Người dùng review UI và quyết định có commit phần UI hay không
+  - Review UI và phần giải thích ở docs/02 mục 8.2–8.3; chờ Duy trả lời và nói Tiếp tục
+  - Phần Security/Problem Details và tích hợp Task 1.12 cần kế hoạch riêng
 Related Docs:
   - AGENTS.md
   - docs/01-PROJECT-OVERVIEW.md

@@ -326,3 +326,72 @@ Unit tests hiện dùng Validator thật, Repository mock và Security Context c
 - Nếu chưa thể tích hợp, test UI độc lập bằng mock; không đưa mock sender hoặc bypass xác thực vào production.
 
 Luồng tích hợp: `Người dùng nhập → React State cập nhật → Send → Axios → Backend lưu → Wrapper chứa Response DTO → Axios đọc response.data.data → Component cha cập nhật UI`.
+
+### 8.1 UI Group đã triển khai trước tích hợp (2026-10-11)
+
+Duy duyệt riêng phạm vi làm UI trước khi API Group chat hoàn tất. Đây là ngoại lệ thứ tự thực hiện cho đợt UI, không xác nhận Backend đã DONE hoặc cho phép tự thay contract.
+
+- Route Frontend `/servers/:serverId` nằm trong `ProtectedRoute`, dùng `GroupChatPage`; dock chọn nhóm bằng `Link`. Đây là route trình duyệt, không phải endpoint Backend.
+- Tái sử dụng `GET /api/v1/servers` qua `serverApi.getAll()` và state của `MainLayout`. GroupChatPage chọn nhóm từ danh sách trả về, không gọi `serverApi.getById()` vì chưa có endpoint tương ứng. Loading, lỗi tải và nhóm không có trong danh sách là ba trạng thái khác nhau; lỗi có nút thử lại.
+- Bố cục tham khảo Discord, dùng màu DenHub: dock nhóm → cột kênh → vùng trò chuyện/ô nhập → thành viên. Từ 1200 px có panel thành viên bật/tắt; dưới 1200 px dùng Drawer thành viên, dưới 992 px dùng Drawer kênh. Không có voice, category hoặc trạng thái online giả.
+- Chưa có API đọc danh sách kênh, thành viên hoặc lịch sử trong source. Tạo server hiện chưa tạo general. UI hiển thị dữ liệu chưa sẵn sàng và khóa composer; không tạo kênh/thành viên/tin nhắn giả, không hardcode channelId, không gọi WebSocket cũ.
+- `MessageInput` nhận props `channelId`, `channelName`, `disabled`, `onSend`, `onSent`. `onSend(channelId, { content })` phải trả Promise chứa kết quả gửi thành công; `onSent(message, channelId)` báo về cha sau thành công. Đây là giao diện component nội bộ, không bổ sung DTO/endpoint.
+- State giữ nội dung nguyên văn; validation tối đa 4000 đơn vị UTF-16 và không chỉ chứa Unicode White_Space (bao gồm U+0085). Enter gửi, Shift+Enter xuống dòng; Enter trong composition không gửi. Trong lúc chờ: ref chặn request lặp ngay lập tức, input readOnly, nút loading/disabled. Thất bại giữ nội dung và hiển thị lỗi an toàn; chỉ thành công mới xóa input.
+- Component con được key theo channelId để reset draft khi đổi kênh. Callback kết quả giữ channelId của request cũ để cha có thể phân luồng; kết quả cũ không xóa draft mới. Bản nháp không được lưu bền hoặc phục hồi khi quay lại kênh trong phạm vi này.
+- Production hiện chưa truyền `onSend`; kiểm thử callback hoàn toàn độc lập. Khi duyệt tích hợp sau này, adapter mới gọi `messageApi.sendMessage`, giữ interceptor JWT và lấy DTO từ `response.data.data`. Chưa được tuyên bố POST, JWT, membership, lưu SQL Server hoặc broadcast đã chạy xuyên suốt từ UI.
+
+### 8.2 Hướng dẫn đọc source của đợt UI
+
+Các dòng dưới đây được đối chiếu tại thời điểm triển khai; nếu sửa source về sau cần kiểm tra lại vị trí.
+
+| File / dòng | Nhiệm vụ và luồng xử lý |
+| :--- | :--- |
+| `client/src/layouts/MainLayout.jsx:23` | `useMatch` lấy ID nhóm đang mở; `useState` giữ danh sách/loading/error. `fetchServers` tại dòng 36 dùng Axios service có sẵn, đọc wrapper và cập nhật state; ref số thứ tự bỏ response cũ khi retry/unmount. `Outlet` dòng 383 truyền state cho trang con. Nếu thiếu phần này, dock không mở nhóm và page không biết đang tải hay lỗi. |
+| `client/src/routes/AppRoutes.jsx:49` | Khai báo route Group bên trong `ProtectedRoute`. React Router đọc serverId; route guard dùng phiên Auth có sẵn. Frontend guard hỗ trợ UX, không thay thế xác thực/phân quyền Backend. |
+| `client/src/pages/chat/GroupChatPage.jsx:47` | `useParams` lấy ID, `useOutletContext` nhận danh sách và trạng thái tải, `useAuth` nhận tài khoản hiện tại. `ChannelSidebar` dòng 9 và `MembersPanel` dòng 34 hiển thị các vùng giao diện; breakpoint và state điều khiển panel/Drawer. Không tìm được nhóm chỉ có nghĩa nhóm không nằm trong danh sách hiện tại, không tự suy ra Backend trả 403 hay nhóm đã bị xóa. |
+| `client/src/pages/chat/group-chat.css:1` | CSS của workspace và composer: focus bàn phím, flex layout, vùng cuộn nội dung, kích thước panel, breakpoint và reduced motion. Không thay global theme hoặc CSS của ChatPage cũ. |
+| `client/src/components/chat/MessageInput.jsx:7` | Component ngoài key component con theo kênh. Component con dòng 11 giữ content/sending/error bằng useState; `value` + `onChange` tạo controlled input. `handleSend` dòng 24 validate, khóa bằng ref, await onSend, xử lý lỗi rồi callback onSent. `handleKeyDown` dòng 45 phân biệt Enter, Shift+Enter và IME. Nếu xóa ref, các event sát nhau có thể vượt qua state chưa render; nếu xóa input trước await sẽ mất bản nháp khi lỗi. |
+| `client/src/utils/messageInput.js:3` | Hàm thuần nhận nội dung, trả thông báo lỗi hoặc null; `.length` của JavaScript cùng đơn vị UTF-16 với Backend. Hàm dòng 14 ánh xạ status sang thông báo an toàn, không hiển thị nguyên error body/stack trace. |
+| `client/tests/messageInput.test.mjs:1` | Node test runner + assert kiểm tra whitespace, nội dung, giới hạn ASCII/emoji và lỗi. Đây là kiểm thử logic thuần, không render React hoặc gọi HTTP. |
+| `client/tests/group-chat.browser.test.mjs:54` | Khởi tạo Vite + Edge headless, chỉ đăng ký trang fixture trong test. `openPage` dòng 84 chặn các request `/api/` và cung cấp danh sách nhóm giả lập; `openComposer` dòng 112 render component thật với Promise thành công/thất bại/pending. 9 cases kiểm tra hành vi DOM, callback, route, auth guard và kích thước màn hình; không chứng minh API thật chạy. |
+| `docs/00-DEVELOPMENT-PROCESS.md` | Progress, log và handoff phân biệt UI đã kiểm thử với API/tích hợp chưa hoàn tất; giữ lịch sử công việc trước. |
+| `docs/02-SYSTEM-ARCHITECTURE.md` | Mục 8 mô tả phạm vi UI, giao diện props, cách kiểm thử và giới hạn tích hợp; không đổi REST/DB contract. |
+
+Luồng hiện tại trong test: gõ chữ → `onChange` → `content` → `handleSend` → Promise `onSend` giả lập → xóa input sau resolve → `onSent` đưa kết quả về cha → cha cập nhật state và render. JSX của cha trong fixture minh họa cập nhật tin nhắn; trang Group thực tế chưa thực hiện bước gửi.
+
+Luồng tích hợp được dự kiến sau khi duyệt: `onSend` dùng Axios gửi JSON `{ content }` cùng Bearer token qua interceptor → Backend lấy người gửi từ JWT, validate và kiểm tra membership → lưu → trả wrapper → adapter đọc `response.data.data` → `onSent`. Nếu API thành công mà UI chưa đổi, kiểm tra lần lượt DTO được bóc đúng chưa, callback có chạy không, channelId có khớp không và cha có cập nhật state bằng mảng mới không.
+
+Chạy từ thư mục `client/`:
+
+```powershell
+node --test tests/messageInput.test.mjs
+npm run build
+npm run dev
+```
+
+Mở đúng URL Vite in ra, đăng nhập rồi bấm biểu tượng nhóm ở dock trái. Nút gửi đang khóa đúng phạm vi chưa tích hợp. `package.json` chưa có script lint/test.
+
+Browser tests cần Playwright và Edge đã có trên máy; không tự cài dependency vào dự án. Có thể cung cấp thư viện từ runtime của workspace:
+
+```powershell
+$env:NODE_PATH = 'C:/Users/Admin/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'
+node --test tests/group-chat.browser.test.mjs
+```
+
+Ở máy khác, dùng đường dẫn Playwright đã cài của máy đó hoặc bản local. `PLAYWRIGHT_CHANNEL` mặc định `msedge`; `GROUP_UI_ARTIFACT_DIR` tùy chọn để lưu screenshot ngoài repository. Test tự mở/đóng Vite, không cần chạy dev server trước. API, tài khoản và Promise là fixture trong test; font ngoài được thay bằng fallback. Không dùng fixture để truy cập Backend thật.
+
+### 8.3 Ôn tập Task 1.12
+
+Năm câu hỏi phỏng vấn kèm đáp án:
+
+1. **Controlled input là gì?** React state là nguồn dữ liệu của input: `value={content}`, `onChange` cập nhật content. Nhờ vậy có thể validate, khóa gửi và reset đúng thời điểm.
+2. **Vì sao dùng cả state và ref để chống gửi trùng?** State phục vụ render/loading nhưng cập nhật theo lượt render; ref đổi ngay trong event để chặn hai lần gọi trước khi UI kịp cập nhật.
+3. **Vì sao chỉ xóa input sau khi await thành công?** Promise có thể reject vì mạng hoặc permission. Giữ draft giúp người dùng sửa/thử lại, không mất nội dung.
+4. **Vì sao không gửi senderId từ browser?** Danh tính do Backend lấy từ JWT đã xác thực. Browser có thể bị chỉnh sửa, không phải nguồn tin cậy cho sender hoặc quyền.
+5. **Vì sao 2000 emoji có thể chạm giới hạn 4000?** Nhiều emoji chiếm hai đơn vị UTF-16; JS `.length` và Java `String.length()` đếm đơn vị này, không đếm ký tự nhìn thấy.
+
+Ba câu kiểm tra để Duy trả lời trước khi chuyển đợt:
+
+1. `onSend` reject thì input và nút Gửi thay đổi thế nào?
+2. Nếu lấy `response.data` thay vì `response.data.data`, component cha sẽ nhận gì?
+3. Vì sao route Group hiện chưa được mở gửi thật dù đã có MessageInput?
