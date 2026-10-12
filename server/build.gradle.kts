@@ -60,6 +60,7 @@ dependencies {
 	// Response follow format RFC7807
 	implementation("org.zalando:problem-spring-web-starter:0.29.1")
 	runtimeOnly("com.microsoft.sqlserver:mssql-jdbc")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
 }
 
 tasks.withType<Test> {

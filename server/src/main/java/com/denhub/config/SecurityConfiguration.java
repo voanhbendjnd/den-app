@@ -82,7 +82,10 @@ public class SecurityConfiguration {
                 "/api/v1/files/**",
                 "/api/files/**",
                 "/api/v1/payments/vnpay-ipn",
-                "/api/v1/payments/vnpay-return"
+                "/api/v1/payments/vnpay-return",
+                "/swagger-ui/**",
+                "/v3/api-docs/**",
+                "/swagger-ui.html"
         };
         // handle for case api public but request including token wrong or expire
         List<String> publicEndpoints = List.of(
@@ -96,10 +99,13 @@ public class SecurityConfiguration {
                 "/api/v1/auth/login",
                 "/api/refresh",
                 "/refresh",
-                "/api/account/activate/**",
-                "/api/activate/**",
-                "/api/account/reset-password/**",
-                "/files/**");
+                "/account/activate/**",
+                "/account/reset-password/init",
+                "/account/reset-password/finish",
+                "/files/**",
+                "/swagger-ui/**",
+                "/v3/api-docs/**",
+                "/swagger-ui.html");
         http.cors(cors -> cors.configurationSource(corsConfig))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(

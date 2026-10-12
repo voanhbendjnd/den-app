@@ -5,5 +5,6 @@ import org.springframework.stereotype.Repository;
 import com.denhub.domain.ServerMember;
 
 @Repository
-public interface ServerMemberRepository extends JpaRepository<ServerMember,Long> {
+public interface ServerMemberRepository extends JpaRepository<ServerMember, Long> {
+    boolean existsByServerIdAndUserId(Long serverId, Long userId);
 }

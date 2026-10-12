@@ -9,12 +9,14 @@ export default function AuthLayout() {
 
   return (
     <div
+      className="tech-grid-bg"
       style={{
         minHeight: '100vh',
-        backgroundColor: '#f5f5f5',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
       <Outlet />

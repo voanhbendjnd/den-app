@@ -1,6 +1,5 @@
 package com.denhub.config;
 
-
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -26,6 +25,7 @@ public class DatabaseInitializer implements CommandLineRunner {
     UserRepository userRepository;
     AuthorityRepository authorityRepository;
     PasswordEncoder passwordEncoder;
+
     @Override
     public void run(String... args) throws Exception {
         log.info("Database start check initialization...");
@@ -33,8 +33,7 @@ public class DatabaseInitializer implements CommandLineRunner {
         Long totalAuthority = authorityRepository.count();
         Set<Authority> authorities = new HashSet<>();
 
-
-        if(totalAuthority.equals(0L)) {
+        if (totalAuthority.equals(0L)) {
             log.info("Start create authority...");
 
             Authority adminAuthority = new Authority();
@@ -46,10 +45,10 @@ public class DatabaseInitializer implements CommandLineRunner {
             authorities.addAll(List.of(adminAuthority, userAuthority, anonymousAuthority));
             authorityRepository.saveAll(authorities);
         }
-        if(totalUsers.equals(0L)){
+        if (totalUsers.equals(0L)) {
             log.info("Start create user...");
             User admin = new User();
-            admin.setName("VO ANH BEN");
+            admin.setName("Oni");
             admin.setActivated(true);
             admin.setUsername("djnd");
             admin.setEmail("benva.ce190709@gmail.com");
@@ -66,10 +65,9 @@ public class DatabaseInitializer implements CommandLineRunner {
             admin2.setAuthorities(authorities);
             userRepository.save(admin2);
         }
-        if(totalUsers > 0 || totalAuthority > 0){
+        if (totalUsers > 0 || totalAuthority > 0) {
             log.info("Skip processing initialize...");
-        }
-        else{
+        } else {
             log.info("End init data and init data success");
         }
     }

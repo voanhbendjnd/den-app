@@ -8,10 +8,6 @@ const authApi = {
   register(data) {
     return axiosClient.post('/auth/register', data);
   },
-
-  getMe() {
-    return axiosClient.get('/users/me');
-  },
 };
 
 export default authApi;
