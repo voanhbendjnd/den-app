@@ -123,4 +123,73 @@ class ServerServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getName()).isEqualTo("My Server");
     }
+
+    @Test
+    void joinServer_Success() {
+        String email = "test@example.com";
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(email, "password")
+        );
+
+        User mockUser = new User();
+        mockUser.setId(1L);
+        mockUser.setEmail(email);
+        mockUser.setName("Test User");
+
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
+
+        Server server = new Server();
+        server.setId(10L);
+
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+
+        serverService.joinServer(10L);
+
+        verify(serverMemberRepository, times(1)).save(any(ServerMember.class));
+    }
+
+    @Test
+    void joinServer_FailWhenNotLoggedIn() {
+        assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+    }
+
+    @Test
+    void joinServer_FailWhenServerNotFound() {
+        String email = "test@example.com";
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(email, "password")
+        );
+
+        User mockUser = new User();
+        mockUser.setId(1L);
+        mockUser.setEmail(email);
+
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
+        when(serverRepository.findById(10L)).thenReturn(Optional.empty());
+
+        assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+    }
+
+    @Test
+    void joinServer_FailWhenAlreadyMember() {
+        String email = "test@example.com";
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(email, "password")
+        );
+
+        User mockUser = new User();
+        mockUser.setId(1L);
+        mockUser.setEmail(email);
+
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
+
+        Server server = new Server();
+        server.setId(10L);
+
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+
+        assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+    }
 }

@@ -1,12 +1,12 @@
 import axiosClient from './axiosClient';
 
 const messageApi = {
-  getMessages(roomId, params) {
-    return axiosClient.get(`/rooms/${roomId}/messages`, { params });
+  getMessages(channelId, params) {
+    return axiosClient.get(`/channels/${channelId}/messages`, { params });
   },
 
-  sendMessage(roomId, data) {
-    return axiosClient.post(`/rooms/${roomId}/messages`, data);
+  sendMessage(channelId, data) {
+    return axiosClient.post(`/channels/${channelId}/messages`, data);
   },
 };
 

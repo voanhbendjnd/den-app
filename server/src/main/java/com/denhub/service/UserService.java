@@ -33,6 +33,12 @@ public class UserService {
     CacheManager cacheManager;
     PasswordEncoder passwordEncoder;
     AuthorityRepository authorityRepository;
+
+    @Transactional(readOnly = true)
+    public Optional<User> getUserWithAuthorities() {
+        return com.denhub.security.SecurityUtils.getCurrentUserLogin()
+                .flatMap(userRepository::findOneWithAuthoritiesByEmail);
+    }
     public User registerUser(UserDTO dto, String password) {
         String normalizedEmail = dto.getEmail().trim().toLowerCase(Locale.ENGLISH);
         userRepository.findOneByEmail(normalizedEmail).ifPresent(existingUser -> {

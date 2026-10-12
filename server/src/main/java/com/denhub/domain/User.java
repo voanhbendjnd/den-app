@@ -12,6 +12,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.hibernate.validator.constraints.Length;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -44,10 +46,27 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
     @Column(length = 254, unique = true)
     @NotNull
     private String email;
-
+    @Length(max = 100)
+    @Column(name = "username", length = 100)
+    private String username;
     @NotNull
     @Column(nullable = false)
     private Boolean activated = false;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.username == null || this.username.isBlank()) {
+            if (this.email != null && !this.email.isBlank()) {
+                String prefix = this.email.contains("@") ? this.email.split("@")[0] : this.email;
+                if (prefix.length() > 60) {
+                    prefix = prefix.substring(0, 60);
+                }
+                this.username = prefix + "_" + UUID.randomUUID().toString().substring(0, 8);
+            } else {
+                this.username = "user_" + UUID.randomUUID().toString().substring(0, 8);
+            }
+        }
+    }
 
 
     @Size(max = 20)
@@ -62,7 +81,7 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
 
     @Column(name = "reset_date")
     private Instant resetDate = null;
-
+    private String avatar;
     @Column(name ="session_id")
     private String sessionId;
     @JsonIgnore

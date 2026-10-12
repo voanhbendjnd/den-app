@@ -17,5 +17,9 @@ public final class ErrorConstants {
     public static final URI INVALID_SESSION_TYPE = URI.create(PROBLEM_BASE_URL + "/invalid-session-type");
     public static final URI BAD_REQUEST_TYPE = URI.create(PROBLEM_BASE_URL + "/bad-request");
     public static final URI CONFLICT = URI.create(PROBLEM_BASE_URL + "/conflict");
+    public static final URI FRIEND_BLOCKED_ALREADY = URI.create(PROBLEM_BASE_URL + "/friend-blocked-already");
+    public static final URI FRIEND_ACCEPT_ALREADY = URI.create(PROBLEM_BASE_URL + "/friend-accept-already");
+
+    public static final URI FRIEND_REQUEST_ALREADY_SENT = URI.create(PROBLEM_BASE_URL + "/friend-request-already-sent");
     private ErrorConstants() {}
 }

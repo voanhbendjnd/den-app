@@ -37,4 +37,11 @@ public class ServerResource {
         java.util.List<ServerResponseDTO> servers = serverService.getUserServers();
         return ResponseEntity.ok(servers);
     }
+
+    @PostMapping("/{serverId}/join")
+    @Operation(summary = "Tham gia vào một Server", description = "Cho phép người dùng hiện tại tham gia vào Server thông qua ID. Yêu cầu đăng nhập.")
+    public ResponseEntity<Void> joinServer(@PathVariable Long serverId) {
+        serverService.joinServer(serverId);
+        return ResponseEntity.noContent().build();
+    }
 }

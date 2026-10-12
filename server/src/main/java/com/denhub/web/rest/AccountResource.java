@@ -56,6 +56,26 @@ public class AccountResource {
             super(message);
         }
     }
+    @GetMapping({"/account", "/users/me"})
+    public ResponseEntity<ResLoginDTO.UserLogin> getAccount() {
+        return userService.getUserWithAuthorities()
+                .map(user -> {
+                    ResLoginDTO.UserLogin userLogin = new ResLoginDTO.UserLogin();
+                    userLogin.setId(user.getId());
+                    userLogin.setEmail(user.getEmail());
+                    userLogin.setName(user.getName());
+                    if (user.getAuthorities() != null) {
+                        userLogin.setAuthorities(
+                                user.getAuthorities().stream()
+                                        .map(com.denhub.domain.Authority::getName)
+                                        .collect(java.util.stream.Collectors.toSet())
+                        );
+                    }
+                    return ResponseEntity.ok(userLogin);
+                })
+                .orElseThrow(() -> new AccountResourceException("User could not be found"));
+    }
+
     @GetMapping(path = "/activate")
     @Operation(summary = "Kích hoạt tài khoản", description = "Kích hoạt tài khoản người dùng thông qua mã xác nhận.")
     public void activateAccount(@RequestParam(value = "key") String key) {

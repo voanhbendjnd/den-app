@@ -16,9 +16,11 @@ import RegisterPage from '../pages/auth/RegisterPage';
 import HomePage from '../pages/home/HomePage';
 import RoomsPage from '../pages/rooms/RoomsPage';
 import ChatPage from '../pages/chat/ChatPage';
+import GroupChatPage from '../pages/chat/GroupChatPage';
 import MeetingsPage from '../pages/meetings/MeetingsPage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
 import ProfilePage from '../pages/profile/ProfilePage';
+import DirectMessagePage from '../pages/direct/DirectMessagePage';
 
 // Admin pages
 import AdminUsersPage from '../pages/admin/AdminUsersPage';
@@ -45,11 +47,14 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/servers/:serverId" element={<GroupChatPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
           <Route path="/rooms/:roomSlug" element={<ChatPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/direct" element={<DirectMessagePage />} />
+          <Route path="/direct/:conversationId" element={<DirectMessagePage />} />
 
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>

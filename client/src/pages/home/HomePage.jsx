@@ -19,7 +19,7 @@ export default function HomePage() {
       {/* =========================================================
           Hero Banner
          ========================================================= */}
-      <div 
+      <div
         className="glass-panel"
         style={{
           borderRadius: 20,
@@ -73,18 +73,18 @@ export default function HomePage() {
               Danh sách các Server mà bạn đang quản lý hoặc tham gia
             </Text>
           </div>
-          <Button 
-            type="link" 
+          <Button
+            type="link"
             icon={<PlusOutlined />}
             onClick={() => openCreateModal?.()}
             style={{ color: '#00F2FE', fontWeight: 600 }}
           >
-            + Tạo thêm Server
+            Tạo thêm Server
           </Button>
         </div>
 
         {servers.length === 0 ? (
-          <div 
+          <div
             className="glass-panel"
             style={{
               padding: '48px 24px',
@@ -104,8 +104,8 @@ export default function HomePage() {
                 </div>
               }
             >
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 icon={<PlusOutlined />}
                 style={{ marginTop: 16, fontWeight: 600, background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)', border: 'none' }}
                 onClick={() => openCreateModal?.()}
@@ -118,7 +118,7 @@ export default function HomePage() {
           <Row gutter={[16, 16]}>
             {servers.map((server) => (
               <Col xs={24} sm={12} md={8} key={server.id}>
-                <div 
+                <div
                   className="glass-card"
                   style={{
                     padding: 20,
@@ -130,10 +130,10 @@ export default function HomePage() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <Avatar 
-                      size={50} 
+                    <Avatar
+                      size={50}
                       src={server.iconUrl}
-                      style={{ 
+                      style={{
                         background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
                         fontWeight: 800,
                         fontSize: 18,

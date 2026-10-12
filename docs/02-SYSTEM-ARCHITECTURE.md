@@ -1,67 +1,49 @@
 # 02 - SYSTEM ARCHITECTURE: DENHUB
 
-> **Tài liệu kiến trúc hệ thống & Quy chuẩn giao tiếp (Living Documentation + Research Template)**  
-> **Source of Truth** về Stack công nghệ, Kiến trúc tầng, REST API Contract, WebSocket Contract và Security.
+> **Tài liệu kiến trúc hệ thống & Quy chuẩn giao tiếp**\
+> **Source of Truth:** Tài liệu này quản lý architecture, API, DTO, Security và WebSocket; nghiệp vụ ở [`01-PROJECT-OVERVIEW.md`](./01-PROJECT-OVERVIEW.md), dữ liệu ở [`03-DATABASE-DESIGN.md`](./03-DATABASE-DESIGN.md).\
+> **Cập nhật 2026-10-11:** Duy chốt giữ wrapper response thành công hiện có; xem mục 4.1, 4.4 và 7.1. Contract được chốt không đồng nghĩa source code đã triển khai xong; xem mục 7.
 
 ---
 
-## 1. Trạng thái & Định hướng kiến trúc
-
-Tài liệu này xác lập ranh giới kỹ thuật và hợp đồng giao tiếp (Communication Contract) giữa Frontend và Backend.
-
-> [!NOTE]
-> Mọi thành phần công nghệ đã chọn ở mức định hướng (`CONFIRMED`) không có nghĩa là kiến trúc chi tiết đã tự động hoàn tất.  
-> Các phương án triển khai chi tiết, endpoint, payload, destination được đánh dấu `TBD` hoặc `PROPOSED` cho đến khi team thống nhất.
-
----
-
-## 2. Technology Stack đã chốt (`CONFIRMED`)
+## 1. Technology Stack (`CONFIRMED`)
 
 | Tầng / Phân hệ | Công nghệ lựa chọn | Mục đích sử dụng | Trạng thái |
 | :--- | :--- | :--- | :---: |
-| **Frontend Framework** | **React + Vite** | Xây dựng Single Page Application (SPA) hiệu năng cao | `CONFIRMED` |
-| **Frontend Language** | **JavaScript / JSX** | Ngôn ngữ lập trình chính của client | `CONFIRMED` |
-| **Routing** | **React Router DOM** | Điều hướng trang và bảo vệ các Private Routes | `CONFIRMED` |
-| **UI Component Library** | **Ant Design (antd)** | Thư viện UI chuẩn mực cho form, layout, button, modal | `CONFIRMED` |
-| **Pro UI Components** | **@ant-design/pro-components** | Thành phần nâng cao (ProLayout, ProTable, ProForm) | `CONFIRMED` |
-| **HTTP Client** | **Axios** | Giao tiếp REST API, cấu hình Interceptor cho JWT | `CONFIRMED` |
-| **Token Handling** | **jwt-decode** | Giải mã client-side JWT payload để lấy user info | `CONFIRMED` |
-| **Text Utility** | **slugify** | Hỗ trợ chuẩn hóa chuỗi, tạo slug hoặc đường dẫn | `CONFIRMED` |
+| **Frontend Framework** | **React + Vite** | SPA hiệu năng cao | `CONFIRMED` |
+| **Routing** | **React Router DOM** | Điều hướng và bảo vệ Protected Routes | `CONFIRMED` |
+| **UI Component Library** | **Ant Design (antd)** | Layout, Navigation, Chat Form, Modals | `CONFIRMED` |
+| **HTTP Client** | **Axios** | REST client có Bearer token interceptor | `CONFIRMED` |
 | **Real-time Client** | **STOMP / WebSocket (@stomp/stompjs)** | Kết nối WebSocket và xử lý STOMP protocol | `CONFIRMED` |
-| **Backend Framework** | **Java + Spring Boot 3** | Xây dựng RESTful API và WebSocket server | `CONFIRMED` |
-| **Security & Auth** | **Spring Security + JWT** | Xác thực người dùng, bảo vệ API và handshake WebSocket | `CONFIRMED` |
-| **Relational ORM** | **Spring Data JPA (Hibernate)** | Tương tác với cơ sở dữ liệu quan hệ SQL Server | `CONFIRMED` |
-| **Document ORM** | **Spring Data MongoDB** | Tương tác với cơ sở dữ liệu NoSQL MongoDB | `CONFIRMED` |
-| **Real-time Server** | **Spring WebSocket + STOMP Messaging** | Quản lý STOMP broker, phân phối tin nhắn theo room | `CONFIRMED` |
-| **API Documentation** | **OpenAPI 3 / Swagger (Springdoc)** | Tự động sinh tài liệu API và hỗ trợ test endpoint | `CONFIRMED` |
-| **Relational Database** | **Microsoft SQL Server** | Lưu trữ dữ liệu cấu trúc quan hệ cốt lõi | `CONFIRMED` |
-| **NoSQL Database** | **MongoDB** | Lưu trữ dữ liệu tài liệu linh hoạt/hiệu năng cao | `CONFIRMED` |
-| **Backend Testing** | **JUnit 5 + Mockito + MockMvc** | Kiểm thử đơn vị (Unit Test) và kiểm thử API layer | `CONFIRMED` |
+| **Backend Framework** | **Java 21 + Spring Boot 3** | REST API, Business Services, WebSocket Broker | `CONFIRMED` |
+| **Security & Auth** | **Spring Security 6 + Nimbus JWT** | Xác thực JWT Access Token, bảo vệ API & STOMP | `CONFIRMED` |
+| **ORM / Data Access** | **Spring Data JPA (Hibernate)** | Tương tác dữ liệu quan hệ Microsoft SQL Server | `CONFIRMED` |
+| **Database** | **Microsoft SQL Server** | Cơ sở dữ liệu duy nhất toàn bộ hệ thống | `CONFIRMED` |
+| **File Storage** | **Cloudinary / Local File Storage** | Lưu trữ ảnh và file đính kèm (DB lưu metadata) | `CONFIRMED` |
+| **Backend Testing** | **JUnit 5 + Mockito + MockMvc** | Kiểm thử đơn vị và API integration | `CONFIRMED` |
 
 ---
 
-## 3. Kiến trúc tổng thể hệ thống (High-Level Architecture)
+## 2. Kiến trúc tổng thể hệ thống
 
 ```mermaid
 graph TB
-    subgraph ClientLayer ["Client Layer (Frontend)"]
-        UI["React SPA (Vite + Ant Design)"]
+    subgraph ClientLayer ["Client Layer (Frontend SPA)"]
+        UI["React 18 + Ant Design"]
         AxiosClient["Axios HTTP Client (REST)"]
-        StompClient["STOMP / WebSocket Client"]
+        StompClient["@stomp/stompjs (WebSocket)"]
     end
 
     subgraph BackendLayer ["Backend Layer (Spring Boot 3)"]
         SecurityFilter["Spring Security Filter (JWT Validation)"]
-        RestControllers["REST Controllers (Auth, Room, Member...)"]
-        WsEndpoints["STOMP WebSocket Controller & Broker"]
-        Services["Business Service Layer"]
+        RestControllers["REST Controllers (Auth, Server, Channel, Message, DM)"]
+        WsEndpoints["STOMP Broker & Channel Interceptors"]
+        Services["Domain Business Services"]
         JpaRepo["Spring Data JPA Repositories"]
-        MongoRepo["Spring Data Mongo Repositories"]
     end
 
-    subgraph DatabaseLayer ["Database Layer (Hybrid)"]
-        SqlServer[("Microsoft SQL Server\n(Relational Data)")]
-        MongoDb[("MongoDB\n(Document Data)")]
+    subgraph DatabaseLayer ["Database Layer"]
+        SqlServer[("Microsoft SQL Server\n(Relational Schema)")]
     end
 
     UI --> AxiosClient
@@ -75,81 +57,96 @@ graph TB
     WsEndpoints --> Services
 
     Services --> JpaRepo
-    Services --> MongoRepo
-
-    JpaRepo -->|JDBC/JPA| SqlServer
-    MongoRepo -->|Mongo Driver| MongoDb
+    JpaRepo -->|JDBC / Hibernate| SqlServer
 ```
 
 ---
 
-## 4. Phân chia ranh giới: REST API vs WebSocket
-
-Nhằm giữ hệ thống đơn giản, dễ debug và bảo trì, dự án phân tách rõ ranh giới giao tiếp:
+## 3. Phân tách ranh giới REST vs WebSocket
 
 | Giao thức | Phạm vi áp dụng | Lý do thiết kế |
 | :--- | :--- | :--- |
-| **REST API (HTTP/HTTPS)** | - Authentication (Đăng ký, Đăng nhập)<br>- Quản lý Room (Tạo, Sửa, Xóa, Lấy danh sách)<br>- Quản lý Member (Tham gia, Rời, Kick, Phân quyền)<br>- Tải lịch sử tin nhắn (Message History, Phân trang) | Các tác vụ dạng Request-Response kinh điển, cần kiểm soát transaction, mã trạng thái HTTP chuẩn và dễ test qua MockMvc / Swagger. |
-| **WebSocket (STOMP)** | - Gửi và nhận tin nhắn mới theo thời gian thực (Real-time Messages)<br>- Các sự kiện tức thời trong Room (ví dụ: member mới tham gia - `TBD`) | Cần độ trễ thấp (low latency), kênh kết nối hai chiều liên tục, không cần polling liên tục gây tải cho server. |
+| **REST API (HTTP/HTTPS)** | - Authentication (Đăng ký, Đăng nhập, Profile)<br>- Quản lý Server, Channel, Member, Invite<br>- Gửi tin nhắn Channel (Task 1.07)<br>- Tải lịch sử tin nhắn (Cursor Pagination)<br>- Quản lý Direct Conversation | Xử lý các tác vụ truy vấn, giao dịch ACID, phân trang và tải dữ liệu khởi tạo đáng tin cậy. |
+| **WebSocket (STOMP)** | - Phát sóng tin nhắn kênh mới (`MESSAGE_CREATED`)<br>- Cập nhật / Xóa tin nhắn (`UPDATED`, `DELETED`)<br>- Sự kiện thả cảm xúc (`REACTION_ADDED`, `REMOVED`)<br>- Phân phối tin nhắn riêng tư 1-1 qua private queue | Truyền tải sự kiện thời gian thực độ trễ thấp, không gây tải polling liên tục lên server. |
 
 ---
 
-## 5. Quy chuẩn REST API Contract
+## 4. Chuẩn REST Response & Error Contract
 
-### 5.1 Cấu trúc phản hồi thành công chuẩn (`PROPOSED`)
-Mọi REST API nên trả về một cấu trúc Envelope đồng nhất:
+### 4.1 Phản hồi thành công: Wrapper `RestResponse<T>` (`CONFIRMED`)
+
+- Quyết định của Duy ngày 2026-10-11 thay thế convention DTO trực tiếp trước đó: giữ wrapper thành công hiện có của `ResFormatResponse` và `RestResponse<T>`.
+- Với response JSON DTO thành công có body, đặt DTO trong `data`; không trả JPA Entity. Wrapper có `statusCode` (khớp HTTP status), `message` (thông báo kết quả), `error` (`null` khi thành công) và `data` (dữ liệu nghiệp vụ).
+- Controller trả `ResponseEntity<DTO>`; `ResFormatResponse` bọc đúng một lần trước khi ghi HTTP body. Không tự tạo thêm `RestResponse` trong Controller vì advice hiện có sẽ bọc lồng nhau.
+- `message` lấy từ `@ApiMessage`, mặc định là `Call API success!` khi method không có annotation. Với gửi tin nhắn, giá trị là `Gửi tin nhắn thành công`; nội dung chat nằm ở `data.content`.
+- Backend dùng `ResponseEntity` để chọn HTTP status phù hợp; không trả HTTP 200 cho mọi kết quả.
+- HTTP `204` không có body. Giữ các ngoại lệ hiện có của advice cho Swagger/API docs, String, file/resource và byte array; không áp dụng wrapper JSON cho các response đó.
+- Response lỗi có status từ `400` trở lên không đi qua wrapper thành công; yêu cầu Problem Details ở mục 4.3 giữ nguyên. Việc chốt wrapper không xác nhận các error handlers đã đáp ứng contract.
+- Không để lộ password, password hash, token hoặc thông tin nhạy cảm.
+- Đây là **convention riêng của DenHub**. HTTP/REST không bắt buộc mọi dự án phải dùng hoặc phải bỏ wrapper.
+
+| HTTP status | Ý nghĩa áp dụng |
+| :--- | :--- |
+| `200 OK` | Lấy hoặc cập nhật dữ liệu thành công, có body. |
+| `201 Created` | Tạo tài nguyên mới thành công. |
+| `204 No Content` | Thành công, không có response body. |
+| `400 Bad Request` | Request không hợp lệ. |
+| `401 Unauthorized` | Chưa xác thực hoặc token không hợp lệ. |
+| `403 Forbidden` | Đã xác thực nhưng không có quyền thực hiện. |
+| `404 Not Found` | Không tìm thấy tài nguyên. |
+| `500 Internal Server Error` | Lỗi hệ thống ngoài dự kiến. |
+
+### 4.2 Cấu trúc phân trang Cursor chuẩn (Lịch sử tin nhắn)
+
+Đây là cấu trúc DTO phân trang đặt trong `data` của wrapper tại mục 4.1; ví dụ dưới đây chỉ mô tả phần `data`. Lịch sử tin nhắn nằm ngoài Task 1.07 / 1.12.
 
 ```json
 {
-  "success": true,
-  "code": 200,
-  "message": "Thực hiện thành công",
-  "data": { ... },
-  "timestamp": "2026-10-06T10:15:30Z"
+  "items": [],
+  "nextCursor": null,
+  "hasMore": false,
+  "limit": 30
 }
 ```
 
-### 5.2 Cấu trúc phản hồi lỗi chuẩn (`PROPOSED`)
-Khi có lỗi xảy ra (4xx, 5xx), Backend bắt buộc trả về format:
+### 4.3 Phản hồi lỗi: Problem Details theo RFC 9457 (`CONFIRMED`)
+
+Sử dụng `application/problem+json` cho response Problem Details. Ví dụ:
 
 ```json
 {
-  "success": false,
-  "code": 400,
-  "errorCode": "ROOM_NAME_DUPLICATE",
-  "message": "Tên phòng đã tồn tại trong hệ thống",
-  "errors": [
-    {
-      "field": "name",
-      "rejectedValue": "Dev Room",
-      "message": "Tên phòng không được trùng lặp"
-    }
-  ],
-  "timestamp": "2026-10-06T10:15:30Z"
+  "type": "about:blank",
+  "title": "Forbidden",
+  "status": 403,
+  "detail": "Bạn không có quyền gửi tin nhắn trong Channel này"
 }
 ```
 
-### 5.3 Cấu trúc phân trang danh sách chuẩn (`PROPOSED`)
-```json
-{
-  "success": true,
-  "code": 200,
-  "data": {
-    "items": [ ... ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 150,
-    "totalPages": 8,
-    "hasNext": true
-  },
-  "timestamp": "2026-10-06T10:15:30Z"
-}
+- Ưu tiên `ProblemDetail` có sẵn của Spring khi phiên bản hỗ trợ.
+- Kiểm tra và tái sử dụng cơ chế xử lý lỗi hiện tại; không tạo GlobalExceptionHandler trùng hoặc xung đột.
+- Phân biệt validation (`400`), authentication (`401`), authorization (`403`) và tài nguyên không tồn tại (`404`).
+- Không trả stack trace, nguyên nhân nội bộ nhạy cảm hoặc credentials cho client.
+- Lỗi do Security filter phát sinh cũng phải được kiểm tra, không chỉ lỗi trong Controller.
+
+### 4.4 Axios đọc Response DTO trong wrapper
+
+```javascript
+const response = await axiosClient.post(`/channels/${channelId}/messages`, { content });
+const message = response.data.data;
 ```
 
-### 5.4 Danh mục REST API cần nghiên cứu chi tiết (`TBD`)
+`axiosClient` hiện có base URL kết thúc bằng `/api`; không thêm `/api` lần nữa vào đường dẫn trên. Interceptor hiện trả nguyên Axios response: `response.data` là toàn bộ wrapper, `response.data.message` là thông báo thành công và `response.data.data` là DTO nghiệp vụ. Ví dụ `message.content` là nội dung chat. Quy tắc đọc này áp dụng cho response thành công được bọc; response lỗi đọc theo mục 4.3.
+
+### 4.5 Danh mục từ nhánh incoming — cần đối chiếu với contract
+
+Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh incoming trước khi gộp ngày 2026-10-11. Đây là bản ghi để đối chiếu, không thay thế contract mục 5 và không xác nhận mọi endpoint đã tồn tại. Các mục TBD vẫn chưa được quyết định.
 
 | Phân hệ | Phương thức | Endpoint | Chức năng dự kiến | Trạng thái |
 | :--- | :---: | :--- | :--- | :---: |
+| **Search** | `GET` | `/api/users/search?username={q}` | Tìm kiếm danh sách người dùng theo username | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/requests` | Gửi yêu cầu kết bạn (hoặc chấp nhận nếu đã có pended req) | `CONFIRMED` |
+| **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
+| **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/login` | Đăng nhập và lấy Access Token JWT | `TBD` |
 | **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tương user hiện tại qua token | `TBD` |
@@ -159,7 +156,7 @@ Khi có lỗi xảy ra (4xx, 5xx), Backend bắt buộc trả về format:
 | **Server** | `GET` | `/api/v1/servers/{serverId}` | Lấy thông tin chi tiết một Server | `TBD` |
 | **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
-| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `TBD` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
 | **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `TBD` |
 | **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
@@ -170,94 +167,329 @@ Khi có lỗi xảy ra (4xx, 5xx), Backend bắt buộc trả về format:
 | **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `CONFIRMED` |
 | **Media / File** | `POST` | `/api/v1/files/upload` | Tải lên file ảnh (multipart/form-data) nhận URL tĩnh | `CONFIRMED` |
 | **Media / File** | `GET` | `/api/v1/files/{folder}/{filename}` | Phục vụ file ảnh công khai cho trình duyệt | `CONFIRMED` |
+| **Conversation** | `GET` | `/api/v1/conversations` | Lấy danh sách hội thoại của user hiện tại (thông tin người kia & tin nhắn mới nhất) | `CONFIRMED` |
+| **Conversation** | `GET` | `/api/v1/conversations/{conversationId}/messages` | Lấy lịch sử tin nhắn của một hội thoại (phân trang page & size) | `CONFIRMED` |
+
+Hiện trạng đã đọc từ source sau gộp:
+
+- AccountResource có POST /api/login; Auth frontend gọi /login và /register với base URL /api. Chưa tìm thấy backend GET /api/users/me; Auth khôi phục cache/JWT theo incoming, không gọi endpoint này. JWT decode trên frontend không xác minh chữ ký; backend vẫn chịu trách nhiệm xác thực/phân quyền.
+- ServerResource dùng /api/v1/servers (GET, POST, POST /{serverId}/join); ChannelResource dùng POST /api/v1/channels; FileResource dùng /api/v1/files. Đây là chênh lệch với mục 5, không tự đổi route trong lần giải conflict.
+- ChannelService cho Owner hoặc Member tạo kênh, khác Owner/Admin tại mục 5.3. Giữ hành vi incoming theo phạm vi được duyệt; cần quyết định riêng trước khi đổi permission.
+- ResFormatResponse bọc success response đúng quyết định SUCCESS-WRAPPER tại mục 4.1/7.1. MessageResource.java còn untracked có sẵn; MessageResourceIT.java đã tracked. Security/JWT/Problem Details và H2 đã PASS theo mục 7.5; còn ghi SQL Server thật chưa xác minh.
+- Backend 58 tests và frontend build PASS thuộc lượt gộp code trước khi áp dụng stash. Lượt gộp tài liệu sau stash không chạy lại test/build; các kết quả lịch sử không xác nhận lại toàn bộ working tree hiện tại hoặc các chênh lệch còn lại.
+
 
 ---
 
-## 6. Quy chuẩn WebSocket / STOMP Real-time Contract
+## 5. Danh mục REST API Chuẩn hóa (`CONFIRMED`)
 
-### 6.1 Cấu hình kết nối cơ sở (`PROPOSED`)
-- **Handshake Endpoint:** `/ws` hoặc `/ws-denhub` (`TBD`)
-- **Transport:** WebSocket thuần hoặc SockJS fallback (nếu cần tương thích trình duyệt cũ).
-- **Authentication:** Gửi Bearer JWT trong STOMP Connect Headers (`Authorization: Bearer <token>`). Interceptor phía Spring Boot sẽ bắt sự kiện `CONNECT` để xác thực Principal trước khi cho phép handshake thành công.
+### 5.1 Authentication & User
+- `POST /api/auth/register`: Đăng ký tài khoản mới
+- `POST /api/auth/login`: Đăng nhập, nhận Access Token JWT và cookie Refresh Token
+- `POST /api/auth/logout`: Đăng xuất, hủy refresh token
+- `GET /api/users/me`: Thông tin người dùng hiện tại
+- `PATCH /api/users/me`: Cập nhật display name, avatar
+- `GET /api/users/search?q={query}`: Tìm kiếm người dùng theo tên
 
-### 6.2 Mô hình Topic & Destination (`PROPOSED`)
+### 5.2 Server & Member Management
+- `GET /api/servers`: Lấy danh sách server người dùng tham gia
+- `POST /api/servers`: Tạo server mới (transactional với `#general` channel và Owner)
+- `GET /api/servers/{serverId}`: Chi tiết server kèm danh sách kênh
+- `PATCH /api/servers/{serverId}`: Cập nhật tên/ảnh server (Owner)
+- `DELETE /api/servers/{serverId}`: Xóa server (Owner)
+- `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
+- `POST /api/servers/{serverId}/invites`: Tạo invite code
+- `POST /api/invites/{code}/join`: Tham gia server qua code
+- `DELETE /api/invites/{code}`: Thu hồi invite code
+- `GET /api/servers/{serverId}/members`: Danh sách thành viên
+- `DELETE /api/servers/{serverId}/members/{userId}`: Kick thành viên
+- `PATCH /api/servers/{serverId}/members/{userId}/role`: Phân quyền `ADMIN`/`MEMBER` (Owner)
 
+### 5.3 Channels & Messages
+- `GET /api/servers/{serverId}/channels`: Danh sách kênh trong server
+- `POST /api/servers/{serverId}/channels`: Tạo kênh văn bản mới (Owner/Admin)
+- `PATCH /api/channels/{channelId}`: Đổi tên / thứ tự kênh
+- `DELETE /api/channels/{channelId}`: Xóa kênh (kênh `#general` không thể xóa)
+- `GET /api/channels/{channelId}/messages?before={id}&limit=30`: Lịch sử tin nhắn
+- `POST /api/channels/{channelId}/messages`: Gửi tin nhắn mới
+- `PATCH /api/messages/{messageId}`: Chỉnh sửa tin nhắn (tác giả)
+- `DELETE /api/messages/{messageId}`: Xóa mềm tin nhắn
+- `POST /api/messages/{messageId}/reactions`: Thả emoji reaction
+- `DELETE /api/messages/{messageId}/reactions/{emoji}`: Gỡ emoji reaction
+
+### 5.4 Direct Messages (1-1)
+- `GET /api/direct-conversations`: Danh sách các cuộc trò chuyện 1-1
+- `POST /api/direct-conversations`: Khởi tạo hoặc tìm cuộc trò chuyện 1-1
+- `GET /api/direct-conversations/{id}/messages?before={id}&limit=30`: Lịch sử DM
+- `POST /api/direct-conversations/{id}/messages`: Gửi tin nhắn DM
+
+---
+
+## 6. Quy chuẩn WebSocket / STOMP Real-time Contract (`CONFIRMED`)
+
+WebSocket là task sau, không triển khai trong Task 1.07 hoặc 1.12. Các destination dưới đây giữ vai trò contract cho giai đoạn real-time.
+
+- **Handshake Endpoint:** `/ws`
+- **Authentication:** Header `Authorization: Bearer <jwt-token>` trong frame STOMP `CONNECT`.
+- **Authorization on Subscribe:** `ChannelInterceptor` kiểm tra người dùng phải là `ServerMember` của server sở hữu channel mới cho phép subscribe topic.
+
+### Ma trận Destination & Topic:
 ```
-Client (Publisher) ───[SEND]───> /app/rooms/{roomId}/chat ───> Backend Processing
-                                                                      │
-Backend Broker     ───[BROADCAST]───> /topic/rooms/{roomId} ───(Tất cả Members đã SUBSCRIBE)
+Client ──[SEND]──> /app/channels/{channelId}/send ──> Server Process & Commit
+                                                            │
+Server ──[BROADCAST]──> /topic/channels/{channelId} ───────(Tất cả Members)
+Server ──[PRIVATE]────> /user/queue/direct-messages ───────(Người nhận DM)
 ```
 
-| Loại Destination | Pattern dự kiến | Mục đích | Trạng thái |
-| :--- | :--- | :--- | :---: |
-| **App Destination (SEND)** | `/app/rooms/{roomId}/send` | Client gửi tin nhắn mới lên Room | `TBD` |
-| **Broker Topic (SUBSCRIBE)**| `/topic/rooms/{roomId}` | Client lắng nghe tin nhắn mới trong Room | `TBD` |
-| **User Queue (Private)** | `/user/queue/errors` | Nhận thông báo lỗi cá nhân từ server | `TBD` |
+| Destination | Action | Mục đích | Trạng thái |
+| :--- | :---: | :--- | :---: |
+| `/app/channels/{channelId}/send` | `SEND` | Gửi tin nhắn văn bản vào channel | `CONFIRMED` |
+| `/topic/channels/{channelId}` | `SUBSCRIBE` | Nhận sự kiện tin nhắn (`CREATED`, `UPDATED`, `DELETED`) | `CONFIRMED` |
+| `/topic/channels/{channelId}/reactions` | `SUBSCRIBE` | Nhận sự kiện reaction (`ADDED`, `REMOVED`) | `TBD` |
+| `/topic/servers/{serverId}` | `SUBSCRIBE` | Nhận sự kiện quản trị server (kênh mới, thành viên bị kick) | `TBD` |
+| `/app/conversations/send` | `SEND` | Client gửi tin nhắn 1-1 (Text / Image) | `CONFIRMED` |
+| `/topic/conversations/{conversationId}` | `SUBSCRIBE` | Client lắng nghe tin nhắn 1-1 real-time | `CONFIRMED` |
+| `/user/queue/friend-requests/received` | `SUBSCRIBE` | Nhận thông báo có lời mời kết bạn mới | `CONFIRMED` |
+| `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Nhận thông báo lời mời kết bạn được chấp nhận | `CONFIRMED` |
+| `/user/queue/direct-messages` | `SUBSCRIBE` | Nhận tin nhắn riêng tư 1-1 gửi trực tiếp cho người dùng | `TBD` |
+| `/user/queue/errors` | `SUBSCRIBE` | Nhận thông báo lỗi thời gian thực cá nhân | `TBD` |
 
-### 6.3 Định dạng WebSocket Payload gửi lên (`PROPOSED`)
+### 6.3 Định dạng WebSocket Payload gửi lên 1-1 (`SendMessageReq`) (`CONFIRMED`)
 ```json
 {
-  "content": "Xin chào mọi người trong phòng!",
-  "clientTempId": "uuid-1234-client-generated"
+  "conversationId": 100,
+  "targetUserId": 2,
+  "type": "IMAGE",
+  "content": "Gửi mọi người bộ ảnh tài liệu",
+  "mediaUrl": "denhub-172838392-uuid1.webp,denhub-172838392-uuid2.webp",
+  "mediaUrls": [
+    "denhub-172838392-uuid1.webp",
+    "denhub-172838392-uuid2.webp"
+  ]
 }
 ```
 
-### 6.4 Định dạng WebSocket Message phát sóng xuống Client (`PROPOSED`)
+### 6.4 Định dạng WebSocket Message phát sóng xuống Client (`SendMessageRes`) (`CONFIRMED`)
 ```json
 {
-  "id": "mongo-message-id-6701a2b",
-  "roomId": 101,
+  "messageId": 501,
+  "conversationId": 100,
   "sender": {
-    "userId": 15,
-    "username": "hoangnam",
-    "displayName": "Hoàng Nam",
-    "avatarUrl": "https://..."
+    "userId": 1,
+    "name": "Hoàng Nam",
+    "avatar": "https://..."
   },
-  "content": "Xin chào mọi người trong phòng!",
-  "createdAt": "2026-10-06T10:15:30Z",
-  "type": "CHAT"
+  "type": "IMAGE",
+  "content": "Gửi mọi người bộ ảnh tài liệu",
+  "mediaUrl": "denhub-172838392-uuid1.webp,denhub-172838392-uuid2.webp",
+  "mediaUrls": [
+    "denhub-172838392-uuid1.webp",
+    "denhub-172838392-uuid2.webp"
+  ],
+  "status": "SENT",
+  "createdAt": "2026-10-08T17:10:00Z"
 }
 ```
 
 ---
 
-## 7. Kiến trúc Security & Authorization
+## 7. Task 1.07 — API gửi tin nhắn Channel
 
-```mermaid
-flowchart TD
-    Req[Incoming HTTP Request] --> JwtFilter[JwtAuthenticationFilter]
-    JwtFilter -->|Token Valid| SecurityContext[Set SecurityContextHolder]
-    JwtFilter -->|Token Invalid/Expired| Return401[Return 401 Unauthorized]
-    SecurityContext --> EndpointAuth{Endpoint Requirement}
-    EndpointAuth -->|Public Endpoint /api/v1/auth/**| Allow[Allow Execution]
-    EndpointAuth -->|Protected Endpoint| RoleCheck{Has Valid Role / Permission?}
-    RoleCheck -->|No| Return403[Return 403 Forbidden]
-    RoleCheck -->|Yes| Controller[Controller & Service Logic]
-    Controller --> RoomGuard{User is Member of Room?}
-    RoomGuard -->|No| Return403Room[Return 403 / 404 Not Found]
-    RoomGuard -->|Yes| ExecuteLogic[Process Request & Return Data]
+### 7.1 Request và response (`CONFIRMED`)
+
+`POST /api/channels/{channelId}/messages`, xác thực bằng JWT theo cơ chế hiện có.
+
+Request DTO `SendMessageRequest` chỉ nhận nội dung:
+
+```json
+{
+  "content": "Hello mọi người!"
+}
 ```
 
-### 7.1 Phân cấp quyền (Authorization Boundaries)
-Hệ thống cần phân biệt rõ 2 cấp độ phân quyền (`TBD` chi tiết):
-1. **System Level:** Cấp quyền toàn hệ thống (ví dụ: `ROLE_USER`, `ROLE_ADMIN`). Được quản lý thông qua Spring Security standard authorities.
-2. **Room Level:** Cấp quyền cục bộ bên trong từng Room (ví dụ: `ROOM_OWNER`, `ROOM_MEMBER`). Được kiểm tra ở Service layer hoặc Custom Security Expression trước khi cho phép thao tác trên tài nguyên của Room.
+HTTP `201 Created`, Response DTO `MessageResponse` nằm trong `data`:
 
----
+```json
+{
+  "statusCode": 201,
+  "error": null,
+  "message": "Gửi tin nhắn thành công",
+  "data": {
+    "id": 101,
+    "channelId": 5,
+    "senderId": 2,
+    "content": "Hello mọi người!",
+    "createdAt": "2026-10-10T07:30:00Z"
+}
+```
 
-## 8. Chiến lược kiểm thử Backend (Testing Strategy)
+Các ID và thời gian chỉ minh họa cấu trúc, không được hardcode. `senderId` ánh xạ từ `Message.authorId`; không nhận danh tính người gửi từ request. `MessageResponse.createdAt` dùng `Instant`, lấy từ `Message.createdDate`; contract JSON dùng ISO-8601 UTC với hậu tố `Z`. MockMvc test hiện kiểm tra HTTP 201, wrapper, thông báo, `error: null` và DTO kể cả timestamp; giới hạn kiểm thử được ghi tại mục 7.4.
 
-Tuân thủ bộ công cụ đã chốt:
-- **Unit Testing (JUnit 5 + Mockito):**
-  - Kiểm thử nghiệp vụ của các Service độc lập, mock Repository.
-  - Đảm bảo các business rules của Room, Member, Message được cover ít nhất các ca thông thường và ca ngoại lệ.
-- **Controller Testing (MockMvc):**
-  - Kiểm thử Request mapping, Validation annotation (`@Valid`), HTTP status code, format Response.
-  - Kiểm thử cơ chế chặn unauthorized access của Spring Security.
+### 7.2 Xử lý và bảo mật
 
----
+1. Xác định người dùng từ Spring Security/JWT đã được xác thực; không hardcode tài khoản và không bỏ qua authentication.
+2. Validate `content`: không null, không rỗng, không toàn khoảng trắng kể cả Unicode, tối đa 4000 đơn vị UTF-16 theo quyết định mục 4.2 của tài liệu database. Giữ nguyên nội dung hợp lệ; không trim hoặc cắt bớt tin nhắn. Database vẫn dùng `NVARCHAR(MAX)`.
+3. Kiểm tra Channel tồn tại; trả `404` nếu không tìm thấy.
+4. Kiểm tra người gửi thuộc Server chứa Channel; trả `403` nếu không có membership.
+5. Lưu Message bằng Repository vào SQL Server, map sang Response DTO; advice bọc DTO trong `data` và trả HTTP `201`.
 
-## 9. Nguyên tắc bảo vệ Contract
+Luồng: `HTTP Request → Security/JWT → Controller/Validation → Service → Repository → SQL Server → Response DTO → ResFormatResponse → HTTP Response`.
 
-1. **Thay đổi Contract phải đi kèm cập nhật tài liệu:** Nếu BE thay đổi tên field DTO hoặc URL API, phải sửa file này và thông báo ngay cho phía FE.
-2. **Độc lập và tuân thủ OpenAPI:** Phía Backend phải duy trì Swagger UI hoạt động chính xác tương ứng với tài liệu này để Frontend có thể trực tiếp kiểm thử endpoint trong quá trình phát triển.
+Chỉ gửi tin nhắn văn bản trong task này; không làm lịch sử, sửa/xóa, reply, reaction, attachment, Direct Message hoặc WebSocket.
+
+### 7.3 Hiện trạng cần xử lý khi lập kế hoạch (2026-10-11)
+
+Đây là hiện trạng lịch sử trước lượt hoàn tất ngày 2026-10-11. Kết quả hiện tại ở mục 7.5; không dùng các ô còn thiếu test dưới đây để suy ra trạng thái mới nhất.
+
+| Thành phần đã kiểm tra | Hiện trạng / tác động |
+| :--- | :--- |
+| `Message`, `MessageRepository` | Đã tồn tại; tái sử dụng, không tạo trùng. |
+| `Channel`, `ServerMember`, `ServerMemberRepository` | Tái sử dụng Entity; lượt 1A thêm `ChannelRepository` và `existsByServerIdAndUserId` vào Repository membership. |
+| Message Service / Controller / DTO | Lượt 1A đã thêm `MessageService`, `SendMessageRequest`, `MessageResponse` và unit tests. Lượt 1B có `MessageResource` (`POST /api/channels/{channelId}/messages`, HTTP 201 Created) và `MessageResourceIT` dùng MockMvc standalone với Service mock; chưa kiểm thử Security filter hoặc ghi SQL Server. |
+| `ResFormatResponse` | `ResponseBodyAdvice` tự bọc response thành công theo convention được Duy chốt ngày 2026-10-11 tại mục 4.1. |
+| `ExceptionTranslator` / Security errors | Đã có handler dùng Zalando Problem. `SmartAuthenticationEntryPoint` hiện trả JSON tùy chỉnh (`application/json`), chưa đúng contract Problem Details; các test lỗi hiện chỉ kiểm tra status. Cần kế hoạch riêng trước khi sửa shared handlers. |
+| JWT hiện có | JWT đã xác thực có subject là email; Service dùng `SecurityUtils` đọc subject rồi `UserRepository.findOneByEmail` lấy User ID. Từ chối anonymous, principal chưa xác thực, User không tồn tại hoặc chưa activated; không dùng ID do client gửi. |
+| `client/src/api/messageApi.js` | Đã cập nhật contract `/channels/{channelId}/messages`. |
+
+Các thành phần và giới hạn trên dùng để lập kế hoạch phần còn lại; không coi MockMvc standalone là kiểm thử toàn chuỗi qua JWT và SQL Server. Nếu thay đổi shared infrastructure đụng module của Ben, Hoàng, Vinh hoặc Kỳ Anh, phải trình phạm vi cụ thể và xin quyết định trước khi sửa.
+
+### 7.4 Phần đã triển khai trong lượt 1A
+
+`MessageService.sendMessage(channelId, request)` thực hiện trong `@Transactional`: xác định email từ Security Context, validate request, tra User, tra Channel, kiểm tra membership của chính Server chứa Channel, rồi `MessageRepository.save` và map DTO từ Entity trả về.
+
+Service dùng `ResponseStatusException` của Spring với `400`, `401`, `403`, `404`; tái sử dụng handler hiện có. Lượt 1B ban đầu chỉ có MockMvc standalone kiểm tra status; lượt hoàn tất đã bổ sung Security/JWT/H2 và xác nhận body/content type ở mục 7.5.
+
+Unit tests hiện dùng Validator thật, Repository mock và Security Context chứa JWT fixture đã xác thực. Chúng không xác minh chữ ký JWT, HTTP response, transaction rollback thực tế hoặc việc ghi vào SQL Server. Spring context test dùng H2 riêng theo cấu hình test hiện có.
+
+### 7.5 Hoàn tất POST trong phạm vi code/H2 (2026-10-11)
+
+Duy đã duyệt hoàn tất POST và bổ sung sửa audit riêng của Message. Contract request/201/wrapper ở mục 7.1 giữ nguyên; không đổi SecurityConfiguration, quyền, FE hoặc WebSocket.
+
+- `MessageSecurityIT` chạy HTTP/MockMvc → Security/JWT ký thật → Controller → Service → Repository/JPA/H2. Không mock Service/Repository, không bypass filter; fixtures nằm trong transaction test và rollback. Test flush/clear trước khi đọc lại Message để kiểm tra lưu trữ thay vì chỉ kiểm tra DTO.
+- 26 tests xác nhận 201/wrapper, content nguyên văn, JWT sender, channel, audit email 53/254, đúng biên 4000 UTF-16; token thiếu/malformed/sai chữ ký/hết hạn, session sai, inactive, không thuộc nhóm dù có ROLE_ADMIN, membership nhóm khác, channel không tồn tại, nội dung không hợp lệ. Lỗi 400/401/403/404 đều có Problem Details và không lưu thêm tin.
+- JWT sai qua `SmartAuthenticationEntryPoint` nay trả `application/problem+json`, `type/title/status/detail` và giữ `error/message/code/publicApi/redirect/redirectUrl`; thêm `WWW-Authenticate: Bearer`. ObjectMapper escape dấu nháy/xuống dòng đúng JSON, kể cả thông báo activation. Có regression trên API khác với token sai.
+- Thiếu JWT vẫn theo handler Problem có sẵn, không giả định có legacy fields hoặc WWW-Authenticate giống entry point. Không thay chính sách session hoặc các trường hợp public endpoint.
+- `ExceptionTranslator.process` vẫn giữ nhánh 4xx; nhánh 5xx bỏ detail/cause/extensions nội bộ, dùng detail “Đã xảy ra lỗi hệ thống”, giữ status/type/title/path và message `error.http.<status>`. Regression 500 dùng lỗi DB giả lập xác nhận không trả SQL/cause; regression 404 xác nhận detail nghiệp vụ vẫn giữ nguyên.
+- `Message` override created_by/last_modified_by dài 254, khắc phục lỗi 500 đã phát hiện với email 53 ký tự mà không cắt email. Script review riêng và giới hạn áp dụng xem docs/03 mục 4.3; không đổi mapping audit của User/Server/Channel.
+
+Verification từ `server/`: `.\gradlew.bat test --tests com.denhub.web.rest.MessageSecurityIT --no-daemon` **PASS 26/26**, tiếp đó `.\gradlew.bat compileJava test check --no-daemon` **PASS 85/85**, không fail/error/skip. Lần fail ban đầu được giữ trong log MESSAGE-SECURITY-INITIAL của docs/00.
+
+**Giới hạn:** H2 không chứng minh SQL Server thật; script SQL chỉ review tĩnh, chưa chạy hoặc áp dụng. Không có migration tự động được thêm. Code còn uncommitted; UI đang dở được giữ nguyên. GET Channel/lịch sử (ID giảm dần, before exclusive, limit 1–100 mặc định 30) lưu tạm hoãn ở docs/00 mục 12; chưa triển khai trong lượt này.
+
+### 7.6 Giải thích lượt hoàn tất cho Duy
+
+Các đường dẫn dưới đây tính từ repository root; dòng được đối chiếu sau khi sửa. Tests/docs/script phục vụ kiểm chứng và vận hành, không phải controller runtime.
+
+| File / dòng | Vai trò và thay đổi |
+| :--- | :--- |
+| `server/src/main/java/com/denhub/domain/Message.java:12` | Tầng persistence: `@Entity`/`@Table` map messages, `@Id` sinh khóa. `@AttributeOverrides` đổi riêng mapping hai field kế thừa; nếu bỏ sẽ trở lại 50 và email dài lại gây lỗi. Getter/setter và ID scalar giữ nguyên, không thêm `@ManyToOne`. |
+| `server/src/main/java/com/denhub/config/SmartAuthenticationEntryPoint.java:28` | Constructor nhận ObjectMapper qua Dependency Injection. `commence` ở dòng 33 nhận request/response/AuthenticationException, chọn thông báo/code/redirect hiện có, tạo ProblemDetail, serialize vào response 401. Không xác thực token tại đây: filter đã từ chối trước đó. Bỏ serializer sẽ mất escape JSON an toàn; bỏ legacy fields có thể làm client cũ hỏng. |
+| `server/src/main/java/com/denhub/web/rest/errors/ExceptionTranslator.java:32` | `@ControllerAdvice` xử lý lỗi chung qua Zalando. `process` nhận Problem response và request, giữ metadata, phân nhánh 5xx tại dòng 53 để tránh lộ SQL; 4xx giữ validation/business detail. Các method handleLogin/Email/Session giữ nguyên, gọi create để trả Problem. Bỏ nhánh 5xx có thể trả chi tiết DB cho client. |
+| `server/src/test/java/com/denhub/web/rest/MessageSecurityIT.java:54` | `@SpringBootTest`/`@AutoConfigureMockMvc` dùng app context và filters thật, `@Transactional` rollback fixture. `setUp` tạo User/Server/Channel/membership; các ca dòng 101–265 gọi HTTP và kiểm tra DB/error. Helper `request` tạo POST JSON; `token` ký JWT test; `problem` kiểm tra cấu trúc; `assertNoMessageSaved` flush/clear/count. Không dùng Mockito trong suite này. Nếu bỏ sẽ mất coverage xuyên tầng và regression email dài. |
+| `server/src/test/java/com/denhub/web/rest/MessageResourceIT.java:55` | Standalone MockMvc với Mockito Service; setUp đăng ký Jackson Problem modules giống serializer cần thiết. Test 404 dòng 147 giữ chi tiết nghiệp vụ; test DB 500 dòng 164 giả lập exception chứa SQL/cause và kiểm tra chúng không lộ. Đây không phải chứng minh DB rollback thật. |
+| `server/scripts/sql/2026-10-11-message-audit-email.sql:1` | Script thủ công, mặc định preview. Nhận database đã chọn và cờ ApplyChanges; kiểm metadata, dựng ALTER chỉ khi cần mở rộng, xuất SQL, áp dụng trong transaction nếu người vận hành bật cờ. Không chứa credential, không được app tự chạy. Bỏ script sẽ thiếu bước đồng bộ DB cũ dù JPA/H2 đã pass. |
+| `docs/00-DEVELOPMENT-PROCESS.md` mục 10–12 | Tiến độ, log kết quả thật, duyệt phạm vi và handoff/API hoãn. Không thay runtime; bỏ cập nhật dễ khiến người sau làm lại hoặc coi SQL Server đã kiểm chứng. |
+| `docs/02-SYSTEM-ARCHITECTURE.md` mục 7.5–7.6 | Ghi hành vi lỗi, coverage/giới hạn và giải thích source; không thay request hoặc quyền. |
+| `docs/03-DATABASE-DESIGN.md` mục 4.3 | Ghi quyết định audit, phạm vi riêng messages và script chưa áp dụng; tránh nhầm annotation với schema production đã cập nhật. |
+
+**Luồng ví dụ “Hello mọi người!” vào Channel 5:** client gửi JSON `{content: ...}` qua REST POST kèm Bearer JWT. Security kiểm chữ ký/hạn/session rồi lưu danh tính vào SecurityContext. `MessageResource` dùng `@RestController`, `@RequestMapping`, `@PostMapping`, `@PathVariable` đọc 5, `@RequestBody` đọc DTO và `@Valid` chặn nội dung sai. `MessageService` (`@Service`, constructor injection, `@Transactional`) lấy email từ JWT, tra User/Channel/membership rồi gọi Spring Data JPA Repository. Repository interface kế thừa JpaRepository được Spring tạo bean; không cần tự viết SQL hoặc thêm `@Repository` nếu source không có. Hibernate map `Message` sang bảng, auditor lấy email để ghi cùng dữ liệu. Trong test là H2; môi trường thực cấu hình SQL Server nhưng chưa kiểm thử ở lượt này. Service map Entity sang MessageResponse, Controller trả `ResponseEntity` 201 và ResFormatResponse bọc trong data. ID 5 chỉ là ví dụ, không hardcode trong production.
+
+Request DTO chỉ có content để client không chọn người gửi; Response DTO chỉ lộ các field được chốt thay vì trả cả Entity/audit. JSON là định dạng trao đổi, REST là cách thiết kế giao tiếp qua tài nguyên/HTTP. 201 là tạo thành công, 400 input sai, 401 chưa xác thực hợp lệ, 403 thiếu quyền membership, 404 không có channel. Problem Details mô tả lỗi; wrapper success là convention riêng của DenHub, không phải điều REST cấm. Với Axios, `response.data` là wrapper, `response.data.data` là DTO. Transaction Service phục vụ tính nhất quán DB; transaction test rollback fixture không chứng minh đã commit trên SQL Server.
+
+**5 câu interview và đáp án:**
+
+1. Vì sao thêm test Security khi đã có Service test? Unit test có thể tự gắn Authentication; chỉ test qua filter với token ký thật mới kiểm chữ ký/hạn/session và entry point.
+2. Vì sao override audit ở Message? Field kế thừa dài 50 không đủ email 254; override sửa đúng phạm vi Message, không đổi schema mọi Entity.
+3. JWT hợp lệ có đủ quyền gửi không? Không; Service còn kiểm User active, Channel tồn tại và membership đúng Server. ROLE_ADMIN trong token không bỏ qua membership hiện tại.
+4. Vì sao dùng ObjectMapper thay String.format cho lỗi? Serializer escape ký tự theo JSON và trả Problem Details nhất quán, vẫn giữ extensions cho client cũ.
+5. 85 tests pass có chứng minh SQL Server không? Không; suite DB dùng H2 và rollback. Còn phải review/apply script, chạy kiểm thử SQL Server riêng.
+
+**3 câu kiểm tra cho Duy trước task tiếp theo:**
+
+1. Client gửi thêm senderId khác thì ai quyết định tác giả thật, tại tầng nào?
+2. Vì sao 2000 emoji `😀` được chấp nhận còn thêm một chữ `a` bị 400?
+3. Vì sao JPA/H2 pass nhưng database SQL Server cũ vẫn cần được kiểm tra hai cột audit?
+
+Dừng tại phạm vi POST; chờ Duy trả lời và yêu cầu tiếp tục trước API GET hoặc frontend.
+
+## 8. Task 1.12 — UI nhập và gửi tin nhắn
+
+- Dùng React + Ant Design; tái sử dụng hoặc tạo `MessageInput` sau khi kiểm tra component hiện tại.
+- Nhận `channelId` qua props hoặc cơ chế state/router có sẵn; không hardcode `channelId` hoặc `senderId`.
+- Controlled input có nút Send; Enter gửi, Shift + Enter xuống dòng.
+- Không gửi nội dung rỗng hoặc toàn khoảng trắng; disable Send khi không hợp lệ hoặc đang gửi, hiển thị loading và ngăn gửi trùng trong lúc chờ request.
+- Hiển thị lỗi khi thất bại, giữ nội dung để người dùng thử lại; chỉ xóa input sau khi gửi thành công.
+- Khi API sẵn sàng **và Duy đồng ý tích hợp**, dùng Axios service theo cấu trúc hiện có, lấy JWT theo Authentication hiện tại, POST đúng endpoint và đọc DTO từ `response.data.data` theo mục 4.4.
+- Trả kết quả thành công cho component cha để cập nhật UI. Không thêm WebSocket hoặc chat riêng trong task này.
+- Nếu chưa thể tích hợp, test UI độc lập bằng mock; không đưa mock sender hoặc bypass xác thực vào production.
+
+Luồng tích hợp: `Người dùng nhập → React State cập nhật → Send → Axios → Backend lưu → Wrapper chứa Response DTO → Axios đọc response.data.data → Component cha cập nhật UI`.
+
+### 8.1 UI Group đã triển khai trước tích hợp (2026-10-11)
+
+Duy duyệt riêng phạm vi làm UI trước khi API Group chat hoàn tất. Đây là ngoại lệ thứ tự thực hiện cho đợt UI, không xác nhận Backend đã DONE hoặc cho phép tự thay contract.
+
+- Route Frontend `/servers/:serverId` nằm trong `ProtectedRoute`, dùng `GroupChatPage`; dock chọn nhóm bằng `Link`. Đây là route trình duyệt, không phải endpoint Backend.
+- Tái sử dụng `GET /api/v1/servers` qua `serverApi.getAll()` và state của `MainLayout`. GroupChatPage chọn nhóm từ danh sách trả về, không gọi `serverApi.getById()` vì chưa có endpoint tương ứng. Loading, lỗi tải và nhóm không có trong danh sách là ba trạng thái khác nhau; lỗi có nút thử lại.
+- Bố cục tham khảo Discord, dùng màu DenHub: dock nhóm → cột kênh → vùng trò chuyện/ô nhập → thành viên. Từ 1200 px có panel thành viên bật/tắt; dưới 1200 px dùng Drawer thành viên, dưới 992 px dùng Drawer kênh. Không có voice, category hoặc trạng thái online giả.
+- Chưa có API đọc danh sách kênh, thành viên hoặc lịch sử trong source. Tạo server hiện chưa tạo general. UI hiển thị dữ liệu chưa sẵn sàng và khóa composer; không tạo kênh/thành viên/tin nhắn giả, không hardcode channelId, không gọi WebSocket cũ.
+- `MessageInput` nhận props `channelId`, `channelName`, `disabled`, `onSend`, `onSent`. `onSend(channelId, { content })` phải trả Promise chứa kết quả gửi thành công; `onSent(message, channelId)` báo về cha sau thành công. Đây là giao diện component nội bộ, không bổ sung DTO/endpoint.
+- State giữ nội dung nguyên văn; validation tối đa 4000 đơn vị UTF-16 và không chỉ chứa Unicode White_Space (bao gồm U+0085). Enter gửi, Shift+Enter xuống dòng; Enter trong composition không gửi. Trong lúc chờ: ref chặn request lặp ngay lập tức, input readOnly, nút loading/disabled. Thất bại giữ nội dung và hiển thị lỗi an toàn; chỉ thành công mới xóa input.
+- Component con được key theo channelId để reset draft khi đổi kênh. Callback kết quả giữ channelId của request cũ để cha có thể phân luồng; kết quả cũ không xóa draft mới. Bản nháp không được lưu bền hoặc phục hồi khi quay lại kênh trong phạm vi này.
+- Production hiện chưa truyền `onSend`; kiểm thử callback hoàn toàn độc lập. Khi duyệt tích hợp sau này, adapter mới gọi `messageApi.sendMessage`, giữ interceptor JWT và lấy DTO từ `response.data.data`. Chưa được tuyên bố POST, JWT, membership, lưu SQL Server hoặc broadcast đã chạy xuyên suốt từ UI.
+
+### 8.2 Hướng dẫn đọc source của đợt UI
+
+Các dòng dưới đây được đối chiếu tại thời điểm triển khai; nếu sửa source về sau cần kiểm tra lại vị trí.
+
+| File / dòng | Nhiệm vụ và luồng xử lý |
+| :--- | :--- |
+| `client/src/layouts/MainLayout.jsx:23` | `useMatch` lấy ID nhóm đang mở; `useState` giữ danh sách/loading/error. `fetchServers` tại dòng 36 dùng Axios service có sẵn, đọc wrapper và cập nhật state; ref số thứ tự bỏ response cũ khi retry/unmount. `Outlet` dòng 383 truyền state cho trang con. Nếu thiếu phần này, dock không mở nhóm và page không biết đang tải hay lỗi. |
+| `client/src/routes/AppRoutes.jsx:49` | Khai báo route Group bên trong `ProtectedRoute`. React Router đọc serverId; route guard dùng phiên Auth có sẵn. Frontend guard hỗ trợ UX, không thay thế xác thực/phân quyền Backend. |
+| `client/src/pages/chat/GroupChatPage.jsx:47` | `useParams` lấy ID, `useOutletContext` nhận danh sách và trạng thái tải, `useAuth` nhận tài khoản hiện tại. `ChannelSidebar` dòng 9 và `MembersPanel` dòng 34 hiển thị các vùng giao diện; breakpoint và state điều khiển panel/Drawer. Không tìm được nhóm chỉ có nghĩa nhóm không nằm trong danh sách hiện tại, không tự suy ra Backend trả 403 hay nhóm đã bị xóa. |
+| `client/src/pages/chat/group-chat.css:1` | CSS của workspace và composer: focus bàn phím, flex layout, vùng cuộn nội dung, kích thước panel, breakpoint và reduced motion. Không thay global theme hoặc CSS của ChatPage cũ. |
+| `client/src/components/chat/MessageInput.jsx:7` | Component ngoài key component con theo kênh. Component con dòng 11 giữ content/sending/error bằng useState; `value` + `onChange` tạo controlled input. `handleSend` dòng 24 validate, khóa bằng ref, await onSend, xử lý lỗi rồi callback onSent. `handleKeyDown` dòng 45 phân biệt Enter, Shift+Enter và IME. Nếu xóa ref, các event sát nhau có thể vượt qua state chưa render; nếu xóa input trước await sẽ mất bản nháp khi lỗi. |
+| `client/src/utils/messageInput.js:3` | Hàm thuần nhận nội dung, trả thông báo lỗi hoặc null; `.length` của JavaScript cùng đơn vị UTF-16 với Backend. Hàm dòng 14 ánh xạ status sang thông báo an toàn, không hiển thị nguyên error body/stack trace. |
+| `client/tests/messageInput.test.mjs:1` | Node test runner + assert kiểm tra whitespace, nội dung, giới hạn ASCII/emoji và lỗi. Đây là kiểm thử logic thuần, không render React hoặc gọi HTTP. |
+| `client/tests/group-chat.browser.test.mjs:54` | Khởi tạo Vite + Edge headless, chỉ đăng ký trang fixture trong test. `openPage` dòng 84 chặn các request `/api/` và cung cấp danh sách nhóm giả lập; `openComposer` dòng 112 render component thật với Promise thành công/thất bại/pending. 9 cases kiểm tra hành vi DOM, callback, route, auth guard và kích thước màn hình; không chứng minh API thật chạy. |
+| `docs/00-DEVELOPMENT-PROCESS.md` | Progress, log và handoff phân biệt UI đã kiểm thử với API/tích hợp chưa hoàn tất; giữ lịch sử công việc trước. |
+| `docs/02-SYSTEM-ARCHITECTURE.md` | Mục 8 mô tả phạm vi UI, giao diện props, cách kiểm thử và giới hạn tích hợp; không đổi REST/DB contract. |
+
+Luồng hiện tại trong test: gõ chữ → `onChange` → `content` → `handleSend` → Promise `onSend` giả lập → xóa input sau resolve → `onSent` đưa kết quả về cha → cha cập nhật state và render. JSX của cha trong fixture minh họa cập nhật tin nhắn; trang Group thực tế chưa thực hiện bước gửi.
+
+Luồng tích hợp được dự kiến sau khi duyệt: `onSend` dùng Axios gửi JSON `{ content }` cùng Bearer token qua interceptor → Backend lấy người gửi từ JWT, validate và kiểm tra membership → lưu → trả wrapper → adapter đọc `response.data.data` → `onSent`. Nếu API thành công mà UI chưa đổi, kiểm tra lần lượt DTO được bóc đúng chưa, callback có chạy không, channelId có khớp không và cha có cập nhật state bằng mảng mới không.
+
+Chạy từ thư mục `client/`:
+
+```powershell
+node --test tests/messageInput.test.mjs
+npm run build
+npm run dev
+```
+
+Mở đúng URL Vite in ra, đăng nhập rồi bấm biểu tượng nhóm ở dock trái. Nút gửi đang khóa đúng phạm vi chưa tích hợp. `package.json` chưa có script lint/test.
+
+Browser tests cần Playwright và Edge đã có trên máy; không tự cài dependency vào dự án. Có thể cung cấp thư viện từ runtime của workspace:
+
+```powershell
+$env:NODE_PATH = 'C:/Users/Admin/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'
+node --test tests/group-chat.browser.test.mjs
+```
+
+Ở máy khác, dùng đường dẫn Playwright đã cài của máy đó hoặc bản local. `PLAYWRIGHT_CHANNEL` mặc định `msedge`; `GROUP_UI_ARTIFACT_DIR` tùy chọn để lưu screenshot ngoài repository. Test tự mở/đóng Vite, không cần chạy dev server trước. API, tài khoản và Promise là fixture trong test; font ngoài được thay bằng fallback. Không dùng fixture để truy cập Backend thật.
+
+### 8.3 Ôn tập Task 1.12
+
+Năm câu hỏi phỏng vấn kèm đáp án:
+
+1. **Controlled input là gì?** React state là nguồn dữ liệu của input: `value={content}`, `onChange` cập nhật content. Nhờ vậy có thể validate, khóa gửi và reset đúng thời điểm.
+2. **Vì sao dùng cả state và ref để chống gửi trùng?** State phục vụ render/loading nhưng cập nhật theo lượt render; ref đổi ngay trong event để chặn hai lần gọi trước khi UI kịp cập nhật.
+3. **Vì sao chỉ xóa input sau khi await thành công?** Promise có thể reject vì mạng hoặc permission. Giữ draft giúp người dùng sửa/thử lại, không mất nội dung.
+4. **Vì sao không gửi senderId từ browser?** Danh tính do Backend lấy từ JWT đã xác thực. Browser có thể bị chỉnh sửa, không phải nguồn tin cậy cho sender hoặc quyền.
+5. **Vì sao 2000 emoji có thể chạm giới hạn 4000?** Nhiều emoji chiếm hai đơn vị UTF-16; JS `.length` và Java `String.length()` đếm đơn vị này, không đếm ký tự nhìn thấy.
+
+Ba câu kiểm tra để Duy trả lời trước khi chuyển đợt:
+
+1. `onSend` reject thì input và nút Gửi thay đổi thế nào?
+2. Nếu lấy `response.data` thay vì `response.data.data`, component cha sẽ nhận gì?
+3. Vì sao route Group hiện chưa được mở gửi thật dù đã có MessageInput?

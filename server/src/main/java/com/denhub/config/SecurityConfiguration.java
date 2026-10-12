@@ -77,8 +77,10 @@ public class SecurityConfiguration {
                 "/error",
                 "/storage/**",
                 "/api/v1/search/**",
+                "/api/users/search/**",
                 "/ws/**",
                 "/api/v1/files/**",
+                "/api/files/**",
                 "/api/v1/payments/vnpay-ipn",
                 "/api/v1/payments/vnpay-return",
                 "/swagger-ui/**",
@@ -88,7 +90,14 @@ public class SecurityConfiguration {
         // handle for case api public but request including token wrong or expire
         List<String> publicEndpoints = List.of(
                 "/api/register",
+                "/api/v1/register",
+                "/api/auth/register",
+                "/api/v1/auth/register",
                 "/api/login",
+                "/api/v1/login",
+                "/api/auth/login",
+                "/api/v1/auth/login",
+                "/api/refresh",
                 "/refresh",
                 "/account/activate/**",
                 "/account/reset-password/init",
@@ -101,8 +110,8 @@ public class SecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(
                         auth -> auth
-                                .requestMatchers(HttpMethod.POST, "/api/register").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/login").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/register", "/api/v1/register", "/api/auth/register", "/api/v1/auth/register").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/login", "/api/v1/login", "/api/auth/login", "/api/v1/auth/login").permitAll()
                                 .requestMatchers(whiteList).permitAll()
                                 .anyRequest().authenticated()
                 )
