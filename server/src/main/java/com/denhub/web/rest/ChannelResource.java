@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping("/api/v1/channels")
+@RequestMapping("/api/v1")
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
 @Tag(name = "Channel", description = "API quản lý Channel trong Server")
@@ -24,10 +24,17 @@ public class ChannelResource {
 
     ChannelService channelService;
 
-    @PostMapping
+    @PostMapping("/channels")
     @Operation(summary = "Tạo mới một Channel", description = "Tạo một kênh chat mới trong server. Yêu cầu đăng nhập và là thành viên/chủ sở hữu server.")
     public ResponseEntity<ChannelResponseDTO> createChannel(@Valid @RequestBody CreateChannelDTO dto) {
         ChannelResponseDTO response = channelService.createChannel(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/servers/{serverId}/channels")
+    @Operation(summary = "Lấy danh sách Channel của một Server", description = "Lấy toàn bộ channel thuộc server chỉ định theo position tăng dần. Yêu cầu đăng nhập và là thành viên/chủ sở hữu server.")
+    public ResponseEntity<java.util.List<ChannelResponseDTO>> getChannelsByServerId(@PathVariable Long serverId) {
+        java.util.List<ChannelResponseDTO> channels = channelService.getChannelsByServerId(serverId);
+        return ResponseEntity.ok(channels);
     }
 }
