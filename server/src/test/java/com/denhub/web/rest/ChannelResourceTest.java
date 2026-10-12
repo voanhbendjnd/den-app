@@ -2,7 +2,9 @@ package com.denhub.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import java.util.List;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -84,5 +86,32 @@ class ChannelResourceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getChannelsByServerId_Success() throws Exception {
+        ChannelResponseDTO ch1 = new ChannelResponseDTO();
+        ch1.setId(100L);
+        ch1.setServerId(10L);
+        ch1.setName("general");
+        ch1.setPosition(0);
+
+        ChannelResponseDTO ch2 = new ChannelResponseDTO();
+        ch2.setId(101L);
+        ch2.setServerId(10L);
+        ch2.setName("random");
+        ch2.setPosition(1);
+
+        when(channelService.getChannelsByServerId(10L)).thenReturn(List.of(ch1, ch2));
+
+        mockMvc.perform(get("/api/v1/servers/10/channels")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(100))
+                .andExpect(jsonPath("$[0].name").value("general"))
+                .andExpect(jsonPath("$[0].position").value(0))
+                .andExpect(jsonPath("$[1].id").value(101))
+                .andExpect(jsonPath("$[1].name").value("random"))
+                .andExpect(jsonPath("$[1].position").value(1));
     }
 }
