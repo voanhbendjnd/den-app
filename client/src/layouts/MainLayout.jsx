@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Outlet, useNavigate, useLocation, useMatch, Link } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, Typography, Tooltip } from 'antd';
 import {
   UserOutlined,
@@ -20,22 +20,38 @@ export default function MainLayout() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const groupMatch = useMatch('/servers/:serverId');
+  const isGroupPage = Boolean(groupMatch);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [servers, setServers] = useState([]);
+  const [serversLoading, setServersLoading] = useState(true);
+  const [serversError, setServersError] = useState(null);
+  const serversRequest = useRef(0);
 
   useEffect(() => {
     fetchServers();
+    return () => { serversRequest.current += 1; };
   }, []);
 
   const fetchServers = async () => {
+    const request = ++serversRequest.current;
+    setServersLoading(true);
+    setServersError(null);
     try {
       const res = await serverApi.getAll();
       const serverList = res.data?.data || res.data || [];
+      if (request !== serversRequest.current) return;
       if (Array.isArray(serverList)) {
         setServers(serverList);
+      } else {
+        setServersError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
       }
     } catch {
-      // Ignored for fallback
+      if (request === serversRequest.current) {
+        setServersError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
+      }
+    } finally {
+      if (request === serversRequest.current) setServersLoading(false);
     }
   };
 
@@ -71,7 +87,7 @@ export default function MainLayout() {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh', background: 'var(--color-bg-base)' }}>
+    <Layout className={isGroupPage ? 'group-layout' : undefined} style={{ minHeight: '100vh', background: 'var(--color-bg-base)' }}>
       {/* =========================================================
           Primary Dock (Far-Left Server Launcher)
          ========================================================= */}
@@ -106,7 +122,9 @@ export default function MainLayout() {
               }} />
             )}
             <Tooltip title="Trang Chủ DenHub" placement="right">
-              <div 
+              <Link
+                to="/"
+                aria-label="Trang chủ DenHub"
                 style={{
                   width: 48,
                   height: 48,
@@ -122,13 +140,12 @@ export default function MainLayout() {
                   boxShadow: location.pathname === '/' ? '0 4px 16px rgba(0, 242, 254, 0.35)' : 'none',
                   border: location.pathname === '/' ? 'none' : '1px solid var(--border-subtle)',
                 }}
-                onClick={() => navigate('/')}
               >
                 <ThunderboltFilled style={{ 
                   fontSize: 22, 
                   color: location.pathname === '/' ? '#fff' : '#00F2FE' 
                 }} />
-              </div>
+              </Link>
             </Tooltip>
           </div>
 
@@ -147,7 +164,7 @@ export default function MainLayout() {
             overflowX: 'hidden'
           }}>
             {servers.map((server) => {
-              const isServerActive = location.pathname.startsWith(`/servers/${server.id}`);
+              const isServerActive = groupMatch?.params.serverId === String(server.id);
               return (
                 <div key={server.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {isServerActive && (
@@ -162,8 +179,10 @@ export default function MainLayout() {
                     }} />
                   )}
                   <Tooltip title={server.name} placement="right">
-                    <div 
-                      onClick={() => navigate('/')}
+                    <Link
+                      to={`/servers/${server.id}`}
+                      aria-label={`Mở nhóm ${server.name}`}
+                      aria-current={isServerActive ? 'page' : undefined}
                       style={{
                         width: 48,
                         height: 48,
@@ -202,7 +221,7 @@ export default function MainLayout() {
                       ) : (
                         <span>{server.name ? server.name.charAt(0).toUpperCase() : 'S'}</span>
                       )}
-                    </div>
+                    </Link>
                   </Tooltip>
                 </div>
               );
@@ -250,7 +269,7 @@ export default function MainLayout() {
       {/* =========================================================
           Secondary Sidebar (Navigation)
          ========================================================= */}
-      <Sider
+      {!isGroupPage && <Sider
         width={240}
         style={{
           background: 'var(--color-bg-layout)',
@@ -354,14 +373,14 @@ export default function MainLayout() {
             </div>
           </Dropdown>
         </div>
-      </Sider>
+      </Sider>}
 
       {/* =========================================================
           Main Content Workspace
          ========================================================= */}
-      <Layout style={{ marginLeft: 312, background: 'var(--color-bg-base)', minHeight: '100vh' }}>
+      <Layout style={{ marginLeft: isGroupPage ? 72 : 312, minWidth: 0, background: 'var(--color-bg-base)', minHeight: '100vh' }}>
         <Content style={{ position: 'relative', height: '100vh', overflowY: 'auto' }}>
-          <Outlet context={{ servers, setServers, openCreateModal: () => setIsCreateModalOpen(true), refreshServers: fetchServers }} />
+          <Outlet context={{ servers, serversLoading, serversError, setServers, openCreateModal: () => setIsCreateModalOpen(true), refreshServers: fetchServers }} />
         </Content>
       </Layout>
 

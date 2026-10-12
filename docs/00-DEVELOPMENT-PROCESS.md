@@ -315,6 +315,16 @@ Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` 
 
 Các entry cũ phản ánh quyết định và verification tại thời điểm ghi. Các nhận xét về DTO trực tiếp hoặc wrapper chưa đồng nhất trong entry ngày 2026-10-10 và MERGE-CONFLICT-RESOLUTION là lịch sử, đã được thay thế bởi quyết định SUCCESS-WRAPPER ngày 2026-10-11 dưới đây. Không áp dụng yêu cầu DTO trực tiếp cũ cho implementation tiếp theo; số test của từng entry chỉ thuộc lượt kiểm tra tương ứng.
 
+### [2026-10-12] SWAGGER-MESSAGE-CONFIG — Cấu hình Swagger/OpenAPI 3 cho API gửi tin nhắn Message
+
+- Duy duyệt kế hoạch cấu hình Swagger cho endpoint `POST /api/channels/{channelId}/messages`.
+- Cập nhật `MessageResource.java`: bổ sung `@Tag(name = "Message")`, `@SecurityRequirement(name = "bearerAuth")`, `@Operation` mô tả nghiệp vụ và `@Parameter` cho `channelId`.
+- Cập nhật `SendMessageRequest.java`: bổ sung `@Schema` mô tả nội dung tin nhắn và giới hạn UTF-16 kèm example.
+- Cập nhật `MessageResponse.java`: bổ sung `@Schema` mô tả cấu trúc dữ liệu trả về cho Swagger UI.
+- Verification:
+  - `.\gradlew.bat compileJava test check --no-daemon`: PASS 100% (85/85 tests PASS, 0 failures, 0 errors).
+- Git: Chưa stage/commit/push; branch `feature/group-chat`. Chờ ủy quyền riêng nếu commit.
+
 ### [2026-10-11] REFACTOR-RECORDS-TO-CLASSES — Chuyển đổi record sang standard Java class (Lombok)
 
 - Duy yêu cầu chuyển đổi các class record thành class Java thông thường và duyệt Phương án A (dùng Lombok).

@@ -33,8 +33,8 @@ Sau khi backend khởi động thành công, hãy mở trình duyệt và truy c
 *Lưu ý: Thay `8080` bằng port thực tế nếu bạn đã đổi cấu hình.*
 
 ## D. Cách đọc một API
-Trong giao diện Swagger UI, các API được nhóm theo **Tag** (ví dụ: `Account`, `Server`, `File`).
-Khi click mở một API (ví dụ: `POST /api/v1/servers`), bạn sẽ thấy:
+Trong giao diện Swagger UI, các API được nhóm theo **Tag** (ví dụ: `Account`, `Server`, `File`, `Message`).
+Khi click mở một API (ví dụ: `POST /api/v1/servers`, `POST /api/channels/{channelId}/messages`), bạn sẽ thấy:
 - **Parameters:** Các tham số truyền trên URL (Path variable) hoặc Query string.
 - **Request body:** Định dạng JSON và các trường bắt buộc để gửi lên server. Bạn có thể xem tab `Schema` để biết kiểu dữ liệu chi tiết.
 - **Responses:** Các mã trạng thái HTTP (200, 201, 400, 401...) và cấu trúc JSON trả về tương ứng.
@@ -48,7 +48,7 @@ Một số API (có biểu tượng ổ khóa) yêu cầu xác thực bằng JWT
 3. Bấm **Execute**. Kéo xuống phần Response body, copy đoạn mã của `accessToken` (không copy dấu ngoặc kép).
 4. Kéo lên đầu trang Swagger UI, bấm nút **Authorize**.
 5. Dán đoạn mã token vừa copy vào ô **Value** và bấm **Authorize**.
-6. Bây giờ bạn có thể gọi các API yêu cầu đăng nhập (như tạo Server, tải ảnh). Hệ thống sẽ tự động gắn header `Authorization: Bearer <token>` vào request.
+6. Bây giờ bạn có thể gọi các API yêu cầu đăng nhập (như tạo Server, tải ảnh, gửi tin nhắn Channel). Hệ thống sẽ tự động gắn header `Authorization: Bearer <token>` vào request.
 
 *Lưu ý: Nếu token hết hạn (mặc định 24h), API sẽ trả về lỗi `401 Unauthorized`. Bạn chỉ cần đăng nhập lại để lấy token mới.*
 

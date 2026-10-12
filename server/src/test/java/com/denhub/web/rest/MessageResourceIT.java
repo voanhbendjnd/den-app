@@ -17,9 +17,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
+import org.zalando.problem.jackson.ProblemModule;
+import org.zalando.problem.violations.ConstraintViolationProblemModule;
 
 import java.time.Instant;
 
@@ -29,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,6 +55,8 @@ class MessageResourceIT {
     void setUp() {
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
+                .registerModule(new ProblemModule())
+                .registerModule(new ConstraintViolationProblemModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter(objectMapper);
@@ -147,6 +153,31 @@ class MessageResourceIT {
         mockMvc.perform(post("/api/channels/{channelId}/messages", 9999L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail").value("404 NOT_FOUND \"Không tìm thấy Channel\""))
+                .andExpect(jsonPath("$.message").value("error.http.404"));
+    }
+
+    @Test
+    void databaseErrorDoesNotExposeSqlOrNestedCause() throws Exception {
+        when(messageService.sendMessage(eq(CHANNEL_ID), any(SendMessageRequest.class)))
+                .thenThrow(new DataIntegrityViolationException("insert into messages: internal SQL",
+                        new IllegalStateException("internal database connection details")));
+
+        mockMvc.perform(post("/api/channels/{channelId}/messages", CHANNEL_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new SendMessageRequest(CONTENT))))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.title").value("Internal Server Error"))
+                .andExpect(jsonPath("$.detail").value("Đã xảy ra lỗi hệ thống"))
+                .andExpect(jsonPath("$.message").value("error.http.500"))
+                .andExpect(jsonPath("$.path").value("/api/channels/5/messages"))
+                .andExpect(jsonPath("$.cause").doesNotExist())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andExpect(jsonPath("$.data").doesNotExist());
     }
 }
