@@ -9,6 +9,10 @@ import java.io.Serializable;
 
 @Entity
 @Table(name = "messages")
+@AttributeOverrides({
+        @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", updatable = false, length = 254)),
+        @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
+})
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
 public class Message extends AbstractAuditingEntity<Long> implements Serializable {
     @Serial

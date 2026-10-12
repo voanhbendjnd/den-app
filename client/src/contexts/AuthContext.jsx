@@ -60,12 +60,12 @@ export function AuthProvider({ children }) {
     }
 
     setTokens(accessToken, refreshToken);
-    
+
     // Normalize user object
-    const authorities = Array.isArray(user?.authorities) 
-      ? user.authorities 
+    const authorities = Array.isArray(user?.authorities)
+      ? user.authorities
       : (typeof user?.authorities === 'string' && user.authorities ? [user.authorities] : []);
-    
+
     const normalizedUser = {
       id: user?.id,
       email: user?.email,

@@ -50,7 +50,11 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
                 .withTitle(problem.getTitle())
                 .with(PATH_KEY, nativeRequest.getRequestURI());
 
-        if (problem instanceof ConstraintViolationProblem) {
+        if (entity.getStatusCode().is5xxServerError()) {
+            // Internal exception messages may contain SQL or infrastructure details.
+            builder.withDetail("Đã xảy ra lỗi hệ thống")
+                    .with(MESSAGE_KEY, "error.http." + entity.getStatusCode().value());
+        } else if (problem instanceof ConstraintViolationProblem) {
             builder
                     .with(VIOLATIONS_KEY, ((ConstraintViolationProblem) problem).getViolations())
                     .with(MESSAGE_KEY, ErrorConstants.ERR_VALIDATION);
