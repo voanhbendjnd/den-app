@@ -1,9 +1,9 @@
 package com.denhub.config;
 
 import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -16,15 +16,31 @@ import com.denhub.security.AuthoritiesConstants;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Component
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Slf4j
 public class DatabaseInitializer implements CommandLineRunner {
     UserRepository userRepository;
     AuthorityRepository authorityRepository;
     PasswordEncoder passwordEncoder;
+    String initEmail;
+    String initPassword;
+
+    public DatabaseInitializer(
+        UserRepository userRepository,
+        AuthorityRepository authorityRepository,
+        PasswordEncoder passwordEncoder,
+        @Value("${denhub.init-admin.email:admin@denhub.local}") String initEmail,
+        @Value("${denhub.init-admin.password:}") String initPassword
+    ) {
+        this.userRepository = userRepository;
+        this.authorityRepository = authorityRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.initEmail = initEmail;
+        this.initPassword = initPassword;
+    }
 
     @Override
     public void run(String... args) throws Exception {
@@ -47,23 +63,36 @@ public class DatabaseInitializer implements CommandLineRunner {
         }
         if (totalUsers.equals(0L)) {
             log.info("Start create user...");
+            String resolvedPassword = (initPassword != null && !initPassword.isBlank())
+                ? initPassword
+                : UUID.randomUUID().toString();
             User admin = new User();
-            admin.setName("Oni");
+            admin.setName("Admin");
             admin.setActivated(true);
-            admin.setUsername("djnd");
-            admin.setEmail("benva.ce190709@gmail.com");
-            admin.setPassword(passwordEncoder.encode("123123"));
+            admin.setUsername("admin");
+            admin.setEmail(initEmail);
+            admin.setPassword(passwordEncoder.encode(resolvedPassword));
             admin.setAuthorities(authorities);
             userRepository.save(admin);
+            log.info("Initial admin user ready with email: {}", initEmail);
 
-            User admin2 = new User();
-            admin2.setName("Nico");
-            admin2.setActivated(true);
-            admin2.setUsername("nico");
-            admin2.setEmail("voanhbendjnd@gmail.com");
-            admin2.setPassword(passwordEncoder.encode("123123"));
-            admin2.setAuthorities(authorities);
-            userRepository.save(admin2);
+            User user1 = new User();
+            user1.setName("Oni");
+            user1.setActivated(true);
+            user1.setUsername("djnd");
+            user1.setEmail("benva.ce190709@gmail.com");
+            user1.setPassword(passwordEncoder.encode("123123"));
+            user1.setAuthorities(authorities);
+            userRepository.save(user1);
+
+            User user2 = new User();
+            user2.setName("Nico");
+            user2.setActivated(true);
+            user2.setUsername("nico");
+            user2.setEmail("voanhbendjnd@gmail.com");
+            user2.setPassword(passwordEncoder.encode("123123"));
+            user2.setAuthorities(authorities);
+            userRepository.save(user2);
         }
         if (totalUsers > 0 || totalAuthority > 0) {
             log.info("Skip processing initialize...");

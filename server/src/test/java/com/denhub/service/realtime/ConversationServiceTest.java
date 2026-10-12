@@ -317,7 +317,7 @@ class ConversationServiceTest {
         Page<Message> msgPage = new PageImpl<>(List.of(msg), PageRequest.of(0, 10), 1);
         when(messageRepository.findByConversationIdOrderByCreatedAtAsc(eq(100L), any(Pageable.class)))
                 .thenReturn(msgPage);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(senderUser));
+        when(userRepository.findByIdIn(anyList())).thenReturn(List.of(senderUser));
 
         Page<MessageHistoryDTO> result = conversationService.getConversationMessages(100L, PageRequest.of(0, 10));
 

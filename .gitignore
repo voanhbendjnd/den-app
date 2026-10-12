@@ -26,3 +26,7 @@ node_modules/
 **/dist/
 dist/
 /den-app-java-spring/.gradle
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log

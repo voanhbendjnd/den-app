@@ -1,18 +1,18 @@
 # 01 - PROJECT OVERVIEW: DENHUB
 
-> **Tài liệu nền tảng & Khung nghiên cứu nghiệp vụ (Living Documentation + Research Template)**  
-> **Source of Truth** cho toàn bộ thành viên nhóm, Frontend, Backend, Database và AI Coding Agents.
+> **Tài liệu tổng quan dự án & Định vị nghiệp vụ**\
+> **Source of Truth:** Tài liệu này quản lý nghiệp vụ và phạm vi. API ở [`02-SYSTEM-ARCHITECTURE.md`](./02-SYSTEM-ARCHITECTURE.md), dữ liệu ở [`03-DATABASE-DESIGN.md`](./03-DATABASE-DESIGN.md). Các trạng thái `CONFIRMED` mô tả yêu cầu, không khẳng định code đã hoàn thành.
 
 ---
 
 ## 1. Thông tin chung về dự án
 
 | Thuộc tính | Giá trị | Trạng thái |
-| :--- | :--- | :--- |
-| **Tên dự án** | **DenHub** | `CONFIRMED` |
-| **Loại dự án** | Nền tảng giao tiếp và cộng tác theo nhóm trên web (Web-based Group Communication & Collaboration Platform) | `CONFIRMED` |
-| **Khóa môn / Ngữ cảnh** | Môn học SBA301 | `CONFIRMED` |
-| **Ý tưởng tổng quát** | DenHub là nền tảng giao tiếp theo nhóm, lấy cảm hứng từ một số khái niệm tổ chức và giao tiếp cộng đồng của Discord, nhưng có phạm vi nhỏ hơn và đơn giản hơn để phù hợp với thời gian, nguồn lực nhóm và yêu cầu học phần. | `CONFIRMED` |
+| :--- | :--- | :---: |
+| **Tên dự án** | **DenHub (Den App)** | `CONFIRMED` |
+| **Loại dự án** | Nền tảng giao tiếp và cộng tác cộng đồng trên web (Web-based Community Communication Platform) | `CONFIRMED` |
+| **Khóa môn / Ngữ cảnh**| Môn học SBA301 | `CONFIRMED` |
+| **Ý tưởng tổng quát** | Nền tảng giao tiếp cộng đồng lấy cảm hứng từ mô hình tổ chức của Discord (User → Server → Channel → Realtime Messaging), tinh giản để tập trung tối đa vào trải nghiệm chat văn bản thời gian thực chất lượng cao. | `CONFIRMED` |
 
 ---
 
@@ -20,177 +20,106 @@
 
 > [!IMPORTANT]
 > **Nguyên tắc bất di bất dịch:**  
-> Discord chỉ được sử dụng như **nguồn tham khảo** để hiểu một số khái niệm giao tiếp nhóm cơ bản.  
+> Discord chỉ là nguồn cảm hứng tham khảo về mô hình tổ chức không gian (Server / Channel).\
 > **DenHub KHÔNG sao chép:**
-> - Nghiệp vụ phức tạp của Discord
-> - Toàn bộ UI/UX của Discord
-> - Thiết kế Database của Discord
-> - Cấu trúc API của Discord
-> - Hệ thống phân quyền nhiều tầng (Permission Hierarchy/Role inheritance) của Discord
-> - Toàn bộ hệ sinh thái tính năng của Discord
+> - Nghiệp vụ phức tạp của Discord (Bot ecosystem, OAuth applications, Rich Presence)
+> - Hệ thống phân quyền nhiều tầng phức tạp (Permission overrides per-channel)
+> - Giao tiếp âm thanh / hình ảnh (Voice / Video calls)
+> - Toàn bộ hệ sinh thái phụ trợ (Store, Nitro, Server Boosting)
 >
 > **Không được tự suy luận rằng một chức năng tồn tại trong DenHub chỉ vì Discord có chức năng đó.**
 
-### Danh sách tính năng TUYỆT ĐỐI KHÔNG THIẾT KẾ (Out of Scope)
-Các tính năng sau **KHÔNG** nằm trong phạm vi DenHub hiện tại:
-- ❌ **Meeting & Lịch họp:** Không thiết kế Meeting, Meeting Schedule, Meeting Participant, Meeting Start/End Time.
+### Danh sách tính năng TUYỆT ĐỐI KHÔNG THIẾT KẾ (Out of Scope - Đã chốt `CONFIRMED`)
+- ❌ **Meeting & Lịch họp:** Không thiết kế Meeting, Meeting Schedule, Meeting Participant.
 - ❌ **Giao tiếp âm thanh / hình ảnh:** Không có Voice Meeting, Video Meeting, Voice Call, Video Call, Screen Sharing.
-- ❌ **Các tính năng phụ trợ phức tạp:** Không tự ý đưa vào Direct Message (DM), Friend System, Bot, Thread, Category, Server Boosting...
-*(Nếu sau này muốn bổ sung bất kỳ tính năng nào ở trên thì bắt buộc phải thông qua quy trình xem xét thay đổi phạm vi của nhóm).*
+- ❌ **Kênh thoại / Kênh sân khấu:** Không có Voice Channel, Stage Channel, Forum Channel.
+- ❌ **Tính năng phụ trợ phức tạp:** Không có Bot, Webhook platform, Threads, Categories, Server Boost, Custom Guild Emojis.
+- ❌ **Group DM:** Chỉ hỗ trợ Direct Message 1-1 (không hỗ trợ nhóm chat riêng ngoài Server).
 
 ---
 
-## 3. Quy ước trạng thái tài liệu (Documentation Lifecycle)
+## 3. Mô hình miền cốt lõi (Core Domain Model - `CONFIRMED`)
 
-Tài liệu này và các tài liệu kiến trúc liên quan được duy trì dưới dạng **Living Documentation**. Mọi mục nghiệp vụ và kỹ thuật sẽ chuyển dịch qua các trạng thái sau:
+Mô hình cấu trúc cốt lõi chuẩn của DenHub:
 
-```mermaid
-graph LR
-    TBD["TBD (To Be Decided)"] --> PROPOSED["PROPOSED (Đề xuất)"]
-    PROPOSED --> CONFIRMED["CONFIRMED (Thống nhất)"]
-    CONFIRMED --> IMPLEMENTED["IMPLEMENTED (Đã code & test)"]
+```
+User ──(tham gia)──> Server ──(chứa)──> Channels (Text) ──(chứa)──> Messages (Real-time)
+                       │
+                       └──(chứa)──> ServerMembers (OWNER / ADMIN / MEMBER)
 ```
 
-- `TBD (To Be Decided)`: Chưa nghiên cứu hoặc chưa có phương án rõ ràng. Tuyệt đối không tự suy diễn khi code.
-- `PROPOSED`: Đã có member đề xuất giải pháp cụ thể nhưng team chưa chính thức chốt.
-- `CONFIRMED`: Toàn team đã thảo luận, đồng thuận và trở thành **Contract chính thức** của dự án.
-- `IMPLEMENTED`: Contract đã được hiện thực hóa đầy đủ trong source code và kiểm thử thành công.
+1. **User** (`CONFIRMED`): Tài khoản người dùng định danh toàn hệ thống.
+2. **Server** (`CONFIRMED`): Không gian giao tiếp cộng đồng độc lập. Khi tạo mới, hệ thống tự động gán Creator làm `OWNER` và khởi tạo Channel mặc định `#general`.
+3. **ServerMember** (`CONFIRMED`): Thực thể liên kết giữa User và Server, mang vai trò (`OWNER`, `ADMIN`, `MEMBER`) và nickname nội bộ.
+4. **Channel** (`CONFIRMED`): Kênh chat văn bản bên trong Server. Mỗi Server có ít nhất kênh `#general` (không được xóa).
+5. **Message** (`CONFIRMED`): Tin nhắn trao đổi trong Channel, hỗ trợ chỉnh sửa (chỉ tác giả), xóa mềm, trích dẫn (reply) và reaction emoji.
+6. **DirectConversation & DirectMessage** (`CONFIRMED`): Kênh chat riêng tư 1-1 giữa 2 người dùng (bảo đảm tính duy nhất của cặp người dùng không phân biệt thứ tự).
 
 ---
 
-## 4. Các khái niệm cốt lõi đã chốt (`CONFIRMED`)
-
-Mô hình cấu trúc cốt lõi hiện tại của DenHub:
-
-```
-User ──(tham gia)──> Room ──(chứa)──> Members
-                       └──(chứa)──> Messages (Real-time)
-```
-
-1. **User** (`CONFIRMED`):
-   - Tài khoản người dùng định danh trong hệ thống DenHub.
-   - Một User có thể tham gia nhiều Room khác nhau.
-
-2. **Room** (`CONFIRMED`):
-   - Không gian giao tiếp tồn tại lâu dài (persistent) của một nhóm.
-   - User sau khi tham gia Room có thể truy cập lại Room bất cứ lúc nào nếu vẫn còn quyền tham gia.
-   - **Room KHÔNG PHẢI cuộc họp, KHÔNG có thời gian bắt đầu hay kết thúc.**
-   - Một Room có thể có nhiều Member.
-
-3. **Member** (`CONFIRMED`):
-   - Một User đã tham gia vào một Room cụ thể.
-   - Membership thể hiện mối quan hệ giữa User và Room.
-   - *Lưu ý:* Quyền hạn chi tiết của từng Member trong Room chưa được mặc định và cần được team nghiên cứu, chốt phương án.
-
-4. **Message** (`CONFIRMED`):
-   - Nội dung trao đổi bằng văn bản giữa các Member trong Room.
-   - *Lưu ý:* Các chức năng mở rộng như edit, delete, reply, reaction... chưa được mặc định.
-
-5. **Real-time Messaging** (`CONFIRMED`):
-   - Tin nhắn mới trong Room được gửi và nhận theo thời gian thực giữa các thành viên đang hoạt động trong Room.
-
----
-
-## 5. Luồng người dùng tổng quát ban đầu (`CONFIRMED`)
+## 4. Luồng người dùng chuẩn MVP (`CONFIRMED`)
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as User
     participant S as DenHub System
-    participant R as Room
+    participant SRV as Server
+    participant CH as Channel (#general)
     actor M as Other Members
 
-    U->>S: Đăng ký / Đăng nhập tài khoản
-    U->>R: Tham gia Room (theo cơ chế được chốt)
-    Note over U,R: User trở thành Member của Room
-    U->>R: Truy cập Room (lâu dài, bất cứ lúc nào)
-    U->>R: Gửi Message
-    R-->>M: Phân phối Message theo thời gian thực (WebSocket)
-    R-->>U: Nhận Message mới từ các Member khác theo thời gian thực
+    U->>S: Đăng ký / Đăng nhập (Nhận JWT)
+    U->>S: Tạo Server (hoặc Redeem Invite Code)
+    Note over U,SRV: Creator thành OWNER, channel #general được tạo tự động
+    U->>CH: Truy cập Channel trong Server
+    U->>CH: Gửi Message qua REST / STOMP
+    CH-->>M: Phát sóng Message theo thời gian thực (/topic/channels/{id})
+    CH-->>U: Nhận phản hồi tin nhắn và Reactions theo thời gian thực
 ```
 
-### Các nhu cầu chính của phiên bản MVP:
-- Người dùng có tài khoản trong hệ thống.
-- Người dùng có thể tham gia các Room.
-- Người dùng đã tham gia Room trở thành Member của Room đó.
-- Member có thể truy cập lại Room bất cứ lúc nào.
-- Member có thể trao đổi Message trong Room.
-- Message được cập nhật theo thời gian thực (Real-time).
-- Room có cơ chế quản lý thành viên phù hợp.
-- Hệ thống có Authentication và Authorization phù hợp.
+---
+
+## 5. Bảng trạng thái nghiệp vụ (Synchronized Status)
+
+Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Các điểm chưa thống nhất giữa thiết kế và source phải được ghi riêng trong handoff, không mặc định rằng mọi `TBD` đã được giải quyết:
+
+| Phân hệ | Vấn đề nghiệp vụ | Trạng thái | Quyết định chuẩn hóa |
+| :--- | :--- | :---: | :--- |
+| **SERVER** | Ai được tạo Server? | `CONFIRMED` | Mọi Authenticated User đều có quyền tạo Server. |
+| **SERVER** | Thành viên tham gia Server bằng cách nào? | `CONFIRMED` | Qua Invite code duy nhất do Owner/Admin tạo. |
+| **SERVER** | Creator có vai trò gì khi tạo Server? | `CONFIRMED` | Creator nhận vai trò `OWNER`. Server tự tạo kênh `#general`. |
+| **SERVER** | Owner có thể rời Server không? | `CONFIRMED` | Không. Owner chỉ có thể chuyển quyền hoặc xóa Server (BR-SRV-01). |
+| **SERVER** | Ai có quyền xóa Server? | `CONFIRMED` | Duy nhất Server `OWNER`. |
+| **CHANNEL** | Loại kênh trong MVP? | `CONFIRMED` | Kênh văn bản (Text Channel). Tên kênh dạng slug chữ thường `[a-z0-9-]`. |
+| **CHANNEL** | Kênh `#general` có thể bị xóa không? | `CONFIRMED` | Không. Luôn duy trì ít nhất kênh `#general` trong Server (BR-SRV-02). |
+| **MEMBER** | Ma trận quyền hạn Server? | `CONFIRMED` | Phân cấp `OWNER > ADMIN > MEMBER` với Hierarchy Kick Shield (BR-MEM-02). |
+| **MEMBER** | Admin có được kick Admin / Owner không? | `CONFIRMED` | Không. Admin chỉ được kick `MEMBER`. Chỉ Owner mới được kick Admin. |
+| **MESSAGE** | Message lưu trữ ở đâu? | `CONFIRMED` | Lưu trữ trong Microsoft SQL Server (bảng `messages`), xóa mềm (`deleted_at`). |
+| **MESSAGE** | Ai được gửi tin nhắn Channel? | `CONFIRMED` | Người dùng đã xác thực và là thành viên của Server chứa Channel. Danh tính người gửi lấy từ cơ chế Authentication hiện có. |
+| **MESSAGE** | Nội dung gửi trong Task 1.07? | `CONFIRMED` | Tin nhắn văn bản; không null, rỗng hoặc toàn khoảng trắng, không vượt giới hạn database đã xác nhận. |
+| **MESSAGE** | Ai được quyền sửa tin nhắn? | `CONFIRMED` | Duy nhất tác giả tin nhắn (BR-MSG-02). |
+| **MESSAGE** | Cơ chế phân trang lịch sử tin nhắn? | `CONFIRMED` | Phân trang bằng con trỏ (Cursor Pagination) qua `before` và `limit`. |
+| **DIRECT MESSAGE** | Phạm vi Direct Message? | `CONFIRMED` | Duy nhất 1-1. Cặp người dùng duy nhất không phân biệt thứ tự `(user1 < user2)`. |
+| **AUTH** | Xác thực & Phiên làm việc? | `CONFIRMED` | Spring Security + JWT Access Token (24h) + HttpOnly Refresh Token Cookie. |
 
 ---
 
-## 6. Khung nghiên cứu nghiệp vụ cần làm rõ (Research Checklist)
+## 6. Phạm vi công việc của Duy — Module 4: Group Chat Management
 
-Tất cả các mục dưới đây **chưa được chốt** và được đánh dấu `TBD`. Các thành viên khi nghiên cứu và đề xuất cần trả lời đủ **10 câu hỏi đánh giá phạm vi**:
+| Task | Kết quả cần đạt | Giới hạn |
+| :--- | :--- | :--- |
+| **1.07 — API gửi tin nhắn + test** | Gửi tin nhắn vào Channel qua REST, kiểm tra nội dung và membership, lưu SQL Server, trả DTO trong wrapper thành công theo mục 4.1 của tài liệu kiến trúc; test validation, authentication, authorization và response. | Không làm lịch sử, sửa/xóa hoặc WebSocket. |
+| **1.12 — UI nhập và gửi tin nhắn** | Ô nhập và nút Send, thao tác bàn phím, loading/error, giữ nội dung khi lỗi, cập nhật UI sau thành công. | Chỉ bắt đầu sau xác nhận tiếp tục của Duy; tích hợp API khi sẵn sàng và được Duy đồng ý. |
 
-> [!TIP]
-> ### 10 Câu hỏi bắt buộc khi đề xuất tính năng mới:
-> 1. Chức năng này giải quyết vấn đề gì cụ thể?
-> 2. Đối tượng User nào cần chức năng này?
-> 3. Chức năng có thực sự cần thiết cho MVP không? (Có thể hoãn sang v2 không?)
-> 4. Business rule (quy tắc nghiệp vụ) cụ thể là gì?
-> 5. Phía Frontend (FE) cần làm gì, giao diện ra sao?
-> 6. Phía Backend (BE) cần xử lý logic gì?
-> 7. Database cần lưu trữ những dữ liệu gì? (SQL Server hay MongoDB?)
-> 8. Tương tác này sử dụng REST API hay WebSocket?
-> 9. Chức năng có ảnh hưởng đến Security / Authentication / Authorization không?
-> 10. Nhóm có đủ thời gian implement, viết unit test và bảo vệ (defense) trước hội đồng không?
+- Backend làm trước; Frontend làm ở đợt riêng. Mỗi đợt giải thích code, chuẩn bị interview và kiểm tra mức độ hiểu trước khi chuyển tiếp.
+- Không sửa module của Ben, Hoàng, Vinh hoặc Kỳ Anh; không làm chat riêng của Ben.
+- Không tự thay database, commit, push, merge hoặc chuyển branch.
+- Các tính năng khác trong mô hình MVP vẫn là phạm vi dự án tổng thể, không tự động thuộc hai task này.
+- Contract chi tiết ở mục 7–8 của tài liệu kiến trúc; quy trình hướng dẫn ở mục 20 của tài liệu phát triển.
 
----
+## 7. Tài liệu tham chiếu chi tiết
+- **Quy trình, tiến độ và bàn giao:** [`00-DEVELOPMENT-PROCESS.md`](./00-DEVELOPMENT-PROCESS.md)
+- **Kiến trúc hệ thống & API:** [`02-SYSTEM-ARCHITECTURE.md`](./02-SYSTEM-ARCHITECTURE.md)
+- **Thiết kế cơ sở dữ liệu:** [`03-DATABASE-DESIGN.md`](./03-DATABASE-DESIGN.md)
 
-## 7. Bảng theo dõi các nghiệp vụ chưa chốt (`TBD`)
-
-| Phân hệ | Vấn đề cần nghiên cứu & thống nhất | Trạng thái | Thành viên phụ trách | Ghi chú / Phương án đề xuất |
-| :--- | :--- | :---: | :---: | :--- |
-| **ROOM** | Ai được tạo Room? (Mọi User hay Role đặc biệt?) | `TBD` | — | Cần đơn giản hóa cho MVP |
-| **ROOM** | User tham gia Room bằng cách nào? (Tìm kiếm, Invite code/link, Admin add?) | `TBD` | — | Cần cơ chế dễ demo và test |
-| **ROOM** | Room có phân loại Public / Private không? | `TBD` | — | Nếu không cần thiết, cân nhắc giữ một loại |
-| **ROOM** | Có mã mời (Invite code) hoặc Invite link không? | `TBD` | — | — |
-| **ROOM** | Ai có quyền xóa Room? (Creator / Admin?) | `TBD` | — | — |
-| **ROOM** | Ai có quyền chỉnh sửa thông tin Room (Tên, mô tả, ảnh đại diện)? | `TBD` | — | — |
-| **ROOM** | Quy trình User rời Room (Leave Room)? | `TBD` | — | — |
-| **ROOM** | Điều gì xảy ra khi người tạo Room (Creator/Owner) rời Room? | `TBD` | — | Chuyển quyền hay giải tán Room? |
-| **ROOM** | Room có những trạng thái vòng đời nào (ACTIVE, ARCHIVED...)? | `TBD` | — | — |
-| **ROOM** | Có giới hạn số lượng Member trong một Room không? | `TBD` | — | — |
-| **MEMBER** | Member có Role riêng trong từng Room hay không? (Owner, Admin, Member?) | `TBD` | — | Tránh làm phân quyền quá phức tạp |
-| **MEMBER** | Ai được quyền mời Member mới? | `TBD` | — | — |
-| **MEMBER** | Ai được quyền Kick (đuổi) Member? | `TBD` | — | — |
-| **MEMBER** | Ai được quyền Ban (chặn vĩnh viễn) Member? | `TBD` | — | Có cần thiết cho MVP không? |
-| **MEMBER** | Member có thể tự ý rời Room bất kỳ lúc nào không? | `TBD` | — | — |
-| **MEMBER** | Ma trận quyền hạn cụ thể của từng loại Member là gì? | `TBD` | — | — |
-| **MESSAGE** | Member nào được phép gửi Message? | `TBD` | — | — |
-| **MESSAGE** | Có cho phép Edit Message không? | `TBD` | — | — |
-| **MESSAGE** | Có cho phép Delete Message không? (Soft delete hay hard delete?) | `TBD` | — | — |
-| **MESSAGE** | Có chức năng Reply (trả lời trích dẫn) không? | `TBD` | — | — |
-| **MESSAGE** | Có chức năng Reaction (thả cảm xúc emoji) không? | `TBD` | — | — |
-| **MESSAGE** | Có hỗ trợ Attachment / File / Image không? | `TBD` | — | Cân nhắc lưu trữ file và upload size |
-| **MESSAGE** | Message có trạng thái nào (SENT, DELIVERED, EDITED, DELETED)? | `TBD` | — | — |
-| **MESSAGE** | Cơ chế phân trang (Pagination) lịch sử tin nhắn (Cursor-based hay Page/Size)? | `TBD` | — | — |
-| **CHANNEL** | Room có chia thành các Channel nhỏ hay không? | `TBD` | — | **Mặc định MVP: KHÔNG có Channel trừ khi chứng minh được sự cần thiết** |
-| **NOTIFICATION** | MVP có cần Notification không? | `TBD` | — | **Mặc định MVP: Chưa bắt buộc** |
-| **NOTIFICATION** | Nếu có, sự kiện nào kích hoạt Notification? Có cần real-time notification qua WS không? | `TBD` | — | — |
-| **AUTH** | Quy trình Đăng ký tài khoản (Register) cần các trường nào? Có OTP/Email verify không? | `TBD` | — | Khuyên dùng: Đăng ký đơn giản cho MVP |
-| **AUTH** | Cơ chế Đăng nhập (Login) và phát hành JWT Token? | `TBD` | — | — |
-| **AUTH** | JWT Payload gồm những claims nào? Hạn sử dụng bao lâu? | `TBD` | — | — |
-| **AUTH** | Có cần Refresh Token không hay Access Token thời gian vừa đủ? | `TBD` | — | — |
-| **AUTH** | Cơ chế Đăng xuất (Logout) (Xóa token phía client hay duy trì Blacklist/Redis)? | `TBD` | — | — |
-| **AUTH** | Chức năng Quên mật khẩu / Reset Password có thuộc MVP không? | `TBD` | — | — |
-| **AUTHORIZATION** | Hệ thống có những System Role nào (ROLE_USER, ROLE_ADMIN...)? | `TBD` | — | — |
-| **AUTHORIZATION** | Room Role và System Role phối hợp như thế nào? | `TBD` | — | — |
-| **AUTHORIZATION** | Các layer kiểm tra quyền ở Backend (Spring Security Filter, `@PreAuthorize`, Service-level)? | `TBD` | — | — |
-
----
-
-## 8. Nguyên tắc đồng bộ Frontend - Backend (Single Source of Truth)
-
-1. **Không tự ý tạo contract riêng:**
-   - Cả FE và BE không được tự định nghĩa API endpoint, DTO, WebSocket topic mà chưa cập nhật vào bộ tài liệu này (`02-SYSTEM-ARCHITECTURE.md` và `03-DATABASE-DESIGN.md`).
-2. **Không bẻ cong contract vì sự tiện lợi tạm thời:**
-   - Frontend không tự thêm các field ảo vào payload gửi lên backend nếu chưa thống nhất.
-   - Backend không tự ý thay đổi tên trường JSON, kiểu dữ liệu hoặc cấu trúc response envelope mà không thông báo.
-3. **Quy tắc xử lý bất đồng thuận (Conflict Resolution):**
-   - Nếu phát hiện code thực tế và tài liệu mâu thuẫn: **DỪNG LẠI và KHÔNG tự ý chọn một bên.**
-   - Người phát hiện phải tạo mục thảo luận trong nhóm để thống nhất sửa tài liệu hoặc sửa code.
+`DEN_APP_SYSTEM_SPECIFICATION.md` và `DECISION_LOG.md` được nhắc trong lịch sử công việc nhưng không có trong thư mục docs tại lần kiểm tra 2026-10-10; không dùng nội dung chưa truy cập được để suy đoán contract.

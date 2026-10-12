@@ -2,12 +2,7 @@ package com.denhub.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.springframework.data.annotation.CreatedDate;
 
@@ -22,8 +17,12 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@AttributeOverrides({
+        @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", updatable = false, length = 254)),
+        @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
+})
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
-public class Message implements Serializable {
+public class Message extends AbstractAuditingEntity<Long> implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -31,8 +30,13 @@ public class Message implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull
-    @Column(name = "sender_id", nullable = false)
+    @Column(name = "channel_id")
+    private Long channelId;
+
+    @Column(name = "author_id")
+    private Long authorId;
+
+    @Column(name = "sender_id")
     private Long senderId;
 
     @Column(name = "conversation_id")
@@ -59,11 +63,33 @@ public class Message implements Serializable {
     @Column(name = "height")
     private Integer height;
 
-    @NotNull
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     @JsonIgnore
     @Builder.Default
     private Instant createdAt = Instant.now();
-}
 
+    @Override
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getSenderId() {
+        return senderId != null ? senderId : authorId;
+    }
+
+    public Long getAuthorId() {
+        return authorId != null ? authorId : senderId;
+    }
+
+    public Instant getCreatedAt() {
+        if (createdAt != null) {
+            return createdAt;
+        }
+        return getCreatedDate();
+    }
+}

@@ -137,11 +137,18 @@ public class ConversationService {
         return messagePage.map(msg -> {
             MessageHistoryDTO.SenderInfo senderInfo = null;
             User sender = senderMap.get(msg.getSenderId());
+            if (sender != null) {
                 senderInfo = MessageHistoryDTO.SenderInfo.builder()
                         .userId(sender.getId())
                         .name(sender.getName() != null ? sender.getName() : sender.getEmail())
                         .avatar(sender.getAvatar())
                         .build();
+            } else if (msg.getSenderId() != null) {
+                senderInfo = MessageHistoryDTO.SenderInfo.builder()
+                        .userId(msg.getSenderId())
+                        .name("User #" + msg.getSenderId())
+                        .build();
+            }
 
             List<String> mediaUrlsList = null;
             if (msg.getMediaUrl() != null && !msg.getMediaUrl().trim().isEmpty()) {

@@ -112,7 +112,8 @@ public class AccountResource {
     /*
     * vm: username, password
     * */
-    @PostMapping("/auth/login")
+    @PostMapping("/login")
+    @Operation(summary = "Đăng nhập", description = "Xác thực người dùng và nhận về Access Token cùng Refresh Token (cookie).")
     public ResponseEntity<ResLoginDTO> loginWithEmail(@Valid @RequestBody LoginVM vm) {
         String normalizedEmail = vm.getUsername().trim().toLowerCase(Locale.ENGLISH);
         // check password

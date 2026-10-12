@@ -34,25 +34,25 @@ public class FileService {
     private String absolutePath;
 
     public List<String> saveAndGetUrls(List<MultipartFile> files) throws IOException {
-        if(files == null || files.isEmpty()) {
+        if (files == null || files.isEmpty()) {
             throw new BadRequestResourceException("File not found", "fileManagement", "filenotfound");
         }
         List<String> errorMessage = new ArrayList<>();
-        for(MultipartFile file : files) {
-            if(file == null || file.isEmpty()) {
-                throw new BadRequestResourceException("File null or email", "fileManagement", "cannotdefine");
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                throw new BadRequestResourceException("File null or empty", "fileManagement", "cannotdefine");
             }
-            if(file.getOriginalFilename() == null || file.getOriginalFilename().isEmpty()) {
+            if (file.getOriginalFilename() == null || file.getOriginalFilename().isEmpty()) {
                 errorMessage.add("File has invalid original file name");
             }
         }
-        if(!errorMessage.isEmpty()) {
-            throw new BadRequestResourceException(String.join("/n", errorMessage), "fileManagement", "filenameinvalid");
+        if (!errorMessage.isEmpty()) {
+            throw new BadRequestResourceException(String.join("\n", errorMessage), "fileManagement", "filenameinvalid");
         }
         var directoryPath = Paths.get(absolutePath);
         Files.createDirectories(directoryPath);
         List<String> urlFiles = new ArrayList<>();
-        for(MultipartFile file : files) {
+        for (MultipartFile file : files) {
             String fileName = "denhub-" + System.currentTimeMillis() + "-" + UUID.randomUUID() + ".webp";
             var filePath = directoryPath.resolve(fileName);
             try (InputStream inputStream = file.getInputStream()) {
@@ -62,6 +62,7 @@ public class FileService {
         }
         return urlFiles;
     }
+
     public FileUploadResponseDTO uploadImage(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestAlertException("File is empty", "file", "fileempty");

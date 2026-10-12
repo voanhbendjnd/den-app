@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -45,13 +46,27 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
     @Column(length = 254, unique = true)
     @NotNull
     private String email;
-    @NotNull
     @Length(max = 100)
-    @Column(name = "username", unique = true, nullable = false, length = 100)
+    @Column(name = "username", length = 100)
     private String username;
     @NotNull
     @Column(nullable = false)
     private Boolean activated = false;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.username == null || this.username.isBlank()) {
+            if (this.email != null && !this.email.isBlank()) {
+                String prefix = this.email.contains("@") ? this.email.split("@")[0] : this.email;
+                if (prefix.length() > 60) {
+                    prefix = prefix.substring(0, 60);
+                }
+                this.username = prefix + "_" + UUID.randomUUID().toString().substring(0, 8);
+            } else {
+                this.username = "user_" + UUID.randomUUID().toString().substring(0, 8);
+            }
+        }
+    }
 
 
     @Size(max = 20)
