@@ -271,7 +271,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Server/Room** | IN_PROGRESS | IN_PROGRESS | TBD | IN_PROGRESS | IN_PROGRESS | IN_PROGRESS | 2026-10-09 |
-| **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | 2026-10-11 |
+| **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-13 |
 | **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Message** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
 | **Real-time** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
@@ -283,6 +283,39 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 ## 11. COMPLETED WORK LOG
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+
+### [2026-10-13] NV-1.20-FEAT-CHANNEL-LIST — Làm API lấy danh sách Channel + test (Kỳ Anh)
+Implemented:
+- Viết API `GET /api/v1/servers/{serverId}/channels` trả về danh sách các kênh trong server:
+  - Xác thực người dùng hiện tại từ Security Context.
+  - Kiểm tra sự tồn tại của Server mục tiêu (`serverRepository.findById`).
+  - Kiểm tra phân quyền truy cập: Chỉ Server Owner hoặc Thành viên (`existsByServerIdAndUserId`) mới có quyền xem danh sách channel.
+  - Truy vấn danh sách kênh sắp xếp tăng dần theo vị trí `position` (`channelRepository.findAllByServerIdOrderByPositionAsc`).
+  - Chuyển đổi sang `ChannelResponseDTO` chứa đầy đủ thông tin `id`, `serverId`, `name`, `position`, `createdDate`.
+- Thêm tài liệu Swagger `@Operation` chi tiết trên controller.
+
+Backend:
+- `ChannelService.java` (Updated `getChannelsByServerId`).
+- `ChannelResource.java` (Updated `GET /api/v1/servers/{serverId}/channels`).
+
+Tests:
+- `ChannelServiceTest`: Bổ sung 5 unit tests bao phủ toàn bộ trường hợp thành công và mã lỗi:
+  - `getChannels_Success_WhenOwner`
+  - `getChannels_Success_WhenMember`
+  - `getChannels_Fail_WhenNotLoggedIn`
+  - `getChannels_Fail_WhenServerNotFound`
+  - `getChannels_Fail_WhenNotMemberOrOwner`
+- `ChannelResourceTest`: Bổ sung test MockMvc `getChannelsByServerId_Success`.
+- Toàn bộ backend test suite: PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Updated endpoint `GET /api/v1/servers/{serverId}/channels` sang `CONFIRMED`).
+
+Commit:
+- Đã hoàn tất chia nhỏ và commit từng file lên branch feature/create-channel-api.
+
+---
 
 ### [2026-10-11] NV-1.15-FEAT-CHANNEL-UI — Làm UI tạo Channel, kết nối API (Kỳ Anh)
 Implemented:
