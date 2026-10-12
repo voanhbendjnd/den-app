@@ -8,6 +8,7 @@ import {
   PlusOutlined,
   ThunderboltFilled,
   HomeOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import CreateServerModal from '../components/common/CreateServerModal';
@@ -67,6 +68,11 @@ export default function MainLayout() {
       key: '/', 
       icon: <HomeOutlined style={{ fontSize: 16 }} />, 
       label: <Link to="/" style={{ fontWeight: 600 }}>Trang Tổng Quan</Link> 
+    },
+    { 
+      key: '/direct', 
+      icon: <MessageOutlined style={{ fontSize: 16 }} />, 
+      label: <Link to="/direct" style={{ fontWeight: 600 }}>Tin Nhắn Trực Tiếp</Link> 
     },
   ];
 
@@ -282,7 +288,7 @@ export default function MainLayout() {
         <div style={{ flex: 1, padding: '16px 8px', overflowY: 'auto' }}>
           <Menu
             mode="inline"
-            selectedKeys={[location.pathname]}
+            selectedKeys={[location.pathname.startsWith('/direct') ? '/direct' : location.pathname]}
             items={secondaryMenuItems}
             style={{ borderRight: 0, background: 'transparent' }}
           />

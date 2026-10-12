@@ -276,9 +276,9 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 | **Server/Room** | IN_PROGRESS | IN_PROGRESS | TBD | IN_PROGRESS | IN_PROGRESS | IN_PROGRESS | 2026-10-09 |
 | **Channel** | TODO | IMPLEMENTED | CONFIRMED | IN_PROGRESS | IMPLEMENTED | IN_PROGRESS | 2026-10-10 |
 | **Member** | TBD | TBD | TBD | TBD | TBD | TODO | 2026-10-06 |
-| **Message (1-1)** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-07 |
-| **Real-time (1-1)** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-07 |
-| **Search User & Friendship** | TBD | DONE | CONFIRMED | TBD | PASS | DONE | 2026-10-10 |
+| **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
+| **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
+| **Search User & Friendship** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 
 
 *(Chỉ cập nhật trạng thái khi tính năng đã qua kiểm thử thực tế).*
@@ -288,6 +288,57 @@ Bảng này phản ánh chính xác trạng thái thực tế của code trong d
 ## 11. COMPLETED WORK LOG
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+
+### [2026-10-12] FIX-REALTIME-DM-PERSISTENCE — Sửa lỗi lưu tin nhắn và hiển thị realtime 1-1 chat
+Implemented:
+- Backend:
+  - Tạo mới `ConversationChatController.java` đón nhận tin nhắn WebSocket tại `@MessageMapping("/conversations/send")` và ủy quyền xử lý cho `ConversationService.processAndSendMessage()`.
+  - Cập nhật `WebSocketConfig.java`:
+    - Mở lại endpoint thuần `registry.addEndpoint("/ws").setAllowedOriginPatterns("*")` cho native WebSocket clients (`@stomp/stompjs`).
+    - Bổ sung `ChannelInterceptor` trong `configureClientInboundChannel` giải mã Bearer JWT từ STOMP `CONNECT` header và thiết lập `Principal/Authentication` cho session.
+  - Cập nhật `ConversationService.java`: hỗ trợ phân giải người gửi linh hoạt từ cả User ID dạng số lẫn Email của JWT token.
+  - Bổ sung Unit Test `ConversationChatControllerTest.java` và test case email principal trong `ConversationServiceTest.java`.
+- Frontend:
+  - Cập nhật `useDirectChat.js`: kết nối STOMP client ngay khi mount component (không phụ thuộc `conversationId != null`), tự động subscribe/unsubscribe linh hoạt khi `conversationId` thay đổi, đảm bảo gửi tin nhắn khởi đầu thành công.
+- Tests & Verification:
+  - `.\gradlew.bat test`: PASS 100% (toàn bộ test suite backend).
+  - `npm run build`: PASS 100% (Vite production build 0 errors).
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+  - `docs/02-SYSTEM-ARCHITECTURE.md` (Updated).
+- Commit:
+  - PENDING (Chờ người dùng ủy quyền).
+
+---
+
+### [2026-10-12] FEAT-SEARCH-FRIEND-DM — Search User, Friend Request & Direct Message 1-1 Chat (FE + BE)
+Implemented:
+- Backend:
+  - Bổ sung `ConversationResponseDTO` và `MessageHistoryDTO`.
+  - Cập nhật `ConversationRepository` và `ConversationMemberRepository` với queries lấy hội thoại của user và thành viên còn lại.
+  - Cập nhật `ConversationService`: bổ sung `getUserConversations()` (danh sách hội thoại kèm otherUser, lastMessage) và `getConversationMessages()` (lịch sử tin nhắn phân trang).
+  - Tạo mới `ConversationResource` với REST API endpoints:
+    - `GET /api/v1/conversations`: Lấy danh sách hội thoại của user hiện tại.
+    - `GET /api/v1/conversations/{conversationId}/messages`: Lấy lịch sử tin nhắn kèm phân trang page/size.
+  - Bổ sung Unit Tests cho `ConversationServiceTest` và `ConversationResourceTest`.
+- Frontend:
+  - Tạo mới `conversationApi.js` và `friendApi.js`.
+  - Tạo mới `useDirectChat.js` quản lý kết nối STOMP WebSocket, subscribe `/topic/conversations/{id}` và gửi tin nhắn 1-1 qua `/app/conversations/send`.
+  - Tạo mới `DirectMessagePage.jsx`: giao diện Cyber-tech nhắn tin 1-1 hoàn chỉnh hỗ trợ gửi tin nhắn text, upload ảnh qua `fileApi.upload(file, 'messages')`, xem trước ảnh (preview gallery/zoom), trạng thái online/offline, optimistic messaging.
+  - Tạo mới `SearchUserPanel.jsx`: tìm kiếm người dùng realtime theo username qua `GET /api/users/search`, nút gửi lời mời kết bạn `POST /api/friendships/requests`, nút mở chat 1-1 trực tiếp.
+  - Tạo mới `ConversationList.jsx`: danh sách hội thoại bên trái kèm avatar, tên, badge online, snippet tin nhắn cuối và thời gian.
+  - Cập nhật `AppRoutes.jsx` hỗ trợ routes `/direct` và `/direct/:conversationId`.
+  - Cập nhật `MainLayout.jsx` thêm mục menu "Tin Nhắn Trực Tiếp" và highlight thông minh.
+- Tests & Verification:
+  - `.\gradlew.bat test`: PASS 100% (toàn bộ test suite backend).
+  - `npm run build`: PASS 100% (Vite production build thành công 0 errors).
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md` (Thêm endpoints `/api/v1/conversations` và `/api/v1/conversations/{id}/messages`).
+  - `docs/00-DEVELOPMENT-PROCESS.md` (Cập nhật tiến độ & Completed Work Log).
+- Commit:
+  - PENDING (Chờ người dùng ủy quyền).
+
+---
 
 ### [2026-10-10] FEAT-SERVER-JOIN — API Tham gia Server
 Implemented:

@@ -78,7 +78,7 @@ export default function HomePage() {
             onClick={() => openCreateModal?.()}
             style={{ color: '#00F2FE', fontWeight: 600 }}
           >
-            + Tạo thêm Server
+            Tạo thêm Server
           </Button>
         </div>
 

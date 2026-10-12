@@ -174,6 +174,8 @@ Khi có lỗi xảy ra (4xx, 5xx), Backend bắt buộc trả về format:
 | **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `TBD` |
 | **Media / File** | `POST` | `/api/v1/files/upload` | Tải lên file ảnh (multipart/form-data) nhận URL tĩnh | `CONFIRMED` |
 | **Media / File** | `GET` | `/api/v1/files/{folder}/{filename}` | Phục vụ file ảnh công khai cho trình duyệt | `CONFIRMED` |
+| **Conversation** | `GET` | `/api/v1/conversations` | Lấy danh sách hội thoại của user hiện tại (thông tin người kia & tin nhắn mới nhất) | `CONFIRMED` |
+| **Conversation** | `GET` | `/api/v1/conversations/{conversationId}/messages` | Lấy lịch sử tin nhắn của một hội thoại (phân trang page & size) | `CONFIRMED` |
 
 ---
 

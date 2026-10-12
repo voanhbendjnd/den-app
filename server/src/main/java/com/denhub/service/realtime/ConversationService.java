@@ -10,8 +10,14 @@ import com.denhub.repository.ConversationMemberRepository;
 import com.denhub.repository.ConversationRepository;
 import com.denhub.repository.MessageRepository;
 import com.denhub.repository.UserRepository;
-import com.denhub.service.errors.BadRequestResourceException;
+import com.denhub.security.SecurityUtils;
 import com.denhub.service.FileService;
+import com.denhub.service.dto.ConversationResponseDTO;
+import com.denhub.service.dto.MessageHistoryDTO;
+import com.denhub.service.errors.BadRequestResourceException;
+import com.denhub.web.rest.errors.BadRequestAlertException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,9 +56,123 @@ public class ConversationService {
 
     }
 
-    /*
-     * Process and send message with multiple files saved directly to server storage
-     */
+
+    @Transactional(readOnly = true)
+    public List<ConversationResponseDTO> getUserConversations() {
+        String currentEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "conversation", "notloggedin"));
+        User currentUser = userRepository.findOneByEmail(currentEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found", "conversation", "usernotfound"));
+
+        List<Conversation> conversations = conversationRepository.findAllByMemberUserId(currentUser.getId());
+
+        return conversations.stream().map(conv -> {
+            List<ConversationMember> otherMembers = conversationMemberRepository
+                    .findOtherMembersByConversationId(conv.getId(), currentUser.getId());
+
+            ConversationResponseDTO.OtherUser otherUserDto = null;
+            if (!otherMembers.isEmpty()) {
+                Long otherUserId = otherMembers.get(0).getUserId();
+                Optional<User> otherUserOpt = userRepository.findById(otherUserId);
+                if (otherUserOpt.isPresent()) {
+                    User other = otherUserOpt.get();
+                    otherUserDto = ConversationResponseDTO.OtherUser.builder()
+                            .userId(other.getId())
+                            .username(other.getUsername())
+                            .name(other.getName() != null ? other.getName() : other.getEmail())
+                            .avatar(other.getAvatar())
+                            .build();
+                }
+            }
+
+            ConversationResponseDTO.LastMessage lastMessageDto = null;
+            if (conv.getLastMessageId() != null) {
+                Optional<Message> lastMsgOpt = messageRepository.findById(conv.getLastMessageId());
+                if (lastMsgOpt.isPresent()) {
+                    Message lastMsg = lastMsgOpt.get();
+                    lastMessageDto = ConversationResponseDTO.LastMessage.builder()
+                            .messageId(lastMsg.getId())
+                            .type(lastMsg.getType())
+                            .content(lastMsg.getContent())
+                            .mediaUrl(lastMsg.getMediaUrl())
+                            .senderId(lastMsg.getSenderId())
+                            .createdAt(lastMsg.getCreatedAt())
+                            .build();
+                }
+            }
+
+            return ConversationResponseDTO.builder()
+                    .conversationId(conv.getId())
+                    .type(conv.getType())
+                    .otherUser(otherUserDto)
+                    .lastMessage(lastMessageDto)
+                    .createdDate(conv.getCreatedDate())
+                    .build();
+        }).toList();
+    }
+
+
+    @Transactional(readOnly = true)
+    public Page<MessageHistoryDTO> getConversationMessages(Long conversationId, Pageable pageable) {
+        String currentEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "conversation", "notloggedin"));
+        User currentUser = userRepository.findOneByEmail(currentEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found", "conversation", "usernotfound"));
+
+        conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BadRequestAlertException("Conversation not found", "conversation", "idnotfound"));
+
+        boolean isMember = conversationMemberRepository.existsByConversationIdAndUserId(conversationId, currentUser.getId());
+        if (!isMember) {
+            throw new BadRequestAlertException("User is not a member of this conversation", "conversation", "notmember");
+        }
+
+        Page<Message> messagePage = messageRepository
+                .findByConversationIdOrderByCreatedAtAsc(conversationId, pageable);
+
+        return messagePage.map(msg -> {
+            MessageHistoryDTO.SenderInfo senderInfo = null;
+            Optional<User> senderOpt = userRepository.findById(msg.getSenderId());
+            if (senderOpt.isPresent()) {
+                User sender = senderOpt.get();
+                senderInfo = MessageHistoryDTO.SenderInfo.builder()
+                        .userId(sender.getId())
+                        .name(sender.getName() != null ? sender.getName() : sender.getEmail())
+                        .avatar(sender.getAvatar())
+                        .build();
+            }
+
+            List<String> mediaUrlsList = null;
+            if (msg.getMediaUrl() != null && !msg.getMediaUrl().trim().isEmpty()) {
+                mediaUrlsList = Arrays.asList(msg.getMediaUrl().split(","));
+            }
+
+            MessageHistoryDTO.FileMetadata metaDto = null;
+            if (msg.getFileName() != null || msg.getWidth() != null || msg.getFileSize() != null) {
+                metaDto = MessageHistoryDTO.FileMetadata.builder()
+                        .fileName(msg.getFileName())
+                        .fileSize(msg.getFileSize() != null ? msg.getFileSize() : 0L)
+                        .width(msg.getWidth() != null ? msg.getWidth() : 0)
+                        .height(msg.getHeight() != null ? msg.getHeight() : 0)
+                        .build();
+            }
+
+            return MessageHistoryDTO.builder()
+                    .messageId(msg.getId())
+                    .conversationId(msg.getConversationId())
+                    .sender(senderInfo)
+                    .type(msg.getType())
+                    .content(msg.getContent())
+                    .mediaUrl(msg.getMediaUrl())
+                    .mediaUrls(mediaUrlsList)
+                    .metadata(metaDto)
+                    .status("SENT")
+                    .createdAt(msg.getCreatedAt())
+                    .build();
+        });
+    }
+
+
     @Transactional
     public SendMessageRes processAndSendMessagesWithFiles(List<MultipartFile> files, SendMessageReq req, Principal principal) {
         if (req == null) {
@@ -86,9 +206,17 @@ public class ConversationService {
         if (principal == null || principal.getName() == null) {
             throw new BadRequestResourceException("Unauthorized user", "conversationManagement", "unauthorized");
         }
-        Long senderId = this.checkNumber(principal.getName());
-        User senderUser = userRepository.findById(senderId)
-                .orElseThrow(() -> new BadRequestResourceException("Sender not found", "conversationManagement", "senderNotFound"));
+        Long senderId;
+        User senderUser;
+        try {
+            senderId = Long.parseLong(principal.getName());
+            senderUser = userRepository.findById(senderId)
+                    .orElseThrow(() -> new BadRequestResourceException("Sender not found", "conversationManagement", "senderNotFound"));
+        } catch (NumberFormatException e) {
+            senderUser = userRepository.findOneByEmail(principal.getName())
+                    .orElseThrow(() -> new BadRequestResourceException("Sender not found", "conversationManagement", "senderNotFound"));
+            senderId = senderUser.getId();
+        }
 
         Conversation conversation;
         if (req.getConversationId() != null) {
@@ -219,4 +347,3 @@ public class ConversationService {
                 .build();
     }
 }
-

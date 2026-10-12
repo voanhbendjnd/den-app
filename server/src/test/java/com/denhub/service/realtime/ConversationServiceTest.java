@@ -17,10 +17,22 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.denhub.domain.ConversationMember;
+import com.denhub.service.dto.ConversationResponseDTO;
+import com.denhub.service.dto.MessageHistoryDTO;
+import com.denhub.web.rest.errors.BadRequestAlertException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -233,5 +245,138 @@ class ConversationServiceTest {
 
         verify(fileService).saveAndGetUrls(files);
         verify(simpMessagingTemplate).convertAndSend(eq("/topic/conversations/100"), any(SendMessageRes.class));
+    }
+
+    @Test
+    void getUserConversations_Success() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("sender@denhub.com", null, List.of())
+        );
+
+        when(userRepository.findOneByEmail("sender@denhub.com")).thenReturn(Optional.of(senderUser));
+
+        Conversation conv = new Conversation();
+        conv.setId(100L);
+        conv.setType(ConversationType.DIRECT.name());
+        conv.setLastMessageId(500L);
+        conv.setCreatedDate(Instant.now());
+
+        when(conversationRepository.findAllByMemberUserId(1L)).thenReturn(List.of(conv));
+
+        ConversationMember otherMember = new ConversationMember();
+        otherMember.setUserId(2L);
+        otherMember.setConversationId(100L);
+        when(conversationMemberRepository.findOtherMembersByConversationId(100L, 1L))
+                .thenReturn(List.of(otherMember));
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(targetUser));
+
+        Message lastMsg = Message.builder()
+                .senderId(1L)
+                .conversationId(100L)
+                .type(MessageType.TEXT.name())
+                .content("Hello")
+                .createdAt(Instant.now())
+                .build();
+        lastMsg.setId(500L);
+        when(messageRepository.findById(500L)).thenReturn(Optional.of(lastMsg));
+
+        List<ConversationResponseDTO> result = conversationService.getUserConversations();
+
+        assertThat(result).hasSize(1);
+        ConversationResponseDTO item = result.get(0);
+        assertThat(item.getConversationId()).isEqualTo(100L);
+        assertThat(item.getOtherUser()).isNotNull();
+        assertThat(item.getOtherUser().getUserId()).isEqualTo(2L);
+        assertThat(item.getLastMessage()).isNotNull();
+        assertThat(item.getLastMessage().getContent()).isEqualTo("Hello");
+    }
+
+    @Test
+    void getConversationMessages_Success() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("sender@denhub.com", null, List.of())
+        );
+
+        when(userRepository.findOneByEmail("sender@denhub.com")).thenReturn(Optional.of(senderUser));
+
+        Conversation conv = new Conversation();
+        conv.setId(100L);
+        when(conversationRepository.findById(100L)).thenReturn(Optional.of(conv));
+        when(conversationMemberRepository.existsByConversationIdAndUserId(100L, 1L)).thenReturn(true);
+
+        Message msg = Message.builder()
+                .senderId(1L)
+                .conversationId(100L)
+                .type(MessageType.TEXT.name())
+                .content("Hello there")
+                .createdAt(Instant.now())
+                .build();
+        msg.setId(500L);
+
+        Page<Message> msgPage = new PageImpl<>(List.of(msg), PageRequest.of(0, 10), 1);
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(eq(100L), any(Pageable.class)))
+                .thenReturn(msgPage);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(senderUser));
+
+        Page<MessageHistoryDTO> result = conversationService.getConversationMessages(100L, PageRequest.of(0, 10));
+
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        MessageHistoryDTO item = result.getContent().get(0);
+        assertThat(item.getMessageId()).isEqualTo(500L);
+        assertThat(item.getContent()).isEqualTo("Hello there");
+        assertThat(item.getSender().getUserId()).isEqualTo(1L);
+    }
+
+    @Test
+    void getConversationMessages_NotMember_ThrowsException() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("sender@denhub.com", null, List.of())
+        );
+
+        when(userRepository.findOneByEmail("sender@denhub.com")).thenReturn(Optional.of(senderUser));
+
+        Conversation conv = new Conversation();
+        conv.setId(100L);
+        when(conversationRepository.findById(100L)).thenReturn(Optional.of(conv));
+        when(conversationMemberRepository.existsByConversationIdAndUserId(100L, 1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> conversationService.getConversationMessages(100L, PageRequest.of(0, 10)))
+                .isInstanceOf(BadRequestAlertException.class)
+                .hasMessageContaining("not a member");
+    }
+
+    @Test
+    void processAndSendMessage_WithEmailPrincipal_Success() {
+        when(principal.getName()).thenReturn("sender@denhub.com");
+        when(userRepository.findOneByEmail("sender@denhub.com")).thenReturn(Optional.of(senderUser));
+        when(userRepository.existsById(2L)).thenReturn(true);
+        when(conversationRepository.findDirectConversationBetweenUsers(ConversationType.DIRECT.name(), 1L, 2L))
+                .thenReturn(Optional.empty());
+
+        Conversation savedConversation = new Conversation();
+        savedConversation.setId(100L);
+        savedConversation.setType(ConversationType.DIRECT.name());
+        when(conversationRepository.save(any(Conversation.class))).thenReturn(savedConversation);
+
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message m = invocation.getArgument(0);
+            m.setId(700L);
+            return m;
+        });
+
+        SendMessageReq req = SendMessageReq.builder()
+                .targetUserId(2L)
+                .type("TEXT")
+                .content("Hello via Email Principal")
+                .build();
+
+        SendMessageRes res = conversationService.processAndSendMessage(req, principal);
+
+        assertThat(res).isNotNull();
+        assertThat(res.getMessageId()).isEqualTo(700L);
+        assertThat(res.getContent()).isEqualTo("Hello via Email Principal");
+        assertThat(res.getSender().getUserId()).isEqualTo(1L);
     }
 }
