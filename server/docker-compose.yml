@@ -1,0 +1,8 @@
+services:
+
+  redis-happy-farm:
+    image: redis:alpine
+    container_name: den-app-local
+    restart: always
+    ports:
+      - "6379:6379"

@@ -1,0 +1,10 @@
+
+bin/
+build/
+uploads/
+/mysql_data
+
+# Environment variables
+.env
+.env.*
+!.env.example

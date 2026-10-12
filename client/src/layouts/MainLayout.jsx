@@ -1,69 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
+import { Layout, Menu, Avatar, Dropdown, Typography, Tooltip } from 'antd';
 import {
-  Layout,
-  Menu,
-  Avatar,
-  Badge,
-  Dropdown,
-  Button,
-  Typography,
-  Drawer,
-} from 'antd';
-import {
-  HomeOutlined,
-  TeamOutlined,
-  CalendarOutlined,
-  BellOutlined,
   UserOutlined,
   LogoutOutlined,
   SettingOutlined,
-  MenuOutlined,
-  UsergroupAddOutlined,
-  AppstoreOutlined,
+  PlusOutlined,
+  ThunderboltFilled,
+  HomeOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
+import CreateServerModal from '../components/common/CreateServerModal';
+import serverApi from '../api/serverApi';
 
-const { Header, Sider, Content } = Layout;
+const { Sider, Content } = Layout;
 const { Text } = Typography;
 
-const SIDEBAR_WIDTH = 220;
-
-function buildMenuItems(role) {
-  const items = [
-    { key: '/', icon: <HomeOutlined />, label: <Link to="/">Home</Link> },
-    { key: '/rooms', icon: <TeamOutlined />, label: <Link to="/rooms">Rooms</Link> },
-    { key: '/meetings', icon: <CalendarOutlined />, label: <Link to="/meetings">Meetings</Link> },
-    { key: '/notifications', icon: <BellOutlined />, label: <Link to="/notifications">Notifications</Link> },
-    { key: '/profile', icon: <UserOutlined />, label: <Link to="/profile">Profile</Link> },
-  ];
-
-  if (role === 'ADMIN') {
-    items.push(
-      { type: 'divider' },
-      {
-        key: 'admin',
-        icon: <SettingOutlined />,
-        label: 'Admin',
-        children: [
-          { key: '/admin/users', icon: <UsergroupAddOutlined />, label: <Link to="/admin/users">Users</Link> },
-          { key: '/admin/rooms', icon: <AppstoreOutlined />, label: <Link to="/admin/rooms">Rooms</Link> },
-        ],
-      }
-    );
-  }
-
-  return items;
-}
-
 export default function MainLayout() {
-  const { currentUser, role, logout } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [servers, setServers] = useState([]);
 
-  const selectedKey = '/' + location.pathname.split('/').slice(1, 3).join('/') || '/';
-  const menuItems = buildMenuItems(role);
+  useEffect(() => {
+    fetchServers();
+  }, []);
+
+  const fetchServers = async () => {
+    try {
+      const res = await serverApi.getAll();
+      const serverList = res.data?.data || res.data || [];
+      if (Array.isArray(serverList)) {
+        setServers(serverList);
+      }
+    } catch {
+      // Ignored for fallback
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -74,145 +48,331 @@ export default function MainLayout() {
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: 'Profile',
+      label: 'Hồ sơ cá nhân',
       onClick: () => navigate('/profile'),
     },
     { type: 'divider' },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Logout',
+      label: 'Đăng xuất',
       danger: true,
       onClick: handleLogout,
     },
   ];
 
-  const sideMenu = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Logo */}
-      <div
-        style={{
-          height: 56,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 20px',
-          borderBottom: '1px solid #f0f0f0',
-          flexShrink: 0,
-        }}
-      >
-        <Text strong style={{ fontSize: 18, letterSpacing: '-0.5px', color: '#1677ff' }}>
-          DenHub
-        </Text>
-      </div>
-
-      <Menu
-        mode="inline"
-        selectedKeys={[location.pathname]}
-        defaultOpenKeys={['admin']}
-        items={menuItems}
-        style={{ border: 'none', flex: 1, overflow: 'auto' }}
-      />
-    </div>
-  );
+  // Chỉ giữ các route thực sự hoạt động trong MVP
+  const secondaryMenuItems = [
+    { 
+      key: '/', 
+      icon: <HomeOutlined style={{ fontSize: 16 }} />, 
+      label: <Link to="/" style={{ fontWeight: 600 }}>Trang Tổng Quan</Link> 
+    },
+  ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {/* Desktop Sidebar */}
+    <Layout style={{ minHeight: '100vh', background: 'var(--color-bg-base)' }}>
+      {/* =========================================================
+          Primary Dock (Far-Left Server Launcher)
+         ========================================================= */}
       <Sider
-        width={SIDEBAR_WIDTH}
-        theme="light"
+        width={72}
         style={{
-          borderRight: '1px solid #f0f0f0',
+          background: 'var(--color-bg-sidebar)',
+          borderRight: '1px solid var(--border-subtle)',
           position: 'fixed',
           left: 0,
           top: 0,
           bottom: 0,
           zIndex: 100,
-          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingTop: 14,
         }}
-        breakpoint="lg"
-        collapsedWidth={0}
-        trigger={null}
       >
-        {sideMenu}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, width: '100%' }}>
+          {/* Main Home Hub Emblem */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {location.pathname === '/' && (
+              <div style={{
+                position: 'absolute',
+                left: -12,
+                width: 4,
+                height: 36,
+                borderRadius: '0 4px 4px 0',
+                background: '#00F2FE',
+                boxShadow: '0 0 10px #00F2FE',
+              }} />
+            )}
+            <Tooltip title="Trang Chủ DenHub" placement="right">
+              <div 
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: location.pathname === '/' ? 16 : 24,
+                  background: location.pathname === '/' 
+                    ? 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)' 
+                    : 'var(--color-bg-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  boxShadow: location.pathname === '/' ? '0 4px 16px rgba(0, 242, 254, 0.35)' : 'none',
+                  border: location.pathname === '/' ? 'none' : '1px solid var(--border-subtle)',
+                }}
+                onClick={() => navigate('/')}
+              >
+                <ThunderboltFilled style={{ 
+                  fontSize: 22, 
+                  color: location.pathname === '/' ? '#fff' : '#00F2FE' 
+                }} />
+              </div>
+            </Tooltip>
+          </div>
+
+          {/* Separator Line */}
+          <div style={{ width: 32, height: 2, background: 'var(--border-subtle)', borderRadius: 1 }} />
+
+          {/* User's Created Servers */}
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 10, 
+            width: '100%', 
+            alignItems: 'center',
+            maxHeight: 'calc(100vh - 200px)',
+            overflowY: 'auto',
+            overflowX: 'hidden'
+          }}>
+            {servers.map((server) => {
+              const isServerActive = location.pathname.startsWith(`/servers/${server.id}`);
+              return (
+                <div key={server.id} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isServerActive && (
+                    <div style={{
+                      position: 'absolute',
+                      left: -12,
+                      width: 4,
+                      height: 36,
+                      borderRadius: '0 4px 4px 0',
+                      background: '#00F2FE',
+                      boxShadow: '0 0 10px #00F2FE',
+                    }} />
+                  )}
+                  <Tooltip title={server.name} placement="right">
+                    <div 
+                      onClick={() => navigate('/')}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: isServerActive ? 16 : 24,
+                        background: 'var(--color-bg-surface)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                        border: '1px solid var(--border-subtle)',
+                        overflow: 'hidden',
+                        color: '#F1F5F9',
+                        fontWeight: 700,
+                        fontSize: 16,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderRadius = '16px';
+                        e.currentTarget.style.borderColor = '#6366F1';
+                        e.currentTarget.style.boxShadow = '0 0 12px rgba(99, 102, 241, 0.3)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isServerActive) {
+                          e.currentTarget.style.borderRadius = '24px';
+                          e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }
+                      }}
+                    >
+                      {server.iconUrl ? (
+                        <img 
+                          src={server.iconUrl} 
+                          alt={server.name} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                      ) : (
+                        <span>{server.name ? server.name.charAt(0).toUpperCase() : 'S'}</span>
+                      )}
+                    </div>
+                  </Tooltip>
+                </div>
+              );
+            })}
+
+            {/* Quick Action: Add Server */}
+            <Tooltip title="Tạo Không Gian Mới (Server)" placement="right">
+              <div 
+                onClick={() => setIsCreateModalOpen(true)}
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  background: 'rgba(0, 242, 254, 0.08)',
+                  color: '#00F2FE',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  border: '1px dashed rgba(0, 242, 254, 0.4)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderRadius = '16px';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)';
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 242, 254, 0.4)';
+                  e.currentTarget.style.border = '1px solid transparent';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderRadius = '24px';
+                  e.currentTarget.style.background = 'rgba(0, 242, 254, 0.08)';
+                  e.currentTarget.style.color = '#00F2FE';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.border = '1px dashed rgba(0, 242, 254, 0.4)';
+                }}
+              >
+                <PlusOutlined style={{ fontSize: 20 }} />
+              </div>
+            </Tooltip>
+          </div>
+        </div>
       </Sider>
 
-      {/* Mobile Drawer */}
-      <Drawer
-        placement="left"
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        width={SIDEBAR_WIDTH}
-        styles={{ body: { padding: 0 } }}
-        title={null}
-        closable={false}
+      {/* =========================================================
+          Secondary Sidebar (Navigation)
+         ========================================================= */}
+      <Sider
+        width={240}
+        style={{
+          background: 'var(--color-bg-layout)',
+          borderRight: '1px solid var(--border-subtle)',
+          position: 'fixed',
+          left: 72,
+          top: 0,
+          bottom: 0,
+          zIndex: 99,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
       >
-        {sideMenu}
-      </Drawer>
-
-      <Layout style={{ marginLeft: SIDEBAR_WIDTH }}>
-        {/* Header */}
-        <Header
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 99,
-            backgroundColor: '#fff',
-            borderBottom: '1px solid #f0f0f0',
-            padding: '0 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            height: 56,
-          }}
-        >
-          {/* Mobile menu button */}
-          <Button
-            type="text"
-            icon={<MenuOutlined />}
-            onClick={() => setDrawerOpen(true)}
-            style={{ display: 'none' }}
-            className="mobile-menu-btn"
+        {/* Workspace Brand Header */}
+        <div style={{
+          height: 56,
+          borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 18px',
+          background: 'rgba(15, 20, 34, 0.6)',
+        }}>
+          <Text style={{ color: '#F1F5F9', fontWeight: 800, fontSize: 16, letterSpacing: '-0.3px' }}>
+            DenHub
+          </Text>
+        </div>
+        
+        {/* Navigation Menu */}
+        <div style={{ flex: 1, padding: '16px 8px', overflowY: 'auto' }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            items={secondaryMenuItems}
+            style={{ borderRight: 0, background: 'transparent' }}
           />
+        </div>
 
-          <div />
-
-          {/* Right side actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Badge count={0} size="small">
-              <Button
-                type="text"
-                icon={<BellOutlined />}
-                onClick={() => navigate('/notifications')}
-              />
-            </Badge>
-
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-              >
-                <Avatar
-                  size={32}
-                  icon={<UserOutlined />}
-                  style={{ backgroundColor: '#1677ff' }}
-                />
-                <Text style={{ fontSize: 14 }}>{currentUser?.displayName || currentUser?.username}</Text>
-              </div>
-            </Dropdown>
+        {/* Bottom User Bar */}
+        <div style={{
+          height: 60,
+          background: 'var(--color-bg-sidebar)',
+          borderTop: '1px solid var(--border-subtle)',
+          padding: '0 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+            <Avatar 
+              size={36} 
+              style={{ 
+                background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
+                fontWeight: 700,
+                color: '#fff',
+                flexShrink: 0,
+              }} 
+              icon={<UserOutlined />}
+            >
+              {currentUser?.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
+            </Avatar>
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, overflow: 'hidden' }}>
+              <Text style={{ 
+                color: '#F1F5F9', 
+                fontWeight: 700, 
+                fontSize: 13, 
+                whiteSpace: 'nowrap', 
+                textOverflow: 'ellipsis', 
+                overflow: 'hidden' 
+              }}>
+                {currentUser?.displayName || currentUser?.username || 'Thành viên'}
+              </Text>
+              <Text style={{ color: '#64748B', fontSize: 11, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                {currentUser?.email || 'online'}
+              </Text>
+            </div>
           </div>
-        </Header>
 
-        {/* Main Content */}
-        <Content
-          style={{
-            padding: 24,
-            backgroundColor: '#f5f5f5',
-            minHeight: 'calc(100vh - 56px)',
-          }}
-        >
-          <Outlet />
+          <Dropdown menu={{ items: userMenuItems }} placement="topRight" trigger={['click']}>
+            <div 
+              style={{ 
+                width: 32, 
+                height: 32, 
+                borderRadius: 8, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                cursor: 'pointer', 
+                color: '#94A3B8',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                e.currentTarget.style.color = '#F1F5F9';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = '#94A3B8';
+              }}
+            >
+              <SettingOutlined style={{ fontSize: 17 }} />
+            </div>
+          </Dropdown>
+        </div>
+      </Sider>
+
+      {/* =========================================================
+          Main Content Workspace
+         ========================================================= */}
+      <Layout style={{ marginLeft: 312, background: 'var(--color-bg-base)', minHeight: '100vh' }}>
+        <Content style={{ position: 'relative', height: '100vh', overflowY: 'auto' }}>
+          <Outlet context={{ servers, setServers, openCreateModal: () => setIsCreateModalOpen(true), refreshServers: fetchServers }} />
         </Content>
       </Layout>
+
+      {/* Create Server Modal (Single Source of Truth) */}
+      <CreateServerModal 
+        open={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        onSuccess={(newServer) => {
+          setServers(prev => [newServer, ...prev.filter(s => s.id !== newServer.id)]);
+        }}
+      />
     </Layout>
   );
 }

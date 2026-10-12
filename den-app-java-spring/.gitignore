@@ -1,5 +1,0 @@
-
-bin/
-build/
-/mysql_data
-/src/main/resources/application.properties
