@@ -1,10 +1,5 @@
 package com.denhub.service;
 
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import com.denhub.domain.Channel;
 import com.denhub.domain.Server;
 import com.denhub.domain.User;
@@ -16,6 +11,13 @@ import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.ChannelResponseDTO;
 import com.denhub.service.dto.CreateChannelDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -29,84 +31,65 @@ public class ChannelService {
     UserRepository userRepository;
 
     public ChannelResponseDTO createChannel(CreateChannelDTO dto) {
-        // 1. Lấy thông tin user đăng nhập hiện tại
-        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
-                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "channel", "notloggedin"));
+        User currentUser = getCurrentUser();
+        validateServerAccess(dto.getServerId(), currentUser.getId());
 
-        User currentUser = userRepository.findOneByEmail(currentUserEmail)
-                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "channel", "usernotfound"));
-
-        // 2. Kiểm tra server có tồn tại không
-        Server server = serverRepository.findById(dto.getServerId())
-                .orElseThrow(() -> new BadRequestAlertException("Server not found with id: " + dto.getServerId(), "channel", "servernotfound"));
-
-        // 3. Kiểm tra quyền: Người tạo phải là Server Owner hoặc Thành viên trong Server
-        boolean isOwner = server.getOwnerId() != null && server.getOwnerId().equals(currentUser.getId());
-        boolean isMember = serverMemberRepository.existsByServerIdAndUserId(dto.getServerId(), currentUser.getId());
-        if (!isOwner && !isMember) {
-            throw new BadRequestAlertException("You do not have permission to create a channel in this server", "channel", "forbidden");
-        }
-
-        // 4. Chuẩn hóa tên channel và kiểm tra trùng tên trong server
         String channelName = dto.getName().trim();
         if (channelRepository.existsByServerIdAndName(dto.getServerId(), channelName)) {
             throw new BadRequestAlertException("Channel with name '" + channelName + "' already exists in this server", "channel", "namealreadyexists");
         }
 
-        // 5. Tự động tính position dựa trên số lượng channel hiện tại trong server
         int currentCount = channelRepository.countByServerId(dto.getServerId());
 
-        // 6. Tạo và lưu Channel
         Channel channel = new Channel();
         channel.setServerId(dto.getServerId());
         channel.setName(channelName);
         channel.setPosition(currentCount);
 
-        channel = channelRepository.save(channel);
-
-        // 7. Chuyển đổi sang Response DTO
-        ChannelResponseDTO response = new ChannelResponseDTO();
-        response.setId(channel.getId());
-        response.setServerId(channel.getServerId());
-        response.setName(channel.getName());
-        response.setPosition(channel.getPosition());
-        response.setCreatedDate(channel.getCreatedDate());
-
-        return response;
+        Channel savedChannel = channelRepository.save(channel);
+        return toChannelResponseDTO(savedChannel);
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<ChannelResponseDTO> getChannelsByServerId(Long serverId) {
-        // 1. Lấy thông tin user đăng nhập hiện tại
+    public List<ChannelResponseDTO> getChannelsByServerId(Long serverId) {
+        User currentUser = getCurrentUser();
+        validateServerAccess(serverId, currentUser.getId());
+
+        return channelRepository.findAllByServerIdOrderByPositionAsc(serverId)
+                .stream()
+                .map(this::toChannelResponseDTO)
+                .toList();
+    }
+
+    // --- Helper Methods ---
+
+    private User getCurrentUser() {
         String currentUserEmail = SecurityUtils.getCurrentUserLogin()
                 .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "channel", "notloggedin"));
 
-        User currentUser = userRepository.findOneByEmail(currentUserEmail)
+        return userRepository.findOneByEmail(currentUserEmail)
                 .orElseThrow(() -> new BadRequestAlertException("User not found in database", "channel", "usernotfound"));
+    }
 
-        // 2. Kiểm tra server có tồn tại không
+    private Server validateServerAccess(Long serverId, Long userId) {
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new BadRequestAlertException("Server not found with id: " + serverId, "channel", "servernotfound"));
 
-        // 3. Kiểm tra quyền: Người gọi phải là Server Owner hoặc Thành viên trong Server
-        boolean isOwner = server.getOwnerId() != null && server.getOwnerId().equals(currentUser.getId());
-        boolean isMember = serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId());
+        boolean isOwner = server.getOwnerId() != null && server.getOwnerId().equals(userId);
+        boolean isMember = serverMemberRepository.existsByServerIdAndUserId(serverId, userId);
         if (!isOwner && !isMember) {
-            throw new BadRequestAlertException("You do not have permission to view channels in this server", "channel", "forbidden");
+            throw new BadRequestAlertException("You do not have permission to access channels in this server", "channel", "forbidden");
         }
+        return server;
+    }
 
-        // 4. Lấy danh sách channel sắp xếp theo position tăng dần
-        java.util.List<Channel> channels = channelRepository.findAllByServerIdOrderByPositionAsc(serverId);
-
-        // 5. Chuyển đổi sang danh sách Response DTO
-        return channels.stream().map(ch -> {
-            ChannelResponseDTO dto = new ChannelResponseDTO();
-            dto.setId(ch.getId());
-            dto.setServerId(ch.getServerId());
-            dto.setName(ch.getName());
-            dto.setPosition(ch.getPosition());
-            dto.setCreatedDate(ch.getCreatedDate());
-            return dto;
-        }).toList();
+    private ChannelResponseDTO toChannelResponseDTO(Channel channel) {
+        ChannelResponseDTO dto = new ChannelResponseDTO();
+        dto.setId(channel.getId());
+        dto.setServerId(channel.getServerId());
+        dto.setName(channel.getName());
+        dto.setPosition(channel.getPosition());
+        dto.setCreatedDate(channel.getCreatedDate());
+        return dto;
     }
 }
