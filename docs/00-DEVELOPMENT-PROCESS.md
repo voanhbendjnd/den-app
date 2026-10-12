@@ -315,6 +315,18 @@ Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` 
 
 Các entry cũ phản ánh quyết định và verification tại thời điểm ghi. Các nhận xét về DTO trực tiếp hoặc wrapper chưa đồng nhất trong entry ngày 2026-10-10 và MERGE-CONFLICT-RESOLUTION là lịch sử, đã được thay thế bởi quyết định SUCCESS-WRAPPER ngày 2026-10-11 dưới đây. Không áp dụng yêu cầu DTO trực tiếp cũ cho implementation tiếp theo; số test của từng entry chỉ thuộc lượt kiểm tra tương ứng.
 
+### [2026-10-12] SECURITY-REMOVE-HARDCODED-SECRET — Loại bỏ hardcoded credential trong DatabaseInitializer
+
+- Duy báo lỗi cảnh báo bảo mật GitGuardian trên GitHub PR (`Detected hardcoded secret in your pull request`, commit `46ee3bd`).
+- Nguyên nhân: `DatabaseInitializer.java` gán cứng mật khẩu plain-text `"123123"` và email cá nhân khi khởi tạo tài khoản admin ban đầu.
+- Khắc phục:
+  - Khai báo biến cấu hình trong `application.properties` (chuẩn 12-Factor App & Externalized Configuration): `denhub.init-admin.email=${INIT_ADMIN_EMAIL:admin@denhub.local}` và `denhub.init-admin.password=${INIT_ADMIN_PASSWORD:}`.
+  - Cập nhật `DatabaseInitializer.java`: inject cấu hình thông qua `@Value` vào constructor. Nếu không cấu hình mật khẩu, tự động sinh mật khẩu ngẫu nhiên an toàn bằng `UUID.randomUUID()`. Đổi tên hiển thị mặc định thành `"Admin"`.
+  - Đồng bộ `server/src/test/resources/application.properties` và `server/.env.example` với placeholder an toàn.
+- Verification:
+  - `.\gradlew.bat compileJava test check --no-daemon`: PASS 100% (85/85 tests PASS, 0 failures, 0 errors).
+- Git: Chưa stage/commit/push; branch `feature/group-chat`. Chờ ủy quyền riêng nếu commit.
+
 ### [2026-10-12] SWAGGER-MESSAGE-CONFIG — Cấu hình Swagger/OpenAPI 3 cho API gửi tin nhắn Message
 
 - Duy duyệt kế hoạch cấu hình Swagger cho endpoint `POST /api/channels/{channelId}/messages`.
