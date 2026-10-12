@@ -51,4 +51,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     """)
     List<UsernameProjection> searchByUsername(@Param("q") String q);
 
+
+    List<User> findByIdIn(List<Long> ids);
 }

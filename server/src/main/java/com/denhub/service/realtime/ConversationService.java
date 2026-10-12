@@ -27,7 +27,10 @@ import java.security.Principal;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class ConversationService {
@@ -129,18 +132,16 @@ public class ConversationService {
 
         Page<Message> messagePage = messageRepository
                 .findByConversationIdOrderByCreatedAtAsc(conversationId, pageable);
-
+        List<Long> senderIds = messagePage.stream().map(Message::getSenderId).toList();
+        Map<Long, User> senderMap = userRepository.findByIdIn(senderIds).stream().collect(Collectors.toMap(User::getId, user -> user));
         return messagePage.map(msg -> {
             MessageHistoryDTO.SenderInfo senderInfo = null;
-            Optional<User> senderOpt = userRepository.findById(msg.getSenderId());
-            if (senderOpt.isPresent()) {
-                User sender = senderOpt.get();
+            User sender = senderMap.get(msg.getSenderId());
                 senderInfo = MessageHistoryDTO.SenderInfo.builder()
                         .userId(sender.getId())
                         .name(sender.getName() != null ? sender.getName() : sender.getEmail())
                         .avatar(sender.getAvatar())
                         .build();
-            }
 
             List<String> mediaUrlsList = null;
             if (msg.getMediaUrl() != null && !msg.getMediaUrl().trim().isEmpty()) {
