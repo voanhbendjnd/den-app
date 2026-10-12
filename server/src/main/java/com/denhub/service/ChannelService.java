@@ -74,4 +74,39 @@ public class ChannelService {
 
         return response;
     }
+
+    @Transactional(readOnly = true)
+    public java.util.List<ChannelResponseDTO> getChannelsByServerId(Long serverId) {
+        // 1. Lấy thông tin user đăng nhập hiện tại
+        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "channel", "notloggedin"));
+
+        User currentUser = userRepository.findOneByEmail(currentUserEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "channel", "usernotfound"));
+
+        // 2. Kiểm tra server có tồn tại không
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new BadRequestAlertException("Server not found with id: " + serverId, "channel", "servernotfound"));
+
+        // 3. Kiểm tra quyền: Người gọi phải là Server Owner hoặc Thành viên trong Server
+        boolean isOwner = server.getOwnerId() != null && server.getOwnerId().equals(currentUser.getId());
+        boolean isMember = serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId());
+        if (!isOwner && !isMember) {
+            throw new BadRequestAlertException("You do not have permission to view channels in this server", "channel", "forbidden");
+        }
+
+        // 4. Lấy danh sách channel sắp xếp theo position tăng dần
+        java.util.List<Channel> channels = channelRepository.findAllByServerIdOrderByPositionAsc(serverId);
+
+        // 5. Chuyển đổi sang danh sách Response DTO
+        return channels.stream().map(ch -> {
+            ChannelResponseDTO dto = new ChannelResponseDTO();
+            dto.setId(ch.getId());
+            dto.setServerId(ch.getServerId());
+            dto.setName(ch.getName());
+            dto.setPosition(ch.getPosition());
+            dto.setCreatedDate(ch.getCreatedDate());
+            return dto;
+        }).toList();
+    }
 }
