@@ -159,6 +159,24 @@ class ServerSecurityIT {
     }
 
     @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void createAndListRejectMissingOrInactiveAccountWithoutWriting(boolean deleteAccount) throws Exception {
+        String token = bearer();
+        if (deleteAccount) users.delete(reader);
+        else reader.setActivated(false);
+        entityManager.flush();
+        long serverCount = servers.count();
+        long memberCount = members.count();
+
+        problem(mvc.perform(post("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"New server\"}")), 401);
+        problem(mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, token)), 401);
+
+        assertEquals(serverCount, servers.count());
+        assertEquals(memberCount, members.count());
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = {55, 254})
     void longEmailCreatesServerAndPreservesBothAuditFields(int length) throws Exception {
         String local = "a".repeat(60);

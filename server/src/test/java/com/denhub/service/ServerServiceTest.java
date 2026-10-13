@@ -17,6 +17,8 @@ import com.denhub.web.rest.errors.BadRequestAlertException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -145,13 +147,14 @@ class ServerServiceTest {
         // Arrange
         String email = "test@example.com";
         SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(email, "password")
+            new UsernamePasswordAuthenticationToken(email, "password", java.util.List.of())
         );
 
         User mockUser = new User();
         mockUser.setId(1L);
         mockUser.setEmail(email);
         mockUser.setName("Test User");
+        mockUser.setActivated(true);
 
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
 
@@ -188,7 +191,8 @@ class ServerServiceTest {
         dto.setName("Test Server");
 
         // Act & Assert
-        assertThrows(BadRequestAlertException.class, () -> serverService.createServer(dto));
+        assertThat(assertThrows(ResponseStatusException.class, () -> serverService.createServer(dto))
+                .getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(serverRepository, never()).save(any());
     }
 
@@ -196,12 +200,13 @@ class ServerServiceTest {
     void getUserServers_Success() {
         String email = "test@example.com";
         SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(email, "password")
+            new UsernamePasswordAuthenticationToken(email, "password", java.util.List.of())
         );
 
         User mockUser = new User();
         mockUser.setId(1L);
         mockUser.setEmail(email);
+        mockUser.setActivated(true);
 
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
 
@@ -216,6 +221,42 @@ class ServerServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getName()).isEqualTo("My Server");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void createAndListRejectInactiveAccountWithoutAccessingServers(boolean create) {
+        User user = prepareDetailUser();
+        user.setActivated(false);
+        assertThat(assertThrows(ResponseStatusException.class, () -> {
+            if (create) serverService.createServer(new CreateServerDTO());
+            else serverService.getUserServers();
+        }).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(serverRepository, serverMemberRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void createAndListRejectMissingAccount(boolean create) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("missing@example.test", null, java.util.List.of()));
+        assertThat(assertThrows(ResponseStatusException.class, () -> {
+            if (create) serverService.createServer(new CreateServerDTO());
+            else serverService.getUserServers();
+        }).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(serverRepository, serverMemberRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void createAndListRejectUnauthenticatedToken(boolean create) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("detail@example.test", null));
+        assertThat(assertThrows(ResponseStatusException.class, () -> {
+            if (create) serverService.createServer(new CreateServerDTO());
+            else serverService.getUserServers();
+        }).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(userRepository, serverRepository, serverMemberRepository);
     }
 
     @Test

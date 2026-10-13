@@ -532,3 +532,4 @@ Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer
 
 - Duy đã duyệt kế hoạch sửa 6 bug và cho chia/push thành 6 commit theo từng bug. Phần đã có trong commit hiện tại được ghi dưới đây; Join, Channel, UUID và shared File API ngoài phạm vi.
 - Audit Server riêng hỗ trợ email 254 ký tự theo docs/03 mục 4.4. Script mặc định preview, chưa thực thi trên SQL Server thật.
+- `POST /api/v1/servers` và `GET /api/v1/servers` dùng cùng kiểm tra identity với chi tiết: Authentication đã xác thực, không anonymous, subject email hợp lệ, User tồn tại và `activated = true`. Vi phạm trả `401` Problem Details; không lưu Server/membership hoặc đọc danh sách trước khi qua kiểm tra. Email được trim/lowercase khi tìm User, audit vẫn giữ identity đầy đủ.

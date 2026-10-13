@@ -85,7 +85,7 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 
 | Phân hệ | Vấn đề nghiệp vụ | Trạng thái | Quyết định chuẩn hóa |
 | :--- | :--- | :---: | :--- |
-| **SERVER** | Ai được tạo Server? | `CONFIRMED` | Mọi Authenticated User đều có quyền tạo Server. |
+| **SERVER** | Ai được tạo Server? | `CONFIRMED` | Người dùng đã xác thực, tồn tại và có `activated = true`. Tạo/list/đọc chi tiết từ chối tài khoản không hợp lệ với `401`. |
 | **SERVER** | Thành viên tham gia Server bằng cách nào? | `CONFIRMED` | Qua Invite code duy nhất do Owner/Admin tạo. |
 | **SERVER** | Creator có vai trò gì khi tạo Server? | `CONFIRMED` | Creator nhận vai trò `OWNER`. Server tự tạo kênh `#general`. |
 | **SERVER** | Owner có thể rời Server không? | `CONFIRMED` | Không. Owner chỉ có thể chuyển quyền hoặc xóa Server (BR-SRV-01). |

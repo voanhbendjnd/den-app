@@ -35,21 +35,7 @@ public class ServerService {
 
     @Transactional(readOnly = true)
     public ServerResponseDTO getServerDetail(Long serverId) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Bạn cần đăng nhập để xem Server");
-        }
-
-        String email = SecurityUtils.getCurrentUserLogin()
-                .filter(login -> !login.isBlank())
-                .map(login -> login.trim().toLowerCase(Locale.ENGLISH))
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
-        User currentUser = userRepository.findOneByEmail(email)
-                .filter(user -> Boolean.TRUE.equals(user.getActivated()))
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+        User currentUser = getActiveCurrentUser();
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
@@ -68,13 +54,27 @@ public class ServerService {
         return response;
     }
 
+    private User getActiveCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Bạn cần đăng nhập để truy cập Server");
+        }
+
+        String email = SecurityUtils.getCurrentUserLogin()
+                .filter(login -> !login.isBlank())
+                .map(login -> login.trim().toLowerCase(Locale.ENGLISH))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+        return userRepository.findOneByEmail(email)
+                .filter(user -> Boolean.TRUE.equals(user.getActivated()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+    }
+
     public ServerResponseDTO createServer(CreateServerDTO dto) {
         // 1. Lấy thông tin user đăng nhập hiện tại
-        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
-                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "server", "notloggedin"));
-
-        User currentUser = userRepository.findOneByEmail(currentUserEmail)
-                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "server", "usernotfound"));
+        User currentUser = getActiveCurrentUser();
 
         // 2. Tạo bản ghi Server mới
         Server server = new Server();
@@ -105,11 +105,7 @@ public class ServerService {
 
     @Transactional(readOnly = true)
     public java.util.List<ServerResponseDTO> getUserServers() {
-        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
-                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "server", "notloggedin"));
-
-        User currentUser = userRepository.findOneByEmail(currentUserEmail)
-                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "server", "usernotfound"));
+        User currentUser = getActiveCurrentUser();
 
         java.util.List<Server> servers = serverRepository.findAllByUserIdOrOwnerId(currentUser.getId());
 
