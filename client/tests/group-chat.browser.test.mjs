@@ -190,6 +190,113 @@ test('creation waits for icon upload, blocks Enter/form submission, and sends th
   assert.deepEqual(errors, []);
 });
 
+test('closed modal ignores old upload success/failure and cannot clear a new pending upload', async () => {
+  for (const oldStatus of [200, 503]) {
+    let releaseOld, releaseNew;
+    const oldGate = new Promise(resolve => { releaseOld = resolve; });
+    const newGate = new Promise(resolve => { releaseNew = resolve; });
+    let uploads = 0;
+    const { page, errors } = await openPage({ handler: async route => {
+      if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+      assert.equal(new URL(route.request().url()).pathname, '/api/v1/files/upload');
+      const isOld = ++uploads === 1;
+      await (isOld ? oldGate : newGate);
+      return route.fulfill({ status: isOld ? oldStatus : 200, json: isOld
+        ? { data: { url: 'https://images.unsplash.com/old-upload.png' }, message: 'Stale upload error' }
+        : { data: { url: uploadedIcon } } });
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await openCreateModal(page);
+    const dialog = page.getByRole('dialog');
+    const oldRequest = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await oldRequest;
+    await dialog.getByRole('button', { name: 'Hủy bỏ', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    await openCreateModal(page);
+    const newRequest = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await newRequest;
+    const oldResponse = page.waitForResponse(response => response.request().method() === 'POST');
+    releaseOld();
+    await (await oldResponse).finished();
+    await settleUI(page);
+    assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isDisabled(), true);
+    assert.equal(await dialog.getByText('ĐANG TẢI...', { exact: true }).isVisible(), true);
+    assert.equal(await page.getByText('Stale upload error', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Đã tải ảnh lên máy chủ thành công!', { exact: true }).count(), 0);
+    const newResponse = page.waitForResponse(response => response.request().method() === 'POST');
+    releaseNew();
+    await (await newResponse).finished();
+    await page.waitForFunction(url => document.querySelector('img[alt=avatar]')?.getAttribute('src') === url, uploadedIcon);
+    assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isEnabled(), true);
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('preset or template selection supersedes pending uploads without a late icon or toast', async () => {
+  for (const selection of ['preset', 'template']) {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const { page, errors } = await openPage({ handler: async route => {
+      if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+      await gate;
+      return route.fulfill({ json: { url: uploadedIcon } });
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await openCreateModal(page);
+    const dialog = page.getByRole('dialog');
+    const upload = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await upload;
+    if (selection === 'preset') await dialog.locator('img[alt=preset]').nth(1).click();
+    else await dialog.getByText('Học tập', { exact: true }).click();
+    const selectedIcon = await dialog.locator('img[alt=avatar]').getAttribute('src');
+    assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isEnabled(), true);
+    const response = page.waitForResponse(response => response.request().method() === 'POST');
+    release();
+    await (await response).finished();
+    await settleUI(page);
+    assert.equal(await dialog.locator('img[alt=avatar]').getAttribute('src'), selectedIcon);
+    assert.equal(await page.getByText('Đã tải ảnh lên máy chủ thành công!', { exact: true }).count(), 0);
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('a newer file supersedes the old upload and current upload errors leave creation usable', async () => {
+  let releaseOld, releaseNew;
+  const oldGate = new Promise(resolve => { releaseOld = resolve; });
+  const newGate = new Promise(resolve => { releaseNew = resolve; });
+  let uploads = 0;
+  const { page, errors } = await openPage({ handler: async route => {
+    if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+    const isOld = ++uploads === 1;
+    await (isOld ? oldGate : newGate);
+    return route.fulfill({ status: isOld ? 200 : 503, json: isOld ? { url: uploadedIcon } : { message: 'Current upload error' } });
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await openCreateModal(page);
+  const dialog = page.getByRole('dialog');
+  const originalIcon = await dialog.locator('img[alt=avatar]').getAttribute('src');
+  for (let i = 0; i < 2; i++) {
+    const request = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await request;
+  }
+  let response = page.waitForResponse(response => response.request().method() === 'POST');
+  releaseOld();
+  await (await response).finished();
+  await settleUI(page);
+  assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isDisabled(), true);
+  response = page.waitForResponse(response => response.request().method() === 'POST');
+  releaseNew();
+  await (await response).finished();
+  await page.getByText('Current upload error', { exact: true }).waitFor();
+  assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isEnabled(), true);
+  assert.equal(await dialog.locator('img[alt=avatar]').getAttribute('src'), originalIcon);
+  assert.deepEqual(errors, []);
+});
+
 test('group route uses server detail instead of the list snapshot, reloads, and switches exact IDs', async () => {
   const { page, requests, errors } = await openPage({ handler: async route => {
     if (new URL(route.request().url()).pathname === '/api/v1/servers/1') {
