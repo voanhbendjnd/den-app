@@ -25,6 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
@@ -192,5 +193,91 @@ class ChannelServiceTest {
         BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> channelService.createChannel(dto));
         assertThat(ex.getErrorKey()).isEqualTo("namealreadyexists");
         verify(channelRepository, never()).save(any());
+    }
+
+    @Test
+    void getChannels_Success_WhenOwner() {
+        authenticateUser();
+        when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+
+        Channel ch1 = new Channel();
+        ch1.setId(101L);
+        ch1.setServerId(10L);
+        ch1.setName("general");
+        ch1.setPosition(0);
+        ch1.setCreatedDate(Instant.now());
+
+        Channel ch2 = new Channel();
+        ch2.setId(102L);
+        ch2.setServerId(10L);
+        ch2.setName("announcements");
+        ch2.setPosition(1);
+        ch2.setCreatedDate(Instant.now());
+
+        when(channelRepository.findAllByServerIdOrderByPositionAsc(10L)).thenReturn(List.of(ch1, ch2));
+
+        List<ChannelResponseDTO> result = channelService.getChannelsByServerId(10L);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getName()).isEqualTo("general");
+        assertThat(result.get(0).getPosition()).isEqualTo(0);
+        assertThat(result.get(1).getName()).isEqualTo("announcements");
+        assertThat(result.get(1).getPosition()).isEqualTo(1);
+    }
+
+    @Test
+    void getChannels_Success_WhenMember() {
+        authenticateUser();
+        mockServer.setOwnerId(99L); // different owner
+
+        when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+
+        Channel ch = new Channel();
+        ch.setId(101L);
+        ch.setServerId(10L);
+        ch.setName("general");
+        ch.setPosition(0);
+
+        when(channelRepository.findAllByServerIdOrderByPositionAsc(10L)).thenReturn(List.of(ch));
+
+        List<ChannelResponseDTO> result = channelService.getChannelsByServerId(10L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(101L);
+    }
+
+    @Test
+    void getChannels_Fail_WhenNotLoggedIn() {
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class,
+                () -> channelService.getChannelsByServerId(10L));
+        assertThat(ex.getErrorKey()).isEqualTo("notloggedin");
+    }
+
+    @Test
+    void getChannels_Fail_WhenServerNotFound() {
+        authenticateUser();
+        when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(serverRepository.findById(999L)).thenReturn(Optional.empty());
+
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class,
+                () -> channelService.getChannelsByServerId(999L));
+        assertThat(ex.getErrorKey()).isEqualTo("servernotfound");
+    }
+
+    @Test
+    void getChannels_Fail_WhenNotMemberOrOwner() {
+        authenticateUser();
+        mockServer.setOwnerId(99L);
+
+        when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class,
+                () -> channelService.getChannelsByServerId(10L));
+        assertThat(ex.getErrorKey()).isEqualTo("forbidden");
     }
 }

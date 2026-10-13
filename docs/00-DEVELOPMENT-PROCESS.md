@@ -283,7 +283,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 | **Server Detail — phần vỏ** | IMPLEMENTED | IMPLEMENTED | REUSED | TESTED (H2 / FE mock) | PASS | DONE (phạm vi đã duyệt) | 2026-10-13 |
 | **Server CRUD — sửa 6 bug** | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 6/6; còn apply schema thật | 2026-10-13 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
-| **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
+| **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-13 |
 | **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | IN_PROGRESS | IN_PROGRESS | 2026-10-11 |
 | **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
@@ -321,6 +321,39 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 ## 11. COMPLETED WORK LOG
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+
+### [2026-10-13] NV-1.20-FEAT-CHANNEL-LIST — Làm API lấy danh sách Channel + test (Kỳ Anh)
+Implemented:
+- Viết API `GET /api/v1/servers/{serverId}/channels` trả về danh sách các kênh trong server:
+  - Xác thực người dùng hiện tại từ Security Context.
+  - Kiểm tra sự tồn tại của Server mục tiêu (`serverRepository.findById`).
+  - Kiểm tra phân quyền truy cập: Chỉ Server Owner hoặc Thành viên (`existsByServerIdAndUserId`) mới có quyền xem danh sách channel.
+  - Truy vấn danh sách kênh sắp xếp tăng dần theo vị trí `position` (`channelRepository.findAllByServerIdOrderByPositionAsc`).
+  - Chuyển đổi sang `ChannelResponseDTO` chứa đầy đủ thông tin `id`, `serverId`, `name`, `position`, `createdDate`.
+- Thêm tài liệu Swagger `@Operation` chi tiết trên controller.
+
+Backend:
+- `ChannelService.java` (Updated `getChannelsByServerId`).
+- `ChannelResource.java` (Updated `GET /api/v1/servers/{serverId}/channels`).
+
+Tests:
+- `ChannelServiceTest`: Bổ sung 5 unit tests bao phủ toàn bộ trường hợp thành công và mã lỗi:
+  - `getChannels_Success_WhenOwner`
+  - `getChannels_Success_WhenMember`
+  - `getChannels_Fail_WhenNotLoggedIn`
+  - `getChannels_Fail_WhenServerNotFound`
+  - `getChannels_Fail_WhenNotMemberOrOwner`
+- `ChannelResourceTest`: Bổ sung test MockMvc `getChannelsByServerId_Success`.
+- Toàn bộ backend test suite: PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Updated endpoint `GET /api/v1/servers/{serverId}/channels` sang `CONFIRMED`).
+
+Commit:
+- Đã hoàn tất chia nhỏ và commit từng file lên branch feature/create-channel-api.
+
+---
 
 ### [2026-10-13] RELEASE-SERVER-CRUD — 6 commit theo từng bug
 
@@ -442,6 +475,35 @@ Implemented:
   - `docs/00-DEVELOPMENT-PROCESS.md` (Cập nhật tiến độ & Completed Work Log).
 - Commit:
   - PENDING (Chờ người dùng ủy quyền).
+
+---
+
+### [2026-10-11] NV-1.15-FEAT-CHANNEL-UI — Làm UI tạo Channel, kết nối API (Kỳ Anh)
+Implemented:
+- Tạo `client/src/api/channelApi.js` hỗ trợ gọi các endpoint quản lý Channel (`create`, `getByServerId`).
+- Xây dựng component `CreateChannelModal.jsx` theo phong cách Cyber-Modern Dark Theme:
+  - Input tên kênh kèm tiền tố `#` (chuẩn Discord/Slack), tự động format kebab-case.
+  - Hàng chip gợi ý kênh thông dụng 1 chạm (`# general`, `# dev-chat`, `# thong-bao`, `# hoi-dap`, `# tai-lieu`).
+  - Validation client (2 - 20 ký tự, không để trống).
+  - Bắt lỗi nghiệp vụ trực tiếp từ server (`namealreadyexists`, `forbidden`...) và hiển thị thông báo Alert/Toast trực quan.
+- Tích hợp vào `MainLayout.jsx` (quản lý state modal và truyền `openCreateChannelModal` qua `Outlet context`).
+- Bổ sung nút bấm `+ Kênh Mới` trên từng thẻ Server tại `HomePage.jsx` để người dùng kích hoạt tạo kênh cho server bất kỳ.
+
+Frontend:
+- `channelApi.js` (Created).
+- `CreateChannelModal.jsx` (Created).
+- `MainLayout.jsx` (Updated).
+- `HomePage.jsx` (Updated).
+
+Tests:
+- `npm run build`: PASS 100% (3177 modules transformed, 0 errors).
+- Kiểm thử tích hợp UI trên dev server: PASS.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+
+Commit:
+- PENDING (Chờ người dùng ủy quyền).
 
 ---
 

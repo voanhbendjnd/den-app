@@ -165,7 +165,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message (có pagination) | `TBD` |
 | **Message** | `DELETE`| `/api/v1/servers/{serverId}/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
 | **Channel** | `POST` | `/api/v1/channels` | Tạo mới một Channel trong Server (yêu cầu là Owner/Member) | `CONFIRMED` |
-| **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `TBD` |
+| **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `CONFIRMED` |
 | **Media / File** | `POST` | `/api/v1/files/upload` | Tải lên file ảnh (multipart/form-data) nhận URL tĩnh | `CONFIRMED` |
 | **Media / File** | `GET` | `/api/v1/files/{folder}/{filename}` | Phục vụ file ảnh công khai cho trình duyệt | `CONFIRMED` |
 | **Conversation** | `GET` | `/api/v1/conversations` | Lấy danh sách hội thoại của user hiện tại (thông tin người kia & tin nhắn mới nhất) | `CONFIRMED` |
