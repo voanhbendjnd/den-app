@@ -9,9 +9,11 @@ import {
   ThunderboltFilled,
   HomeOutlined,
   MessageOutlined,
+  CompassOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import CreateServerModal from '../components/common/CreateServerModal';
+import JoinServerModal from '../components/common/JoinServerModal';
 import CreateChannelModal from '../components/common/CreateChannelModal';
 import serverApi from '../api/serverApi';
 
@@ -25,6 +27,7 @@ export default function MainLayout() {
   const groupMatch = useMatch('/servers/:serverId');
   const isGroupPage = Boolean(groupMatch);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isCreateChannelModalOpen, setIsCreateChannelModalOpen] = useState(false);
   const [targetChannelServer, setTargetChannelServer] = useState(null);
   const [servers, setServers] = useState([]);
@@ -271,6 +274,42 @@ export default function MainLayout() {
                 <PlusOutlined style={{ fontSize: 20 }} />
               </div>
             </Tooltip>
+
+            {/* Quick Action: Join Server */}
+            <Tooltip title="Tham Gia Server (ID)" placement="right">
+              <div 
+                onClick={() => setIsJoinModalOpen(true)}
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  color: '#818CF8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  border: '1px dashed rgba(99, 102, 241, 0.4)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderRadius = '16px';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(0, 242, 254, 0.25) 100%)';
+                  e.currentTarget.style.color = '#00F2FE';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(99, 102, 241, 0.35)';
+                  e.currentTarget.style.borderColor = '#00F2FE';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderRadius = '24px';
+                  e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)';
+                  e.currentTarget.style.color = '#818CF8';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.4)';
+                }}
+              >
+                <CompassOutlined style={{ fontSize: 20 }} />
+              </div>
+            </Tooltip>
           </div>
         </div>
       </Sider>
@@ -389,17 +428,18 @@ export default function MainLayout() {
          ========================================================= */}
       <Layout style={{ marginLeft: isGroupPage ? 72 : 312, minWidth: 0, background: 'var(--color-bg-base)', minHeight: '100vh' }}>
         <Content style={{ position: 'relative', height: '100vh', overflowY: 'auto' }}>
-          <Outlet context={{ 
-            servers, 
-            serversLoading, 
-            serversError, 
-            setServers, 
-            openCreateModal: () => setIsCreateModalOpen(true), 
+          <Outlet context={{
+            servers,
+            serversLoading,
+            serversError,
+            setServers,
+            openCreateModal: () => setIsCreateModalOpen(true),
+            openJoinModal: () => setIsJoinModalOpen(true),
             openCreateChannelModal: (server) => {
               setTargetChannelServer(server);
               setIsCreateChannelModalOpen(true);
             },
-            refreshServers: fetchServers 
+            refreshServers: fetchServers
           }} />
         </Content>
       </Layout>
@@ -410,6 +450,18 @@ export default function MainLayout() {
         onClose={() => setIsCreateModalOpen(false)} 
         onSuccess={(newServer) => {
           setServers(prev => [newServer, ...prev.filter(s => s.id !== newServer.id)]);
+        }}
+      />
+
+      {/* Join Server Modal */}
+      <JoinServerModal
+        open={isJoinModalOpen}
+        onClose={() => setIsJoinModalOpen(false)}
+        onSuccess={async (joinedServerId) => {
+          await fetchServers();
+          if (joinedServerId) {
+            navigate(`/servers/${joinedServerId}`);
+          }
         }}
       />
 
