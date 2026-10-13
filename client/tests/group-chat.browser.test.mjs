@@ -150,6 +150,32 @@ async function settleUI(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+test('home distinguishes loading, failed list with retry, and a successful empty list', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let mode = 'failure';
+  const { page, errors } = await openPage({ handler: async route => {
+    await gate;
+    if (mode === 'failure') return route.fulfill({ status: 503, json: { message: 'Unavailable' } });
+    return route.fulfill({ json: { data: mode === 'empty' ? [] : servers } });
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('status', { name: 'Đang tải danh sách Server' }).waitFor();
+  assert.equal(await page.getByText('Bạn chưa có Server nào', { exact: true }).count(), 0);
+  release();
+  await page.getByRole('heading', { name: 'Chưa tải được danh sách Server' }).waitFor();
+  assert.equal(await page.getByText('Bạn chưa có Server nào', { exact: true }).count(), 0);
+  mode = 'success';
+  await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
+  await page.getByRole('heading', { name: 'Không Gian Của Bạn (2)' }).waitFor();
+  await page.getByRole('heading', { name: 'Nhóm học tập', exact: true }).waitFor();
+  mode = 'empty';
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Bạn chưa có Server nào' }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Chưa tải được danh sách Server' }).count(), 0);
+  assert.deepEqual(errors, []);
+});
+
 test('creation waits for icon upload, blocks Enter/form submission, and sends the uploaded URL', async () => {
   let release;
   const gate = new Promise(resolve => { release = resolve; });
