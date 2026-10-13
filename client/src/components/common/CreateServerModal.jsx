@@ -64,13 +64,23 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   const { currentUser } = useAuth();
   const [form] = Form.useForm();
   const fileInputRef = useRef(null);
+  const uploadRequestRef = useRef(0);
+  const uploadPendingRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
   const [avatarUrl, setAvatarUrl] = useState(AVATAR_SUGGESTIONS[0]);
 
+  const invalidateUpload = () => {
+    uploadRequestRef.current += 1;
+    uploadPendingRef.current = false;
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   // Chọn template mẫu
   const handleSelectTemplate = (tmpl) => {
+    invalidateUpload();
     setSelectedTemplate(tmpl.id);
     setAvatarUrl(tmpl.iconUrl);
     form.setFieldsValue({
@@ -80,6 +90,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   };
 
   const handleIconSelect = (url) => {
+    invalidateUpload();
     setAvatarUrl(url);
     form.setFieldsValue({ iconUrl: url });
   };
@@ -99,9 +110,14 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
       return;
     }
 
+    const requestId = ++uploadRequestRef.current;
+    uploadPendingRef.current = true;
     setUploading(true);
+    // Clear immediately so the same file can be selected for a later request.
+    e.target.value = '';
     try {
       const res = await fileApi.upload(file, 'servers');
+      if (requestId !== uploadRequestRef.current) return;
       const uploadedUrl = res.data?.url || res.data?.data?.url;
       if (uploadedUrl) {
         setAvatarUrl(uploadedUrl);
@@ -111,16 +127,20 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
         message.error('Không nhận được đường dẫn ảnh từ máy chủ');
       }
     } catch (err) {
+      if (requestId !== uploadRequestRef.current) return;
       const errMsg = err.response?.data?.message || err.response?.data?.detail || 'Không thể tải ảnh lên. Vui lòng thử lại!';
       message.error(errMsg);
     } finally {
-      setUploading(false);
-      if (e.target) e.target.value = '';
+      if (requestId === uploadRequestRef.current) {
+        uploadPendingRef.current = false;
+        setUploading(false);
+      }
     }
   };
 
   // Reset form và khôi phục ảnh đại diện về preset mặc định mỗi khi mở modal
   useEffect(() => {
+    invalidateUpload();
     if (open) {
       setSelectedTemplate('custom');
       setAvatarUrl(AVATAR_SUGGESTIONS[0]);
@@ -133,9 +153,14 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
         fileInputRef.current.value = '';
       }
     }
+    return () => {
+      uploadRequestRef.current += 1;
+      uploadPendingRef.current = false;
+    };
   }, [open, form]);
 
   const handleClose = () => {
+    invalidateUpload();
     setSelectedTemplate('custom');
     setAvatarUrl(AVATAR_SUGGESTIONS[0]);
     form.resetFields();
@@ -146,6 +171,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   };
 
   const handleSubmit = async (values) => {
+    if (uploadPendingRef.current || loading) return;
     setLoading(true);
     try {
       const res = await serverApi.create({
@@ -407,6 +433,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
           type="primary" 
           onClick={() => form.submit()} 
           loading={loading}
+          disabled={uploading}
           style={{ 
             height: 40,
             padding: '0 24px', 

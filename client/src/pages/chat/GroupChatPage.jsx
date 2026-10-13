@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
 import { ArrowLeftOutlined, MenuOutlined, MessageOutlined, SettingOutlined, TeamOutlined } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
+import serverApi from '../../api/serverApi';
 import './group-chat.css';
 
 function ChannelSidebar({ server, user }) {
@@ -46,15 +47,38 @@ function MembersPanel() {
 
 export default function GroupChatPage() {
   const { serverId } = useParams();
-  const { servers, serversLoading, serversError, refreshServers } = useOutletContext();
   const { currentUser } = useAuth();
   const screens = Grid.useBreakpoint();
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [membersVisible, setMembersVisible] = useState(true);
-  const server = servers.find((item) => String(item.id) === serverId);
+  const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
+  const [reload, setReload] = useState(0);
 
-  if (serversLoading) {
+  useEffect(() => {
+    let active = true;
+    setDetail({ serverId, server: null, loading: true, error: null });
+    serverApi.getById(serverId).then((response) => {
+      const server = response.data?.data;
+      if (!server || String(server.id) !== serverId || typeof server.name !== 'string') {
+        throw new Error('Invalid server detail response');
+      }
+      if (active) setDetail({ serverId, server, loading: false, error: null });
+    }).catch((error) => {
+      if (!active) return;
+      const status = error.response?.status;
+      const message = status === 404 ? 'Nhóm này không tồn tại hoặc đã bị xóa.'
+          : status === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+            : status === 400 ? 'Đường dẫn nhóm không hợp lệ.'
+              : 'Không thể tải thông tin nhóm. Vui lòng thử lại.';
+      setDetail({ serverId, server: null, loading: false, error: { status, message } });
+    });
+    return () => { active = false; };
+  }, [serverId, reload]);
+
+  const server = detail.server;
+
+  if (detail.serverId !== serverId || detail.loading) {
     return (
       <div className="group-state" role="status" aria-label="Đang tải nhóm">
         <Spin size="large" />
@@ -64,14 +88,17 @@ export default function GroupChatPage() {
     );
   }
 
-  if (serversError || !server) {
+  if (detail.error?.status === 403) return <Navigate to="/" replace />;
+
+  if (detail.error) {
+    const title = detail.error.status === 404 ? 'Không tìm thấy nhóm của bạn' : 'Chưa tải được nhóm';
     return (
       <div className="group-state">
         <div className="group-state__icon"><TeamOutlined /></div>
-        <h1>{serversError ? 'Chưa tải được nhóm' : 'Không tìm thấy nhóm của bạn'}</h1>
-        <p role={serversError ? 'alert' : undefined}>{serversError || 'Nhóm này không nằm trong danh sách nhóm bạn đang tham gia.'}</p>
+        <h1>{title}</h1>
+        <p role="alert">{detail.error.message}</p>
         <div className="group-state__actions">
-          <Button onClick={refreshServers}>Thử lại</Button>
+          <Button onClick={() => setReload((value) => value + 1)}>Thử lại</Button>
           <Link to="/">Về tổng quan</Link>
         </div>
       </div>

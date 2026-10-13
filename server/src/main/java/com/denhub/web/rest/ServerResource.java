@@ -24,6 +24,12 @@ public class ServerResource {
 
     ServerService serverService;
 
+    @GetMapping("/{serverId}")
+    @Operation(summary = "Đọc chi tiết Server", description = "Lấy thông tin Server. Yêu cầu đăng nhập và là chủ sở hữu hoặc thành viên của Server.")
+    public ResponseEntity<ServerResponseDTO> getServerDetail(@PathVariable("serverId") Long serverId) {
+        return ResponseEntity.ok(serverService.getServerDetail(serverId));
+    }
+
     @PostMapping
     @Operation(summary = "Tạo mới một Server", description = "Tạo một không gian giao tiếp mới. Yêu cầu đăng nhập.")
     public ResponseEntity<ServerResponseDTO> createServer(@Valid @RequestBody CreateServerDTO dto) {

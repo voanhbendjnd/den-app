@@ -11,6 +11,10 @@ import java.io.Serializable;
 @Entity
 @Table(name = "servers")
 @Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
+@AttributeOverrides({
+    @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", length = 254, updatable = false)),
+    @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
+})
 
 public class Server extends AbstractAuditingEntity<Long> implements Serializable{
     @Serial
