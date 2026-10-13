@@ -64,6 +64,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   const { currentUser } = useAuth();
   const [form] = Form.useForm();
   const fileInputRef = useRef(null);
+  const uploadPendingRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
@@ -99,6 +100,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
       return;
     }
 
+    uploadPendingRef.current = true;
     setUploading(true);
     try {
       const res = await fileApi.upload(file, 'servers');
@@ -114,6 +116,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
       const errMsg = err.response?.data?.message || err.response?.data?.detail || 'Không thể tải ảnh lên. Vui lòng thử lại!';
       message.error(errMsg);
     } finally {
+      uploadPendingRef.current = false;
       setUploading(false);
       if (e.target) e.target.value = '';
     }
@@ -146,6 +149,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   };
 
   const handleSubmit = async (values) => {
+    if (uploadPendingRef.current || loading) return;
     setLoading(true);
     try {
       const res = await serverApi.create({
@@ -407,6 +411,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
           type="primary" 
           onClick={() => form.submit()} 
           loading={loading}
+          disabled={uploading}
           style={{ 
             height: 40,
             padding: '0 24px', 

@@ -86,6 +86,9 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
   contexts.push(context);
   context.setDefaultTimeout(12000);
   await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
+  await context.route('https://images.unsplash.com/**', route => route.fulfill({
+    contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrZkAAAAASUVORK5CYII=', 'base64'),
+  }));
   // Fixtures never reach a real API and are not included in the app bundle.
   if (authenticated) {
     await context.addInitScript(() => {
@@ -134,6 +137,58 @@ async function screenshot(page, name) {
   await mkdir(process.env.GROUP_UI_ARTIFACT_DIR, { recursive: true });
   await page.screenshot({ path: path.join(process.env.GROUP_UI_ARTIFACT_DIR, name), fullPage: true });
 }
+
+const iconFile = { name: 'server.png', mimeType: 'image/png', buffer: Buffer.from('fixture image') };
+const uploadedIcon = 'https://images.unsplash.com/new-upload.png';
+
+async function openCreateModal(page) {
+  await page.getByText('Tạo Không Gian (Server) Mới', { exact: true }).click();
+  await page.getByRole('dialog').waitFor();
+}
+
+async function settleUI(page) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+test('creation waits for icon upload, blocks Enter/form submission, and sends the uploaded URL', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const creates = [];
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    const request = route.request();
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/files/upload') {
+      await gate;
+      return route.fulfill({ json: { data: { url: uploadedIcon } } });
+    }
+    if (request.method() === 'POST') {
+      assert.equal(new URL(request.url()).pathname, '/api/v1/servers');
+      creates.push(request.postDataJSON());
+      return route.fulfill({ status: 201, json: { data: { id: 33, ...creates.at(-1) } } });
+    }
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await openCreateModal(page);
+  const dialog = page.getByRole('dialog');
+  const upload = page.waitForRequest(request => new URL(request.url()).pathname === '/api/v1/files/upload');
+  await dialog.locator('input[type=file]').setInputFiles(iconFile);
+  await upload;
+  await dialog.getByText('ĐANG TẢI...', { exact: true }).waitFor();
+  assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isDisabled(), true);
+  await dialog.getByPlaceholder('Ví dụ: Nhóm Học SBA301').press('Enter');
+  await dialog.locator('form').evaluate(form => form.requestSubmit());
+  await settleUI(page);
+  assert.equal(creates.length, 0);
+  const response = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/files/upload');
+  release();
+  await (await response).finished();
+  await page.waitForFunction(url => document.querySelector('img[alt=avatar]')?.getAttribute('src') === url, uploadedIcon);
+  await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(creates, [{ name: 'Không Gian Của Tôi', iconUrl: uploadedIcon }]);
+  assert.equal(requests.filter(request => request.method === 'POST' && request.path === '/api/v1/servers').length, 1);
+  assert.deepEqual(errors, []);
+});
 
 test('group route uses server detail instead of the list snapshot, reloads, and switches exact IDs', async () => {
   const { page, requests, errors } = await openPage({ handler: async route => {
