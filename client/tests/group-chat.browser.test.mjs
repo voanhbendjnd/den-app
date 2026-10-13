@@ -89,6 +89,8 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
   // Fixtures never reach a real API and are not included in the app bundle.
   if (authenticated) {
     await context.addInitScript(() => {
+      if (sessionStorage.getItem('denhub_test_auth_initialized')) return;
+      sessionStorage.setItem('denhub_test_auth_initialized', 'true');
       const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, sub: 'ui-test@example.invalid' }));
       localStorage.setItem('denhub_access_token', `fixture.${payload}.fixture`);
       localStorage.setItem('denhub_user', JSON.stringify({ id: 100, displayName: 'UI Test', email: 'ui-test@example.invalid' }));
@@ -99,14 +101,25 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
     const request = route.request();
     requests.push({ method: request.method(), path: new URL(request.url()).pathname });
     if (handler) return handler(route, requests);
-    assert.equal(request.method(), 'GET');
-    assert.equal(new URL(request.url()).pathname, '/api/v1/servers');
-    await route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
+    await fulfillServerRequest(route);
   });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   return { page, requests, errors };
+}
+
+async function fulfillServerRequest(route) {
+  const request = route.request();
+  assert.equal(request.method(), 'GET');
+  const pathname = new URL(request.url()).pathname;
+  if (pathname === '/api/v1/servers') {
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
+  }
+  assert.match(pathname, /^\/api\/v1\/servers\/\d+$/);
+  const server = servers.find(item => String(item.id) === pathname.split('/').at(-1));
+  if (!server) return route.fulfill({ status: 404, contentType: 'application/problem+json', json: { status: 404, title: 'Not Found' } });
+  return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: server } });
 }
 
 async function openComposer() {
@@ -122,10 +135,16 @@ async function screenshot(page, name) {
   await page.screenshot({ path: path.join(process.env.GROUP_UI_ARTIFACT_DIR, name), fullPage: true });
 }
 
-test('group route shows the real server-list response, disables sending, and switches exact server IDs', async () => {
-  const { page, requests, errors } = await openPage();
+test('group route uses server detail instead of the list snapshot, reloads, and switches exact IDs', async () => {
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers/1') {
+      assert.match(route.request().headers().authorization, /^Bearer fixture\./);
+      return route.fulfill({ json: { data: { ...servers[0], name: 'Nhóm học tập mới' } } });
+    }
+    return fulfillServerRequest(route);
+  } });
   await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
+  await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập mới' }).waitFor();
   assert.equal(await page.getByRole('textbox').isDisabled(), true);
   assert.equal(await page.getByRole('button', { name: 'Gửi tin nhắn' }).isDisabled(), true);
   await page.getByRole('link', { name: 'Mở nhóm DenHub Design' }).click();
@@ -139,14 +158,17 @@ test('group route shows the real server-list response, disables sending, and swi
   assert.equal(await page.getByRole('complementary', { name: 'Thành viên của nhóm' }).count(), 0);
   await page.getByRole('button', { name: 'Hiện danh sách thành viên' }).click();
   assert.equal(await page.getByRole('complementary', { name: 'Thành viên của nhóm' }).count(), 1);
-  assert.ok(requests.every(request => request.method === 'GET' && request.path === '/api/v1/servers'));
+  assert.ok(requests.some(request => request.path === '/api/v1/servers/1'));
+  assert.ok(requests.filter(request => request.path === '/api/v1/servers/12').length >= 2);
+  assert.ok(requests.every(request => request.method === 'GET'));
   assert.deepEqual(errors, []);
 });
 
-test('loading, failed server list and retry are distinct from a missing group', async () => {
+test('detail loading, service failure and retry are distinct from a missing group', async () => {
   let respond;
   const gate = new Promise(resolve => { respond = resolve; });
   const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers') return fulfillServerRequest(route);
     await gate;
     await route.fulfill({ status: 503, json: { message: 'Unavailable' } });
   } });
@@ -156,12 +178,123 @@ test('loading, failed server list and retry are distinct from a missing group', 
   respond();
   await page.getByRole('heading', { name: 'Chưa tải được nhóm' }).waitFor();
   await page.context().unroute(apiPattern);
-  await page.context().route(apiPattern, route => route.fulfill({ json: { data: servers } }));
+  await page.context().route(apiPattern, fulfillServerRequest);
   await page.getByRole('button', { name: 'Thử lại' }).click();
   await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
   await page.goto(`${origin}/servers/999`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Không tìm thấy nhóm của bạn' }).waitFor();
   assert.deepEqual(errors, []);
+});
+
+test('server detail remains accessible when the dock list fails or does not contain the server', async () => {
+  for (const failedList of [true, false]) {
+    const { page, errors } = await openPage({ handler: async route => {
+      if (new URL(route.request().url()).pathname === '/api/v1/servers') {
+        return failedList ? route.fulfill({ status: 503, json: { message: 'Unavailable' } })
+          : route.fulfill({ json: { data: [] } });
+      }
+      return fulfillServerRequest(route);
+    } });
+    await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('detail 403 redirects a direct visit to home without a permission error or logout', async () => {
+  const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers') return fulfillServerRequest(route);
+    return route.fulfill({ status: 403, json: { status: 403, detail: 'internal details must not be displayed' } });
+  } });
+  await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL(`${origin}/`);
+  await page.getByRole('heading', { name: 'Xin chào, UI Test! 👋' }).waitFor();
+  assert.equal(await page.locator('.group-workspace').count(), 0);
+  assert.equal(await page.getByText('Bạn không có quyền truy cập nhóm', { exact: false }).count(), 0);
+  assert.equal(await page.getByText('internal details must not be displayed').count(), 0);
+  assert.match(await page.evaluate(() => localStorage.getItem('denhub_access_token')), /^fixture\./);
+  assert.deepEqual(errors, []);
+});
+
+test('detail 403 replaces the denied route so Back returns to the previous allowed server', async () => {
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers/1') {
+      return route.fulfill({ status: 403, json: { status: 403 } });
+    }
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/servers/12`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).waitFor();
+  await page.getByRole('link', { name: 'Mở nhóm Nhóm học tập' }).click();
+  await page.waitForURL(`${origin}/`);
+  await page.getByRole('heading', { name: 'Xin chào, UI Test! 👋' }).waitFor();
+  assert.equal(await page.getByText('Bạn không có quyền truy cập nhóm', { exact: false }).count(), 0);
+  const deniedRequests = requests.filter(request => request.path === '/api/v1/servers/1').length;
+  assert.ok(deniedRequests > 0);
+  await page.goBack();
+  await page.waitForURL(`${origin}/servers/12`);
+  await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).waitFor();
+  assert.equal(requests.filter(request => request.path === '/api/v1/servers/1').length, deniedRequests);
+  assert.match(await page.evaluate(() => localStorage.getItem('denhub_access_token')), /^fixture\./);
+  assert.deepEqual(errors, []);
+});
+
+test('network failure can retry the detail endpoint', async () => {
+  let fail = true;
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname !== '/api/v1/servers' && fail) return route.abort('failed');
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Chưa tải được nhóm' }).waitFor();
+  fail = false;
+  await page.getByRole('button', { name: 'Thử lại' }).click();
+  await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
+  assert.ok(requests.filter(request => request.path === '/api/v1/servers/1').length >= 2);
+  assert.deepEqual(errors, []);
+});
+
+test('detail 401 uses the existing session expiry redirect', async () => {
+  const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers') return fulfillServerRequest(route);
+    return route.fulfill({ status: 401, json: { status: 401, title: 'Unauthorized' } });
+  } });
+  await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL('**/login');
+  assert.equal(await page.evaluate(() => localStorage.getItem('denhub_access_token')), null);
+  assert.deepEqual(errors, []);
+});
+
+test('late detail success or failure from a previous server cannot replace the current server', async () => {
+  for (const lateStatus of [200, 403]) {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const completions = [];
+    const { page, errors } = await openPage({ handler: async route => {
+      if (new URL(route.request().url()).pathname !== '/api/v1/servers/1') return fulfillServerRequest(route);
+      let completed;
+      completions.push(new Promise(resolve => { completed = resolve; }));
+      await gate;
+      await route.fulfill({ status: lateStatus, json: lateStatus === 200 ? { data: servers[0] } : { status: 403 } });
+      completed();
+    } });
+    const firstRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/api/v1/servers/1');
+    await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+    await firstRequest;
+    await page.getByRole('status', { name: 'Đang tải nhóm' }).waitFor();
+    await page.getByRole('link', { name: 'Mở nhóm DenHub Design' }).click();
+    await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).waitFor();
+    const lateResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/servers/1');
+    release();
+    const response = await lateResponse;
+    await response.finished();
+    await Promise.all(completions);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(new URL(page.url()).pathname, '/servers/12');
+    assert.equal(await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).isVisible(), true);
+    assert.equal(await page.locator('.group-state').count(), 0);
+    assert.deepEqual(errors, []);
+  }
 });
 
 test('group route remains behind authentication', async () => {
