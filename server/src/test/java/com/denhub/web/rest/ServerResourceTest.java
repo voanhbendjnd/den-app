@@ -39,6 +39,22 @@ class ServerResourceTest {
     }
 
     @Test
+    void getServerDetail_UsesRequestedId() throws Exception {
+        ServerResponseDTO dto = new ServerResponseDTO();
+        dto.setId(12L);
+        dto.setName("Detail server");
+        dto.setOwnerId(100L);
+        when(serverService.getServerDetail(12L)).thenReturn(dto);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/servers/12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(12))
+                .andExpect(jsonPath("$.name").value("Detail server"))
+                .andExpect(jsonPath("$.ownerId").value(100));
+        org.mockito.Mockito.verify(serverService).getServerDetail(12L);
+    }
+
+    @Test
     void createServer_Success() throws Exception {
         CreateServerDTO dto = new CreateServerDTO();
         dto.setName("Test Server");

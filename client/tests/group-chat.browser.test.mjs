@@ -86,9 +86,14 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
   contexts.push(context);
   context.setDefaultTimeout(12000);
   await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
+  await context.route('https://images.unsplash.com/**', route => route.fulfill({
+    contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrZkAAAAASUVORK5CYII=', 'base64'),
+  }));
   // Fixtures never reach a real API and are not included in the app bundle.
   if (authenticated) {
     await context.addInitScript(() => {
+      if (sessionStorage.getItem('denhub_test_auth_initialized')) return;
+      sessionStorage.setItem('denhub_test_auth_initialized', 'true');
       const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, sub: 'ui-test@example.invalid' }));
       localStorage.setItem('denhub_access_token', `fixture.${payload}.fixture`);
       localStorage.setItem('denhub_user', JSON.stringify({ id: 100, displayName: 'UI Test', email: 'ui-test@example.invalid' }));
@@ -99,14 +104,25 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
     const request = route.request();
     requests.push({ method: request.method(), path: new URL(request.url()).pathname });
     if (handler) return handler(route, requests);
-    assert.equal(request.method(), 'GET');
-    assert.equal(new URL(request.url()).pathname, '/api/v1/servers');
-    await route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
+    await fulfillServerRequest(route);
   });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   return { page, requests, errors };
+}
+
+async function fulfillServerRequest(route) {
+  const request = route.request();
+  assert.equal(request.method(), 'GET');
+  const pathname = new URL(request.url()).pathname;
+  if (pathname === '/api/v1/servers') {
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
+  }
+  assert.match(pathname, /^\/api\/v1\/servers\/\d+$/);
+  const server = servers.find(item => String(item.id) === pathname.split('/').at(-1));
+  if (!server) return route.fulfill({ status: 404, contentType: 'application/problem+json', json: { status: 404, title: 'Not Found' } });
+  return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: server } });
 }
 
 async function openComposer() {
@@ -122,10 +138,201 @@ async function screenshot(page, name) {
   await page.screenshot({ path: path.join(process.env.GROUP_UI_ARTIFACT_DIR, name), fullPage: true });
 }
 
-test('group route shows the real server-list response, disables sending, and switches exact server IDs', async () => {
-  const { page, requests, errors } = await openPage();
+const iconFile = { name: 'server.png', mimeType: 'image/png', buffer: Buffer.from('fixture image') };
+const uploadedIcon = 'https://images.unsplash.com/new-upload.png';
+
+async function openCreateModal(page) {
+  await page.getByText('Tạo Không Gian (Server) Mới', { exact: true }).click();
+  await page.getByRole('dialog').waitFor();
+}
+
+async function settleUI(page) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+test('home distinguishes loading, failed list with retry, and a successful empty list', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let mode = 'failure';
+  const { page, errors } = await openPage({ handler: async route => {
+    await gate;
+    if (mode === 'failure') return route.fulfill({ status: 503, json: { message: 'Unavailable' } });
+    return route.fulfill({ json: { data: mode === 'empty' ? [] : servers } });
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('status', { name: 'Đang tải danh sách Server' }).waitFor();
+  assert.equal(await page.getByText('Bạn chưa có Server nào', { exact: true }).count(), 0);
+  release();
+  await page.getByRole('heading', { name: 'Chưa tải được danh sách Server' }).waitFor();
+  assert.equal(await page.getByText('Bạn chưa có Server nào', { exact: true }).count(), 0);
+  mode = 'success';
+  await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
+  await page.getByRole('heading', { name: 'Không Gian Của Bạn (2)' }).waitFor();
+  await page.getByRole('heading', { name: 'Nhóm học tập', exact: true }).waitFor();
+  mode = 'empty';
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Bạn chưa có Server nào' }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Chưa tải được danh sách Server' }).count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('creation waits for icon upload, blocks Enter/form submission, and sends the uploaded URL', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const creates = [];
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    const request = route.request();
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/files/upload') {
+      await gate;
+      return route.fulfill({ json: { data: { url: uploadedIcon } } });
+    }
+    if (request.method() === 'POST') {
+      assert.equal(new URL(request.url()).pathname, '/api/v1/servers');
+      creates.push(request.postDataJSON());
+      return route.fulfill({ status: 201, json: { data: { id: 33, ...creates.at(-1) } } });
+    }
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await openCreateModal(page);
+  const dialog = page.getByRole('dialog');
+  const upload = page.waitForRequest(request => new URL(request.url()).pathname === '/api/v1/files/upload');
+  await dialog.locator('input[type=file]').setInputFiles(iconFile);
+  await upload;
+  await dialog.getByText('ĐANG TẢI...', { exact: true }).waitFor();
+  assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isDisabled(), true);
+  await dialog.getByPlaceholder('Ví dụ: Nhóm Học SBA301').press('Enter');
+  await dialog.locator('form').evaluate(form => form.requestSubmit());
+  await settleUI(page);
+  assert.equal(creates.length, 0);
+  const response = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/files/upload');
+  release();
+  await (await response).finished();
+  await page.waitForFunction(url => document.querySelector('img[alt=avatar]')?.getAttribute('src') === url, uploadedIcon);
+  await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(creates, [{ name: 'Không Gian Của Tôi', iconUrl: uploadedIcon }]);
+  assert.equal(requests.filter(request => request.method === 'POST' && request.path === '/api/v1/servers').length, 1);
+  assert.deepEqual(errors, []);
+});
+
+test('closed modal ignores old upload success/failure and cannot clear a new pending upload', async () => {
+  for (const oldStatus of [200, 503]) {
+    let releaseOld, releaseNew;
+    const oldGate = new Promise(resolve => { releaseOld = resolve; });
+    const newGate = new Promise(resolve => { releaseNew = resolve; });
+    let uploads = 0;
+    const { page, errors } = await openPage({ handler: async route => {
+      if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+      assert.equal(new URL(route.request().url()).pathname, '/api/v1/files/upload');
+      const isOld = ++uploads === 1;
+      await (isOld ? oldGate : newGate);
+      return route.fulfill({ status: isOld ? oldStatus : 200, json: isOld
+        ? { data: { url: 'https://images.unsplash.com/old-upload.png' }, message: 'Stale upload error' }
+        : { data: { url: uploadedIcon } } });
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await openCreateModal(page);
+    const dialog = page.getByRole('dialog');
+    const oldRequest = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await oldRequest;
+    await dialog.getByRole('button', { name: 'Hủy bỏ', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    await openCreateModal(page);
+    const newRequest = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await newRequest;
+    const oldResponse = page.waitForResponse(response => response.request().method() === 'POST');
+    releaseOld();
+    await (await oldResponse).finished();
+    await settleUI(page);
+    assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isDisabled(), true);
+    assert.equal(await dialog.getByText('ĐANG TẢI...', { exact: true }).isVisible(), true);
+    assert.equal(await page.getByText('Stale upload error', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Đã tải ảnh lên máy chủ thành công!', { exact: true }).count(), 0);
+    const newResponse = page.waitForResponse(response => response.request().method() === 'POST');
+    releaseNew();
+    await (await newResponse).finished();
+    await page.waitForFunction(url => document.querySelector('img[alt=avatar]')?.getAttribute('src') === url, uploadedIcon);
+    assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isEnabled(), true);
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('preset or template selection supersedes pending uploads without a late icon or toast', async () => {
+  for (const selection of ['preset', 'template']) {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const { page, errors } = await openPage({ handler: async route => {
+      if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+      await gate;
+      return route.fulfill({ json: { url: uploadedIcon } });
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await openCreateModal(page);
+    const dialog = page.getByRole('dialog');
+    const upload = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await upload;
+    if (selection === 'preset') await dialog.locator('img[alt=preset]').nth(1).click();
+    else await dialog.getByText('Học tập', { exact: true }).click();
+    const selectedIcon = await dialog.locator('img[alt=avatar]').getAttribute('src');
+    assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isEnabled(), true);
+    const response = page.waitForResponse(response => response.request().method() === 'POST');
+    release();
+    await (await response).finished();
+    await settleUI(page);
+    assert.equal(await dialog.locator('img[alt=avatar]').getAttribute('src'), selectedIcon);
+    assert.equal(await page.getByText('Đã tải ảnh lên máy chủ thành công!', { exact: true }).count(), 0);
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('a newer file supersedes the old upload and current upload errors leave creation usable', async () => {
+  let releaseOld, releaseNew;
+  const oldGate = new Promise(resolve => { releaseOld = resolve; });
+  const newGate = new Promise(resolve => { releaseNew = resolve; });
+  let uploads = 0;
+  const { page, errors } = await openPage({ handler: async route => {
+    if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+    const isOld = ++uploads === 1;
+    await (isOld ? oldGate : newGate);
+    return route.fulfill({ status: isOld ? 200 : 503, json: isOld ? { url: uploadedIcon } : { message: 'Current upload error' } });
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await openCreateModal(page);
+  const dialog = page.getByRole('dialog');
+  const originalIcon = await dialog.locator('img[alt=avatar]').getAttribute('src');
+  for (let i = 0; i < 2; i++) {
+    const request = page.waitForRequest(request => request.method() === 'POST');
+    await dialog.locator('input[type=file]').setInputFiles(iconFile);
+    await request;
+  }
+  let response = page.waitForResponse(response => response.request().method() === 'POST');
+  releaseOld();
+  await (await response).finished();
+  await settleUI(page);
+  assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isDisabled(), true);
+  response = page.waitForResponse(response => response.request().method() === 'POST');
+  releaseNew();
+  await (await response).finished();
+  await page.getByText('Current upload error', { exact: true }).waitFor();
+  assert.equal(await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).isEnabled(), true);
+  assert.equal(await dialog.locator('img[alt=avatar]').getAttribute('src'), originalIcon);
+  assert.deepEqual(errors, []);
+});
+
+test('group route uses server detail instead of the list snapshot, reloads, and switches exact IDs', async () => {
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers/1') {
+      assert.match(route.request().headers().authorization, /^Bearer fixture\./);
+      return route.fulfill({ json: { data: { ...servers[0], name: 'Nhóm học tập mới' } } });
+    }
+    return fulfillServerRequest(route);
+  } });
   await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
+  await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập mới' }).waitFor();
   assert.equal(await page.getByRole('textbox').isDisabled(), true);
   assert.equal(await page.getByRole('button', { name: 'Gửi tin nhắn' }).isDisabled(), true);
   await page.getByRole('link', { name: 'Mở nhóm DenHub Design' }).click();
@@ -139,14 +346,17 @@ test('group route shows the real server-list response, disables sending, and swi
   assert.equal(await page.getByRole('complementary', { name: 'Thành viên của nhóm' }).count(), 0);
   await page.getByRole('button', { name: 'Hiện danh sách thành viên' }).click();
   assert.equal(await page.getByRole('complementary', { name: 'Thành viên của nhóm' }).count(), 1);
-  assert.ok(requests.every(request => request.method === 'GET' && request.path === '/api/v1/servers'));
+  assert.ok(requests.some(request => request.path === '/api/v1/servers/1'));
+  assert.ok(requests.filter(request => request.path === '/api/v1/servers/12').length >= 2);
+  assert.ok(requests.every(request => request.method === 'GET'));
   assert.deepEqual(errors, []);
 });
 
-test('loading, failed server list and retry are distinct from a missing group', async () => {
+test('detail loading, service failure and retry are distinct from a missing group', async () => {
   let respond;
   const gate = new Promise(resolve => { respond = resolve; });
   const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers') return fulfillServerRequest(route);
     await gate;
     await route.fulfill({ status: 503, json: { message: 'Unavailable' } });
   } });
@@ -156,12 +366,123 @@ test('loading, failed server list and retry are distinct from a missing group', 
   respond();
   await page.getByRole('heading', { name: 'Chưa tải được nhóm' }).waitFor();
   await page.context().unroute(apiPattern);
-  await page.context().route(apiPattern, route => route.fulfill({ json: { data: servers } }));
+  await page.context().route(apiPattern, fulfillServerRequest);
   await page.getByRole('button', { name: 'Thử lại' }).click();
   await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
   await page.goto(`${origin}/servers/999`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Không tìm thấy nhóm của bạn' }).waitFor();
   assert.deepEqual(errors, []);
+});
+
+test('server detail remains accessible when the dock list fails or does not contain the server', async () => {
+  for (const failedList of [true, false]) {
+    const { page, errors } = await openPage({ handler: async route => {
+      if (new URL(route.request().url()).pathname === '/api/v1/servers') {
+        return failedList ? route.fulfill({ status: 503, json: { message: 'Unavailable' } })
+          : route.fulfill({ json: { data: [] } });
+      }
+      return fulfillServerRequest(route);
+    } });
+    await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('detail 403 redirects a direct visit to home without a permission error or logout', async () => {
+  const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers') return fulfillServerRequest(route);
+    return route.fulfill({ status: 403, json: { status: 403, detail: 'internal details must not be displayed' } });
+  } });
+  await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL(`${origin}/`);
+  await page.getByRole('heading', { name: 'Xin chào, UI Test! 👋' }).waitFor();
+  assert.equal(await page.locator('.group-workspace').count(), 0);
+  assert.equal(await page.getByText('Bạn không có quyền truy cập nhóm', { exact: false }).count(), 0);
+  assert.equal(await page.getByText('internal details must not be displayed').count(), 0);
+  assert.match(await page.evaluate(() => localStorage.getItem('denhub_access_token')), /^fixture\./);
+  assert.deepEqual(errors, []);
+});
+
+test('detail 403 replaces the denied route so Back returns to the previous allowed server', async () => {
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers/1') {
+      return route.fulfill({ status: 403, json: { status: 403 } });
+    }
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/servers/12`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).waitFor();
+  await page.getByRole('link', { name: 'Mở nhóm Nhóm học tập' }).click();
+  await page.waitForURL(`${origin}/`);
+  await page.getByRole('heading', { name: 'Xin chào, UI Test! 👋' }).waitFor();
+  assert.equal(await page.getByText('Bạn không có quyền truy cập nhóm', { exact: false }).count(), 0);
+  const deniedRequests = requests.filter(request => request.path === '/api/v1/servers/1').length;
+  assert.ok(deniedRequests > 0);
+  await page.goBack();
+  await page.waitForURL(`${origin}/servers/12`);
+  await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).waitFor();
+  assert.equal(requests.filter(request => request.path === '/api/v1/servers/1').length, deniedRequests);
+  assert.match(await page.evaluate(() => localStorage.getItem('denhub_access_token')), /^fixture\./);
+  assert.deepEqual(errors, []);
+});
+
+test('network failure can retry the detail endpoint', async () => {
+  let fail = true;
+  const { page, requests, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname !== '/api/v1/servers' && fail) return route.abort('failed');
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Chưa tải được nhóm' }).waitFor();
+  fail = false;
+  await page.getByRole('button', { name: 'Thử lại' }).click();
+  await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
+  assert.ok(requests.filter(request => request.path === '/api/v1/servers/1').length >= 2);
+  assert.deepEqual(errors, []);
+});
+
+test('detail 401 uses the existing session expiry redirect', async () => {
+  const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname === '/api/v1/servers') return fulfillServerRequest(route);
+    return route.fulfill({ status: 401, json: { status: 401, title: 'Unauthorized' } });
+  } });
+  await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL('**/login');
+  assert.equal(await page.evaluate(() => localStorage.getItem('denhub_access_token')), null);
+  assert.deepEqual(errors, []);
+});
+
+test('late detail success or failure from a previous server cannot replace the current server', async () => {
+  for (const lateStatus of [200, 403]) {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const completions = [];
+    const { page, errors } = await openPage({ handler: async route => {
+      if (new URL(route.request().url()).pathname !== '/api/v1/servers/1') return fulfillServerRequest(route);
+      let completed;
+      completions.push(new Promise(resolve => { completed = resolve; }));
+      await gate;
+      await route.fulfill({ status: lateStatus, json: lateStatus === 200 ? { data: servers[0] } : { status: 403 } });
+      completed();
+    } });
+    const firstRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/api/v1/servers/1');
+    await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+    await firstRequest;
+    await page.getByRole('status', { name: 'Đang tải nhóm' }).waitFor();
+    await page.getByRole('link', { name: 'Mở nhóm DenHub Design' }).click();
+    await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).waitFor();
+    const lateResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/servers/1');
+    release();
+    const response = await lateResponse;
+    await response.finished();
+    await Promise.all(completions);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(new URL(page.url()).pathname, '/servers/12');
+    assert.equal(await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design' }).isVisible(), true);
+    assert.equal(await page.locator('.group-state').count(), 0);
+    assert.deepEqual(errors, []);
+  }
 });
 
 test('group route remains behind authentication', async () => {

@@ -1,4 +1,4 @@
-import { Typography, Row, Col, Button, Avatar, Tag, Empty } from 'antd';
+import { Typography, Row, Col, Button, Avatar, Tag, Empty, Spin } from 'antd';
 import {
   PlusOutlined,
   ThunderboltFilled,
@@ -12,7 +12,7 @@ const { Title, Text, Paragraph } = Typography;
 export default function HomePage() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const { servers = [], openCreateModal, openCreateChannelModal } = useOutletContext() || {};
+  const { servers = [], serversLoading = false, serversError, refreshServers, openCreateModal, openCreateChannelModal } = useOutletContext() || {};
 
   return (
     <div style={{ padding: '36px 40px', maxWidth: 1100, margin: '0 auto' }}>
@@ -67,7 +67,7 @@ export default function HomePage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
           <div>
             <Title level={4} style={{ margin: 0, color: '#F1F5F9', fontWeight: 700 }}>
-              Không Gian Của Bạn ({servers.length})
+              Không Gian Của Bạn{!serversLoading && !serversError ? ` (${servers.length})` : ''}
             </Title>
             <Text style={{ color: '#64748B', fontSize: 13 }}>
               Danh sách các Server mà bạn đang quản lý hoặc tham gia
@@ -83,7 +83,18 @@ export default function HomePage() {
           </Button>
         </div>
 
-        {servers.length === 0 ? (
+        {serversLoading ? (
+          <div role="status" aria-label="Đang tải danh sách Server" style={{ padding: '48px 24px', textAlign: 'center' }}>
+            <Spin />
+            <div style={{ marginTop: 12 }}>Đang tải danh sách Server...</div>
+          </div>
+        ) : serversError ? (
+          <div role="alert" className="glass-panel" style={{ padding: '48px 24px', borderRadius: 16, textAlign: 'center' }}>
+            <Title level={4} style={{ color: '#F1F5F9' }}>Chưa tải được danh sách Server</Title>
+            <Paragraph style={{ color: '#94A3B8' }}>Vui lòng thử lại để xem các Server của bạn.</Paragraph>
+            <Button onClick={() => refreshServers?.()}>Thử lại</Button>
+          </div>
+        ) : servers.length === 0 ? (
           <div
             className="glass-panel"
             style={{
