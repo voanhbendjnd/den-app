@@ -1,6 +1,7 @@
 package com.denhub.web.rest;
 
 import com.denhub.service.MessageService;
+import com.denhub.service.dto.CursorPageResponse;
 import com.denhub.service.dto.MessageResponse;
 import com.denhub.service.dto.SendMessageRequest;
 import com.denhub.util.ResFormatResponse;
@@ -25,11 +26,13 @@ import org.zalando.problem.jackson.ProblemModule;
 import org.zalando.problem.violations.ConstraintViolationProblemModule;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -179,5 +182,70 @@ class MessageResourceIT {
                 .andExpect(jsonPath("$.cause").doesNotExist())
                 .andExpect(jsonPath("$.stackTrace").doesNotExist())
                 .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    void getMessagesSuccessReturns200OkWithCursorPageResponse() throws Exception {
+        MessageResponse msg1 = new MessageResponse(102L, CHANNEL_ID, SENDER_ID, "Msg 102", Instant.parse("2026-10-10T08:00:00Z"));
+        MessageResponse msg2 = new MessageResponse(101L, CHANNEL_ID, SENDER_ID, "Msg 101", Instant.parse("2026-10-10T07:30:00Z"));
+        CursorPageResponse<MessageResponse> pageResponse = new CursorPageResponse<>(
+                List.of(msg1, msg2), 101L, true, 2);
+
+        when(messageService.getMessages(eq(CHANNEL_ID), eq(105L), eq(2))).thenReturn(pageResponse);
+
+        mockMvc.perform(get("/api/channels/{channelId}/messages", CHANNEL_ID)
+                        .param("before", "105")
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.message").value("Lấy lịch sử tin nhắn thành công"))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items[0].id").value(102))
+                .andExpect(jsonPath("$.data.items[0].content").value("Msg 102"))
+                .andExpect(jsonPath("$.data.items[1].id").value(101))
+                .andExpect(jsonPath("$.data.items[1].content").value("Msg 101"))
+                .andExpect(jsonPath("$.data.nextCursor").value(101))
+                .andExpect(jsonPath("$.data.hasMore").value(true))
+                .andExpect(jsonPath("$.data.limit").value(2));
+
+        verify(messageService).getMessages(eq(CHANNEL_ID), eq(105L), eq(2));
+    }
+
+    @Test
+    void getMessagesWhenChannelNotFoundReturns404() throws Exception {
+        when(messageService.getMessages(eq(9999L), any(), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Channel"));
+
+        mockMvc.perform(get("/api/channels/{channelId}/messages", 9999L))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail").value("404 NOT_FOUND \"Không tìm thấy Channel\""));
+    }
+
+    @Test
+    void getMessagesWhenForbiddenReturns403() throws Exception {
+        when(messageService.getMessages(eq(CHANNEL_ID), any(), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem tin nhắn trong Channel này"));
+
+        mockMvc.perform(get("/api/channels/{channelId}/messages", CHANNEL_ID))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.detail").value("403 FORBIDDEN \"Bạn không có quyền xem tin nhắn trong Channel này\""));
+    }
+
+    @Test
+    void getMessagesWhenBadRequestReturns400() throws Exception {
+        when(messageService.getMessages(eq(CHANNEL_ID), any(), eq(150)))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số lượng tin nhắn phải từ 1 đến 100"));
+
+        mockMvc.perform(get("/api/channels/{channelId}/messages", CHANNEL_ID)
+                        .param("limit", "150"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").value("400 BAD_REQUEST \"Số lượng tin nhắn phải từ 1 đến 100\""));
     }
 }

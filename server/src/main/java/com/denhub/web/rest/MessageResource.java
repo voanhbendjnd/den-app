@@ -1,6 +1,7 @@
 package com.denhub.web.rest;
 
 import com.denhub.service.MessageService;
+import com.denhub.service.dto.CursorPageResponse;
 import com.denhub.service.dto.MessageResponse;
 import com.denhub.service.dto.SendMessageRequest;
 import com.denhub.util.anotation.ApiMessage;
@@ -38,5 +39,22 @@ public class MessageResource {
             @Valid @RequestBody SendMessageRequest request) {
         MessageResponse response = messageService.sendMessage(channelId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/channels/{channelId}/messages")
+    @ApiMessage("Lấy lịch sử tin nhắn thành công")
+    @Operation(
+        summary = "Lấy lịch sử tin nhắn trong Channel",
+        description = "Lấy danh sách tin nhắn phân trang bằng con trỏ (Cursor Pagination) sắp xếp theo ID giảm dần. Yêu cầu là thành viên của Server chứa Channel."
+    )
+    public ResponseEntity<CursorPageResponse<MessageResponse>> getMessages(
+            @Parameter(description = "ID của Channel", example = "1")
+            @PathVariable("channelId") Long channelId,
+            @Parameter(description = "ID con trỏ (lấy các tin nhắn có ID nhỏ hơn con trỏ này)", example = "105")
+            @RequestParam(name = "before", required = false) Long before,
+            @Parameter(description = "Số lượng tin nhắn cần lấy (1 đến 100, mặc định 30)", example = "30")
+            @RequestParam(name = "limit", required = false, defaultValue = "30") Integer limit) {
+        CursorPageResponse<MessageResponse> response = messageService.getMessages(channelId, before, limit);
+        return ResponseEntity.ok(response);
     }
 }

@@ -284,7 +284,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 | **Server CRUD — sửa 6 bug** | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 6/6; còn apply schema thật | 2026-10-13 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
 | **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-13 |
-| **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | IN_PROGRESS | IN_PROGRESS | 2026-10-11 |
+| **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-14 |
 | **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Search User & Friendship** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
@@ -304,6 +304,7 @@ Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trướ
 | Task 1.07 / đồng bộ wrapper thành công | DONE | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE. |
 | Task 1.12 — UI nhập và gửi tin nhắn | IN_PROGRESS | Duy duyệt làm UI trước ngày 2026-10-11. Đã có GroupChatPage và MessageInput; 5 Node tests, 9 browser tests dùng mock PASS, build PASS. Chưa nối gửi thật; chờ dữ liệu Channel và xác nhận tích hợp. |
 | Task 1.12 / khung Group và ô nhập độc lập | DONE | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE. |
+| Task 1.08 — API lấy lịch sử tin nhắn + test | DONE | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%. |
 
 Chỉ đánh dấu `TESTED` khi đã thực sự chạy và vượt qua các kiểm thử phù hợp. Kiểm tra docs không thay thế test code hoặc integration test SQL Server.
 
@@ -319,6 +320,33 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-14] FEAT-MESSAGE-HISTORY-API — Làm API lấy lịch sử tin nhắn Channel (Cursor Pagination) + Test
+Implemented:
+- Backend:
+  - Cập nhật `MessageResource.java`: Bổ sung endpoint `GET /api/channels/{channelId}/messages` với `@ApiMessage("Lấy lịch sử tin nhắn thành công")`, `@Operation` và Swagger parameter annotations.
+  - Tích hợp `MessageService.java` (`getMessages(channelId, before, limit)`):
+    - Xác thực người dùng qua JWT, kiểm tra `activated == true`.
+    - Validate `channelId`, `limit` (mặc định 30, dải 1–100), `before` con trỏ tin nhắn.
+    - Kiểm tra Channel tồn tại và người dùng là thành viên (`ServerMember`) của Server chứa Channel.
+    - Truy vấn danh sách tin nhắn theo ID giảm dần với `PageRequest.of(0, limit + 1)`.
+    - Tính toán `hasMore`, `nextCursor` và trả về `CursorPageResponse<MessageResponse>`.
+  - Tái sử dụng `MessageRepository.java` (`findByChannelIdOrderByIdDesc`, `findByChannelIdAndIdLessThanOrderByIdDesc`).
+- Tests Added / Updated:
+  - `MessageServiceTest.java`: Bổ sung 11 unit tests kiểm thử thành công, limit mặc định, hasMore, nextCursor, kênh rỗng, và toàn bộ các mã lỗi 400/401/403/404.
+  - `MessageResourceIT.java`: Bổ sung 4 standalone MockMvc tests kiểm thử response 200, wrapper `statusCode: 200`, `message`, `error: null`, cấu trúc DTO cursor, và Problem Details khi lỗi.
+  - `MessageSecurityIT.java`: Bổ sung 5 integration tests với JWT encoder và JPA/H2 thật kiểm thử thứ tự ID giảm dần, phân trang `before`, 401 khi không có token, 403 khi không phải thành viên server, 400 khi limit ngoài khoảng.
+- Verification (thực thi thực tế):
+  - `.\gradlew.bat compileJava test check --no-daemon`: PASS 100% (toàn bộ backend suite pass, 0 lỗi).
+  - `npm run build`: PASS 100% (Vite production build 0 errors).
+  - `node --test tests/serverJoin.test.mjs tests/messageInput.test.mjs`: PASS 13/13.
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md`
+  - `docs/02-SYSTEM-ARCHITECTURE.md`
+- Git:
+  - Uncommitted changes (Chờ người dùng ủy quyền commit).
+
+---
 
 ### [2026-10-13] NV-1.25-FEAT-CHANNEL-UI-LIST — Làm UI hiển thị danh sách Channel, chọn Channel (Kỳ Anh)
 Implemented:
