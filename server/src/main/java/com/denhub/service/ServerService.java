@@ -15,6 +15,13 @@ import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.CreateServerDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Locale;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -25,6 +32,41 @@ public class ServerService {
     ServerRepository serverRepository;
     ServerMemberRepository serverMemberRepository;
     UserRepository userRepository;
+
+    @Transactional(readOnly = true)
+    public ServerResponseDTO getServerDetail(Long serverId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Bạn cần đăng nhập để xem Server");
+        }
+
+        String email = SecurityUtils.getCurrentUserLogin()
+                .filter(login -> !login.isBlank())
+                .map(login -> login.trim().toLowerCase(Locale.ENGLISH))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+        User currentUser = userRepository.findOneByEmail(email)
+                .filter(user -> Boolean.TRUE.equals(user.getActivated()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
+
+        boolean isOwner = currentUser.getId().equals(server.getOwnerId());
+        if (!isOwner && !serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xem Server này");
+        }
+
+        ServerResponseDTO response = new ServerResponseDTO();
+        response.setId(server.getId());
+        response.setName(server.getName());
+        response.setIconUrl(server.getIconUrl());
+        response.setOwnerId(server.getOwnerId());
+        response.setCreatedDate(server.getCreatedDate());
+        return response;
+    }
 
     public ServerResponseDTO createServer(CreateServerDTO dto) {
         // 1. Lấy thông tin user đăng nhập hiện tại
