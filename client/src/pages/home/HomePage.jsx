@@ -2,6 +2,7 @@ import { Typography, Row, Col, Button, Avatar, Tag, Empty } from 'antd';
 import {
   PlusOutlined,
   ThunderboltFilled,
+  CompassOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,7 +12,7 @@ const { Title, Text, Paragraph } = Typography;
 export default function HomePage() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const { servers = [], openCreateModal } = useOutletContext() || {};
+  const { servers = [], openCreateModal, openJoinModal } = useOutletContext() || {};
 
   return (
     <div style={{ padding: '36px 40px', maxWidth: 1100, margin: '0 auto' }}>
@@ -37,25 +38,42 @@ export default function HomePage() {
           </Title>
 
           <Paragraph style={{ color: '#94A3B8', fontSize: 15, marginTop: 8, marginBottom: 20, maxWidth: 600 }}>
-            Chào mừng bạn đến với DenHub. Bắt đầu bằng cách tạo không gian nhóm của riêng bạn để trao đổi và làm việc chung.
+            Chào mừng bạn đến với DenHub. Bắt đầu bằng cách tạo không gian nhóm của riêng bạn hoặc tham gia server của bạn bè.
           </Paragraph>
 
-          <Button
-            type="primary"
-            size="large"
-            icon={<PlusOutlined />}
-            onClick={() => openCreateModal?.()}
-            style={{
-              height: 44,
-              padding: '0 24px',
-              fontWeight: 700,
-              background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
-              border: 'none',
-              boxShadow: '0 4px 16px rgba(0, 242, 254, 0.3)',
-            }}
-          >
-            Tạo Không Gian (Server) Mới
-          </Button>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Button
+              type="primary"
+              size="large"
+              icon={<PlusOutlined />}
+              onClick={() => openCreateModal?.()}
+              style={{
+                height: 44,
+                padding: '0 24px',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
+                border: 'none',
+                boxShadow: '0 4px 16px rgba(0, 242, 254, 0.3)',
+              }}
+            >
+              Tạo Không Gian (Server) Mới
+            </Button>
+            <Button
+              size="large"
+              icon={<CompassOutlined />}
+              onClick={() => openJoinModal?.()}
+              style={{
+                height: 44,
+                padding: '0 24px',
+                fontWeight: 600,
+                background: 'rgba(255, 255, 255, 0.06)',
+                color: '#F1F5F9',
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+              }}
+            >
+              Tham Gia Server (ID)
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -72,14 +90,24 @@ export default function HomePage() {
               Danh sách các Server mà bạn đang quản lý hoặc tham gia
             </Text>
           </div>
-          <Button
-            type="link"
-            icon={<PlusOutlined />}
-            onClick={() => openCreateModal?.()}
-            style={{ color: '#00F2FE', fontWeight: 600 }}
-          >
-            Tạo thêm Server
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+              type="link"
+              icon={<CompassOutlined />}
+              onClick={() => openJoinModal?.()}
+              style={{ color: '#818CF8', fontWeight: 600 }}
+            >
+              Tham gia bằng ID
+            </Button>
+            <Button
+              type="link"
+              icon={<PlusOutlined />}
+              onClick={() => openCreateModal?.()}
+              style={{ color: '#00F2FE', fontWeight: 600 }}
+            >
+              Tạo thêm Server
+            </Button>
+          </div>
         </div>
 
         {servers.length === 0 ? (
@@ -98,19 +126,28 @@ export default function HomePage() {
                 <div>
                   <Title level={4} style={{ color: '#F1F5F9', margin: '0 0 6px' }}>Bạn chưa có Server nào</Title>
                   <Text style={{ color: '#94A3B8' }}>
-                    Tạo ngay một server đầu tiên của riêng bạn chỉ với vài cú click!
+                    Tạo ngay một server đầu tiên của riêng bạn hoặc tham gia server có sẵn!
                   </Text>
                 </div>
               }
             >
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                style={{ marginTop: 16, fontWeight: 600, background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)', border: 'none' }}
-                onClick={() => openCreateModal?.()}
-              >
-                Tạo Server Đầu Tiên
-              </Button>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  style={{ fontWeight: 600, background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)', border: 'none' }}
+                  onClick={() => openCreateModal?.()}
+                >
+                  Tạo Server Đầu Tiên
+                </Button>
+                <Button
+                  icon={<CompassOutlined />}
+                  style={{ fontWeight: 600, background: 'rgba(255, 255, 255, 0.06)', color: '#F1F5F9', borderColor: 'rgba(255, 255, 255, 0.15)' }}
+                  onClick={() => openJoinModal?.()}
+                >
+                  Tham Gia Bằng ID
+                </Button>
+              </div>
             </Empty>
           </div>
         ) : (
