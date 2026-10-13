@@ -320,7 +320,35 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
-Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+### [2026-10-13] NV-1.25-FEAT-CHANNEL-UI-LIST — Làm UI hiển thị danh sách Channel, chọn Channel (Kỳ Anh)
+Implemented:
+- Cập nhật `GroupChatPage.jsx` kết nối API `channelApi.getByServerId(serverId)` để tải danh sách các kênh trong server.
+- Xây dựng component `ChannelSidebar`:
+  - Render danh sách các kênh chat với biểu tượng `#` chuẩn Discord/Slack.
+  - Thêm nút `+` (Tạo kênh mới) trên header kênh trò chuyện, tích hợp `CreateChannelModal`.
+  - Hiển thị các trạng thái loading (`Spin`), lỗi (`channelsError`) với nút Thử lại, và trạng thái chưa có kênh (`group-channel-empty`) với nút Tạo kênh đầu tiên.
+  - Tự động chọn kênh đầu tiên khi danh sách tải xong.
+  - Hỗ trợ click chuyển đổi kênh (`activeChannel`), highlight kênh đang chọn với gradient cyan/indigo.
+- Cập nhật Header khung chat hiển thị tên kênh đang active (`# {activeChannel.name}`) và badge kênh.
+- Cập nhật khung tin nhắn `MessageInput` mở khóa và liên kết với `activeChannel.id` khi đã chọn kênh.
+- Cập nhật `group-chat.css`: bổ sung styles chuẩn Cyber Dark cho danh sách kênh (`.group-channel-item`, `.group-channel-item--active`, `.group-add-channel-btn`...).
+
+Frontend:
+- `GroupChatPage.jsx` (Updated).
+- `group-chat.css` (Updated).
+- `group-chat.browser.test.mjs` (Updated mock endpoint /channels).
+
+Tests:
+- `npm run build`: PASS 100% (3188 modules transformed, 0 errors).
+- `node --test tests/messageInput.test.mjs`: PASS 5/5.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Updated).
+
+Commit:
+- Đã hoàn tất chia nhỏ commit theo từng file.
+
+---
 
 ### [2026-10-13] FEAT-SERVER-JOIN-FE — UI Tham Gia Server & Tích Hợp API
 Implemented:

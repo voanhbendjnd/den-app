@@ -119,6 +119,9 @@ async function fulfillServerRequest(route) {
   if (pathname === '/api/v1/servers') {
     return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
   }
+  if (pathname.endsWith('/channels')) {
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [{ id: 101, serverId: 1, name: 'general', position: 0 }] } });
+  }
   assert.match(pathname, /^\/api\/v1\/servers\/\d+$/);
   const server = servers.find(item => String(item.id) === pathname.split('/').at(-1));
   if (!server) return route.fulfill({ status: 404, contentType: 'application/problem+json', json: { status: 404, title: 'Not Found' } });

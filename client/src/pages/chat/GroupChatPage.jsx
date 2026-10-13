@@ -1,13 +1,33 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
-import { ArrowLeftOutlined, MenuOutlined, MessageOutlined, SettingOutlined, TeamOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined,
+  MenuOutlined,
+  MessageOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SettingOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
+import CreateChannelModal from '../../components/common/CreateChannelModal';
 import serverApi from '../../api/serverApi';
+import channelApi from '../../api/channelApi';
 import './group-chat.css';
 
-function ChannelSidebar({ server, user }) {
+function ChannelSidebar({
+  server,
+  user,
+  channels,
+  channelsLoading,
+  channelsError,
+  activeChannel,
+  onSelectChannel,
+  onOpenCreateChannel,
+  onRetryChannels,
+}) {
   return (
     <div className="group-sidebar">
       <div className="group-sidebar__heading">
@@ -16,12 +36,72 @@ function ChannelSidebar({ server, user }) {
       </div>
       <div className="group-sidebar__body">
         <Link className="group-back-link" to="/"><ArrowLeftOutlined /> Tổng quan</Link>
-        <h2 className="group-section-label">Kênh trò chuyện</h2>
-        <div className="group-channel-empty">
-          <span className="group-channel-empty__hash" aria-hidden="true">#</span>
-          <p>Danh sách kênh chưa sẵn sàng.</p>
-          <span>Các kênh của nhóm sẽ xuất hiện tại đây.</span>
+
+        <div className="group-section-header">
+          <h2 className="group-section-label">Kênh trò chuyện</h2>
+          <button
+            type="button"
+            className="group-add-channel-btn"
+            title="Tạo kênh mới"
+            aria-label="Tạo kênh mới"
+            onClick={onOpenCreateChannel}
+          >
+            <PlusOutlined />
+          </button>
         </div>
+
+        {channelsLoading ? (
+          <div className="group-channel-loading" role="status" aria-label="Đang tải kênh">
+            <Spin size="small" />
+            <span>Đang tải kênh...</span>
+          </div>
+        ) : channelsError ? (
+          <div className="group-channel-error" role="alert">
+            <span>{channelsError}</span>
+            <Button
+              type="link"
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={onRetryChannels}
+              style={{ color: '#00f2fe', padding: 0, height: 'auto', textAlign: 'left' }}
+            >
+              Thử lại
+            </Button>
+          </div>
+        ) : channels.length === 0 ? (
+          <div className="group-channel-empty">
+            <span className="group-channel-empty__hash" aria-hidden="true">#</span>
+            <p>Chưa có kênh nào trong server.</p>
+            <Button
+              type="dashed"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={onOpenCreateChannel}
+              className="group-create-first-channel-btn"
+            >
+              Tạo kênh đầu tiên
+            </Button>
+          </div>
+        ) : (
+          <nav className="group-channels-nav" aria-label="Danh sách kênh">
+            {channels.map((ch) => {
+              const isActive = activeChannel?.id === ch.id;
+              return (
+                <button
+                  key={ch.id}
+                  type="button"
+                  className={`group-channel-item ${isActive ? 'group-channel-item--active' : ''}`}
+                  onClick={() => onSelectChannel(ch)}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <span className="group-channel-item__hash" aria-hidden="true">#</span>
+                  <span className="group-channel-item__name" title={ch.name}>{ch.name}</span>
+                  {isActive && <span className="group-channel-item__indicator" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </nav>
+        )}
       </div>
       <div className="group-user">
         <Avatar size={34}>{(user?.displayName || user?.username || 'U')[0].toUpperCase()}</Avatar>
@@ -54,6 +134,57 @@ export default function GroupChatPage() {
   const [membersVisible, setMembersVisible] = useState(true);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
+
+  // Channels state
+  const [channels, setChannels] = useState([]);
+  const [channelsLoading, setChannelsLoading] = useState(true);
+  const [channelsError, setChannelsError] = useState(null);
+  const [activeChannel, setActiveChannel] = useState(null);
+  const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+
+  const fetchChannels = (id) => {
+    setChannelsLoading(true);
+    setChannelsError(null);
+    channelApi.getByServerId(id)
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setChannels(list);
+        setActiveChannel((prev) => {
+          if (prev && list.some((c) => c.id === prev.id)) {
+            return prev;
+          }
+          return list.length > 0 ? list[0] : null;
+        });
+      })
+      .catch((err) => {
+        setChannelsError(err.response?.data?.message || 'Không thể tải danh sách kênh.');
+      })
+      .finally(() => {
+        setChannelsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    if (serverId) {
+      fetchChannels(serverId);
+    }
+  }, [serverId]);
+
+  const handleSelectChannel = (channel) => {
+    setActiveChannel(channel);
+    if (!screens.lg) {
+      setChannelsOpen(false);
+    }
+  };
+
+  const handleChannelCreated = (newChannel) => {
+    if (serverId) {
+      fetchChannels(serverId);
+    }
+    if (newChannel) {
+      setActiveChannel(newChannel);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -108,14 +239,31 @@ export default function GroupChatPage() {
   return (
     <div className="group-workspace">
       <aside className="group-channel-column" aria-label="Kênh của nhóm">
-        <ChannelSidebar server={server} user={currentUser} />
+        <ChannelSidebar
+          server={server}
+          user={currentUser}
+          channels={channels}
+          channelsLoading={channelsLoading}
+          channelsError={channelsError}
+          activeChannel={activeChannel}
+          onSelectChannel={handleSelectChannel}
+          onOpenCreateChannel={() => setIsCreateChannelOpen(true)}
+          onRetryChannels={() => fetchChannels(serverId)}
+        />
       </aside>
       <main className="group-chat">
         <header className="group-chat__header">
           <Button className="group-mobile-channels" type="text" icon={<MenuOutlined />} aria-label="Mở danh sách kênh" onClick={() => setChannelsOpen(true)} />
           <span className="group-header-hash" aria-hidden="true">#</span>
-          <div className="group-chat__title"><strong>Trò chuyện nhóm</strong><span title={server.name}>{server.name}</span></div>
-          <span className="group-pending-label">Chưa chọn kênh</span>
+          <div className="group-chat__title">
+            <strong>{activeChannel ? activeChannel.name : 'Trò chuyện nhóm'}</strong>
+            <span title={server.name}>{server.name}</span>
+          </div>
+          {activeChannel ? (
+            <span className="group-channel-badge">#{activeChannel.name}</span>
+          ) : (
+            <span className="group-pending-label">Chưa chọn kênh</span>
+          )}
           <Button
             type="text"
             icon={<TeamOutlined />}
@@ -125,20 +273,42 @@ export default function GroupChatPage() {
           />
         </header>
         <div className="group-chat__content">
-          <section className="group-welcome" aria-labelledby="group-welcome-title">
-            <div className="group-welcome__visual" aria-hidden="true">
-              <div className="group-welcome__orbit" />
-              <Avatar shape="square" size={72} src={server.iconUrl}>{server.name?.[0]?.toUpperCase()}</Avatar>
-              <span className="group-welcome__bubble"><MessageOutlined /></span>
-            </div>
-            <span className="group-welcome__eyebrow">KHÔNG GIAN CỦA BẠN</span>
-            <h1 id="group-welcome-title">Chào mừng đến với<br /><span>{server.name}</span></h1>
-            <p>Nơi cả nhóm cùng trao đổi, chia sẻ ý tưởng<br className="group-desktop-break" /> và giữ kết nối mỗi ngày.</p>
-            <div className="group-welcome__notice"><span aria-hidden="true">#</span><div><strong>Cuộc trò chuyện bắt đầu từ một kênh</strong><p>Danh sách kênh chưa sẵn sàng. Bạn có thể quay lại tổng quan hoặc chuyển sang nhóm khác.</p></div></div>
-            <Link className="group-back-link" to="/"><ArrowLeftOutlined /> Về tổng quan</Link>
-          </section>
+          {activeChannel ? (
+            <section className="group-welcome group-channel-welcome" aria-labelledby="channel-welcome-title">
+              <div className="group-welcome__visual" aria-hidden="true">
+                <div className="group-welcome__orbit" />
+                <span className="group-channel-avatar-hash">#</span>
+              </div>
+              <span className="group-welcome__eyebrow">KÊNH TRÒ CHUYỆN</span>
+              <h1 id="channel-welcome-title">Chào mừng đến với<br /><span>#{activeChannel.name}!</span></h1>
+              <p>Đây là phần khởi đầu của kênh <strong>#{activeChannel.name}</strong> trong không gian <strong>{server.name}</strong>.</p>
+            </section>
+          ) : (
+            <section className="group-welcome" aria-labelledby="group-welcome-title">
+              <div className="group-welcome__visual" aria-hidden="true">
+                <div className="group-welcome__orbit" />
+                <Avatar shape="square" size={72} src={server.iconUrl}>{server.name?.[0]?.toUpperCase()}</Avatar>
+                <span className="group-welcome__bubble"><MessageOutlined /></span>
+              </div>
+              <span className="group-welcome__eyebrow">KHÔNG GIAN CỦA BẠN</span>
+              <h1 id="group-welcome-title">Chào mừng đến với<br /><span>{server.name}</span></h1>
+              <p>Nơi cả nhóm cùng trao đổi, chia sẻ ý tưởng<br className="group-desktop-break" /> và giữ kết nối mỗi ngày.</p>
+              <div className="group-welcome__notice">
+                <span aria-hidden="true">#</span>
+                <div>
+                  <strong>Cuộc trò chuyện bắt đầu từ một kênh</strong>
+                  <p>Hãy chọn một kênh ở cột bên trái hoặc tạo kênh mới để bắt đầu thảo luận.</p>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
-        <MessageInput key={serverId} disabled />
+        <MessageInput
+          key={`${serverId}-${activeChannel?.id || 'none'}`}
+          channelId={activeChannel?.id}
+          channelName={activeChannel?.name}
+          disabled={!activeChannel}
+        />
       </main>
       {screens.xl && membersVisible && <aside className="group-member-column" aria-label="Thành viên của nhóm"><MembersPanel /></aside>}
       <Drawer
@@ -149,7 +319,20 @@ export default function GroupChatPage() {
         onClose={() => setChannelsOpen(false)}
         styles={{ body: { padding: 0 } }}
       >
-        <ChannelSidebar server={server} user={currentUser} />
+        <ChannelSidebar
+          server={server}
+          user={currentUser}
+          channels={channels}
+          channelsLoading={channelsLoading}
+          channelsError={channelsError}
+          activeChannel={activeChannel}
+          onSelectChannel={handleSelectChannel}
+          onOpenCreateChannel={() => {
+            setChannelsOpen(false);
+            setIsCreateChannelOpen(true);
+          }}
+          onRetryChannels={() => fetchChannels(serverId)}
+        />
       </Drawer>
       <Drawer
         title="Thành viên của nhóm"
@@ -160,6 +343,13 @@ export default function GroupChatPage() {
       >
         <MembersPanel />
       </Drawer>
+
+      <CreateChannelModal
+        open={isCreateChannelOpen}
+        onClose={() => setIsCreateChannelOpen(false)}
+        server={server}
+        onSuccess={handleChannelCreated}
+      />
     </div>
   );
 }
