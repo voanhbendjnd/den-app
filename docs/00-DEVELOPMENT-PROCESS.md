@@ -280,6 +280,8 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | DONE | TESTED | DONE | 2026-10-13 |
+| **Server Detail — phần vỏ** | IMPLEMENTED | IMPLEMENTED | REUSED | TESTED (H2 / FE mock) | PASS | DONE (phạm vi đã duyệt) | 2026-10-13 |
+| **Server CRUD — sửa 6 bug** | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 6/6; còn apply schema thật | 2026-10-13 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
 | **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | IN_PROGRESS | IN_PROGRESS | 2026-10-11 |
@@ -289,10 +291,12 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
-### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-11)
+### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
 | Công việc | Trạng thái | Bằng chứng / bước còn lại |
 | :--- | :--- | :--- |
+| Đọc chi tiết phần vỏ Server + FE | DONE trong phạm vi code/H2/FE mock | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
+| Sửa 6 bug Server CRUD | Release 6/6; còn apply schema audit SQL Server | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng, chặn tạo khi icon đang upload, bỏ upload cũ, Home loading/error/retry. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi. |
 | Đồng bộ docs theo prompt | DONE | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database. |
 | Xác minh schema SQL Server | DONE | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database. |
 | Task 1.07 — API gửi tin nhắn + test | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE. |
@@ -338,6 +342,80 @@ Implemented:
   - `feat(server): add join server API client and validation utilities`
   - `feat(server): implement join server modal and layout integration`
   - `docs(server): update API architecture status and development progress`
+
+---
+
+### [2026-10-13] RELEASE-SERVER-CRUD — 6 commit theo từng bug
+
+- Duy trực tiếp cho phép “chia ra nhiều commit theo từng phần commit push giúp tôi. Tôi cho phép”, sau đó chốt “nãy có 6 bug thì 6 commit theo từng bug đó đi”. Ủy quyền commit/push chỉ nhánh `feature/server-detail` và 6 bug đã duyệt, ưu tiên yêu cầu trực tiếp mới này so với quy định không push trước đó. Không force push, không đụng main/master hoặc thay AGENTS.md.
+- Commit hiện tại: bug 6/6 — Home loading/error/retry, gồm thay đổi hành vi, tests và tài liệu liên quan. Các bản index trung gian được xuất riêng ra thư mục tạm ngoài repo và kiểm thử trước từng commit, không sửa application code khi chia commit.
+- Verification bản staged: bug 1: 130 BE tests PASS; bug 2: 138 BE tests PASS; bug 3: 150 BE tests PASS; bug 4: 21 FE tests + build PASS; bug 5: 24 FE tests + build PASS; bug 6: 25 FE tests + build PASS. BE chạy `.\gradlew.bat compileJava test check --no-daemon`; FE chạy `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` với NODE_PATH Playwright có sẵn và `npm run build`.
+- Verification toàn bộ implementation trước release: 150 BE + 25 FE tests và build PASS; đã sửa fixture email 254 trong lượt implement. Review staged diff và whitespace trước mỗi commit. Không có script npm lint/test, không cài dependency.
+- Còn lại: SQL script mặc định preview chưa chạy/apply trên SQL Server thật. H2 và browser API mock không chứng minh FE → BE → SQL Server thật. PRE-EXISTING ISSUE: warning Ant Design và chunk >500 kB. Không triển khai Join, Channel, UUID hoặc shared File API.
+
+Các phần đã commit và push trước commit hiện tại:
+
+- Bug 1: `3f86d64` — `fix(server): support long emails in server audit`; push thành công.
+- Bug 2: `341758c` — `fix(server): reject inactive users on create and list`; push thành công.
+- Bug 3: `e1101bc` — `fix(server): normalize generated owner nicknames`; push thành công.
+- Bug 4: `8cd1bfa` — `fix(server-ui): block creation during icon upload`; push thành công.
+- Bug 5: `c06c2b2` — `fix(server-ui): ignore superseded icon uploads`; push thành công.
+
+Commit hiện tại dùng title `fix(server-ui): show list errors and retry on home`; kết quả push cuối xác nhận qua Git và báo sau khi hoàn tất.
+
+### [2026-10-13] RELEASE-SERVER-DETAIL — Chia commit BE, FE và tài liệu
+
+- Duy trực tiếp yêu cầu “chia ra nhiều commit + push theo từng phần giúp tôi”. Yêu cầu mới cho phép commit và push riêng nhánh `feature/server-detail` trong lượt này, thay cho quy định không push ở các lượt trước; không thay AGENTS.md hoặc nới quyền cho task khác, không force push, không đụng main/master.
+- Chia 9 file thành 3 commit: API chi tiết và tests BE (5 file); FE đọc chi tiết/redirect 403 và browser tests (2 file); docs/00 và docs/02 (2 file). Không tách tests khỏi hành vi được kiểm thử, không đổi application code trong lượt chia commit.
+- Đã chạy trước commit: từ `server/`, `.\gradlew.bat compileJava test check --no-daemon --rerun-tasks` **PASS 128/128**, 0 failure/error/skip; từ `client/`, với NODE_PATH Playwright như lượt trước, `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` **PASS 20/20** (15 browser + 5 logic), `npm run build` **PASS**. Review `git diff --check` **PASS**; giữ các giới hạn H2/FE mock và cảnh báo có sẵn.
+- Các log “chưa commit / không push” bên dưới phản ánh trạng thái các lượt trước. Trạng thái commit/push mới nhất được kiểm tra qua Git và báo khi kết thúc lượt này.
+- Đã commit và push lần lượt: `b4525b8` — `feat(server): add authorized server detail endpoint`; `973e236` — `feat(server): load detail and redirect forbidden access home`. Commit tài liệu chứa entry này dùng tiêu đề `docs(server): document detail API and verification`; kết quả push cuối được báo sau khi Git xác nhận.
+
+### [2026-10-13] FIX-SERVER-DETAIL-FORBIDDEN — Chuyển về Home khi không có quyền đọc Server
+
+Authorization / Scope:
+- Duy duyệt kế hoạch bằng “oke duyệt”: sửa redirect `403`, browser tests và docs trên `feature/server-detail`. Giữ 9 file chưa commit từ lượt API; không thêm UUID/publicId, không thay BE/API/DB/WebSocket hoặc Channel.
+
+Implemented / Tests:
+- `GroupChatPage` render `Navigate` về `/` với `replace` khi API chi tiết Server hiện tại trả `403`; không hiện thông báo thiếu quyền, không logout. Giữ guard serverId/cleanup để response cũ không điều hướng; giữ xử lý `401`/`404`/lỗi mạng.
+- Cập nhật browser test mở trực tiếp URL bị từ chối: về Home, không hiện chi tiết lỗi/thiếu quyền và giữ token. Thêm test mở từ dock: `replace` giúp Back về Server trước đó, không gọi lại ID bị từ chối. Test response cũ bổ sung kiểm URL vẫn là Server đang chọn.
+
+Verification (thực chạy từ `client/`):
+- `$env:NODE_PATH = 'C:/Users/ADMIN/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'`; `node --test tests/group-chat.browser.test.mjs`: **PASS 15/15**, 0 failure/cancelled/skip, Edge headless với API mock.
+- `npm run build`: **PASS**. PRE-EXISTING ISSUE: chunk >500 kB và warning Ant Design Spin/Modal như lượt trước; không có browser pageerror trong các case bị ảnh hưởng.
+- Không chạy lại test BE/Node logic: lượt này chỉ sửa FE điều hướng và browser tests. Chưa kiểm chứng FE → BE → SQL Server thật.
+- `git diff --check`: **PASS**; rà diff code/tests/docs và Git status, thay đổi trong lượt này chỉ thuộc 4 file đã duyệt; không stage/commit, không thêm generated file hoặc dependency.
+
+Documentation / Handoff:
+- Docs/02 mục 9.2–9.3 cập nhật redirect/history và kiểm thử. Docs/00 cập nhật tiến độ/log/handoff; docs/01 và docs/03 không bị ảnh hưởng bởi hành vi điều hướng, không đổi nghiệp vụ quyền hoặc dữ liệu.
+- UUID/publicId chưa triển khai, cần kế hoạch riêng. Nhánh `feature/server-detail`, toàn bộ công việc còn uncommitted; commit cần ủy quyền riêng.
+- Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-13] FEAT-SERVER-DETAIL — API đọc chi tiết phần vỏ Server và tích hợp FE
+
+Authorization / Scope:
+- Duy giới hạn công việc ở phần vỏ Server, giao Channel cho developer khác; duyệt kế hoạch bằng “oke chuyển nhánh khác và thực hiện plan”. Working tree ban đầu sạch trên develop; đã tạo/chuyển sang `feature/server-detail` theo ủy quyền.
+- Chốt endpoint `/api/v1/servers/{serverId}` phù hợp source/FE hiện có, trả `ServerResponseDTO` hiện có; không kèm Channel trong lượt này. Không đổi DB, role, shared security, WebSocket, dependencies hoặc API tạo/list/join.
+
+Implemented:
+- `ServerResource` bổ sung GET chi tiết và Swagger; `ServerService` đọc transaction readOnly, xác định User activated từ Authentication/email, cho Owner hoặc membership đúng Server, trả DTO.
+- `GroupChatPage` dùng `serverApi.getById`, đọc wrapper data; loading/lỗi/retry riêng, không phụ thuộc danh sách ở dock, không hiển thị dữ liệu lỗi từ hạ tầng, bỏ response cũ khi chuyển Server. 401 dùng interceptor logout hiện có.
+
+Tests Added / Updated:
+- `ServerServiceTest`: thêm 7 cases; `ServerResourceTest`: thêm 1 case. Thêm `ServerSecurityIT`: 13 cases JWT/filters/JPA/H2 thật, owner/member/outsider/cross-server, token/session/account, wrapper, Problem Details, không ghi dữ liệu khi đọc.
+- Cập nhật browser fixtures phân biệt list/detail và chỉ gắn phiên một lần; thêm 5 browser tests cho list lỗi/rỗng, 403, network/retry, 401 và response cũ. Cập nhật regression reload/loading/404 và ID theo luồng chi tiết.
+
+Verification (thực chạy):
+- Trong `server/`: `.\gradlew.bat compileJava test check --no-daemon` **PASS 128/128**, 0 failures/errors/skipped.
+- Trong `client/`: `node --test tests/messageInput.test.mjs` **PASS 5/5**; `npm run build` **PASS**.
+- `$env:NODE_PATH = 'C:/Users/ADMIN/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'`; `node --test tests/group-chat.browser.test.mjs`: lượt đầu **13 PASS / 1 FAIL**, fixture tự gắn lại token sau redirect khiến assertion logout fail. Đã sửa fixture chỉ seed một lần mỗi tab và chạy lại **PASS 14/14**. Không sửa Auth của ứng dụng để giải quyết lỗi fixture.
+- Giới hạn: backend integration dùng H2 và rollback, browser dùng API mock; chưa chạy FE → BE → SQL Server thật. PRE-EXISTING ISSUE: warning chunk >500 kB, Ant Design Spin/Modal/Empty deprecated APIs; không mở rộng phạm vi sửa.
+- Review: `git diff --check` PASS, đã rà diff và file test mới; 9 file đúng kế hoạch, không có generated file hoặc secret mới. Kiểm tra Markdown phát hiện PRE-EXISTING ISSUE: docs/00 có 21 dòng code fence (số lẻ) ở cả HEAD và working tree; task không thêm/bớt fence. Không tuyên bố toàn bộ tài liệu cân bằng fence, không sửa lịch sử log ngoài phạm vi. Docs/02 giữ 22 fence như HEAD.
+
+Documentation / Git:
+- Cập nhật docs/02 mục 5.2/9, trạng thái endpoint và mô tả UI; docs/00 tiến độ/log/handoff. Đã kiểm tra docs/01 và docs/03: không thêm nghiệp vụ hoặc thay Entity/schema, không cần sửa.
+- 9 file thuộc kế hoạch; không stage/commit. Sẵn sàng review/commit khi người dùng ủy quyền riêng.
+- Not pushed — AI agents are not allowed to push DenHub.
 
 ---
 
@@ -1219,6 +1297,20 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff hiện tại — Server CRUD release 6/6 (2026-10-13)
+
+- Phần đã có trong commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng, chặn tạo khi icon đang upload, bỏ upload cũ, Home loading/error/retry. Tài liệu liên quan đồng bộ theo từng bug; nhánh `feature/server-detail`. Duy đã ủy quyền chia/push đúng 6 commit.
+- Test bản staged chạy trước từng commit như release log; toàn bộ implementation có 150 BE + 25 FE tests và build PASS. Các số 128/20 bên dưới là lịch sử release Server Detail.
+- Bước còn lại: review/apply `server/scripts/sql/2026-10-13-server-audit-email.sql` trên database đích; mặc định preview, chưa thực thi. Không coi ddl-auto=update là bằng chứng schema đã mở rộng. UUID đã hủy; Join/Channel thuộc developer khác.
+
+### Handoff Server Detail đã phát hành — lịch sử (2026-10-13)
+
+- Hoàn tất phần vỏ Server: `GET /api/v1/servers/{serverId}` và FE `/servers/:serverId` đọc chi tiết riêng. Contract và quyền Owner/Member ở docs/02 mục 9. Nhánh `feature/server-detail`; 9 file thuộc task được chia thành commit BE, FE và docs theo yêu cầu mới của Duy.
+- FE nhận `403` chi tiết hiện tại thì về Home `/` với `replace`, không hiện thiếu quyền, không logout; response cũ bị bỏ qua. Contract BE vẫn kiểm Owner/Member và trả `403`. UUID/publicId chưa triển khai, cần kế hoạch riêng.
+- PASS kiểm tra lại trước commit: 128 backend tests/compileJava/check (rerun), 20 FE tests (15 Edge browser dùng mock + 5 Node logic), frontend build. API production và SQL Server thật chưa kiểm thử trong các lượt này.
+- Channel/Member UI và composer vẫn chưa tích hợp; Channel thuộc developer khác. Không tự chuyển sang API Channel/lịch sử/Message, Invite hoặc role. Handoff Message ngày 2026-10-11 bên dưới là lịch sử và vẫn ghi những phần chưa hoàn tất tương ứng.
+- Duy đã ủy quyền commit và push từng phần riêng nhánh `feature/server-detail` trong lượt RELEASE-SERVER-DETAIL; không force push hoặc thay main/master. Các việc tiếp theo chỉ thực hiện khi được giao: UUID/publicId, sửa/xóa Server hoặc bàn giao dữ liệu Channel.
 
 ### Ưu tiên đã duyệt ngày 2026-10-11 — hoàn tất gửi Message trước
 

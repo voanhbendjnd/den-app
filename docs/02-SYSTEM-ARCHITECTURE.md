@@ -3,6 +3,7 @@
 > **Tài liệu kiến trúc hệ thống & Quy chuẩn giao tiếp**\
 > **Source of Truth:** Tài liệu này quản lý architecture, API, DTO, Security và WebSocket; nghiệp vụ ở [`01-PROJECT-OVERVIEW.md`](./01-PROJECT-OVERVIEW.md), dữ liệu ở [`03-DATABASE-DESIGN.md`](./03-DATABASE-DESIGN.md).\
 > **Cập nhật 2026-10-11:** Duy chốt giữ wrapper response thành công hiện có; xem mục 4.1, 4.4 và 7.1. Contract được chốt không đồng nghĩa source code đã triển khai xong; xem mục 7.
+> **Cập nhật 2026-10-13:** Đọc chi tiết phần vỏ Server qua `GET /api/v1/servers/{serverId}` và tích hợp FE đã hoàn tất theo phạm vi Duy duyệt; xem mục 9. Channel thuộc developer khác.
 
 ---
 
@@ -153,7 +154,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Auth** | `POST` | `/api/v1/auth/logout` | Đăng xuất người dùng | `TBD` |
 | **Server** | `GET` | `/api/v1/servers` | Lấy danh sách Server mà User là Member / Owner | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers` | Tạo một Server mới | `CONFIRMED` |
-| **Server** | `GET` | `/api/v1/servers/{serverId}` | Lấy thông tin chi tiết một Server | `TBD` |
+| **Server** | `GET` | `/api/v1/servers/{serverId}` | Đọc thông tin phần vỏ Server; Owner/Member, contract mục 9 | `IMPLEMENTED` |
 | **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
@@ -194,7 +195,7 @@ Hiện trạng đã đọc từ source sau gộp:
 ### 5.2 Server & Member Management
 - `GET /api/servers`: Lấy danh sách server người dùng tham gia
 - `POST /api/servers`: Tạo server mới (transactional với `#general` channel và Owner)
-- `GET /api/servers/{serverId}`: Chi tiết server kèm danh sách kênh
+- `GET /api/v1/servers/{serverId}`: Chi tiết phần vỏ Server theo phạm vi duyệt 2026-10-13 (mục 9); trả DTO Server hiện có. Thiết kế trước đó `/api/servers/{serverId}` kèm danh sách kênh được thu hẹp cho lượt này; dữ liệu Channel thuộc module Channel, không thêm alias `/api/servers/{serverId}`.
 - `PATCH /api/servers/{serverId}`: Cập nhật tên/ảnh server (Owner)
 - `DELETE /api/servers/{serverId}`: Xóa server (Owner)
 - `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
@@ -430,7 +431,7 @@ Luồng tích hợp: `Người dùng nhập → React State cập nhật → Sen
 Duy duyệt riêng phạm vi làm UI trước khi API Group chat hoàn tất. Đây là ngoại lệ thứ tự thực hiện cho đợt UI, không xác nhận Backend đã DONE hoặc cho phép tự thay contract.
 
 - Route Frontend `/servers/:serverId` nằm trong `ProtectedRoute`, dùng `GroupChatPage`; dock chọn nhóm bằng `Link`. Đây là route trình duyệt, không phải endpoint Backend.
-- Tái sử dụng `GET /api/v1/servers` qua `serverApi.getAll()` và state của `MainLayout`. GroupChatPage chọn nhóm từ danh sách trả về, không gọi `serverApi.getById()` vì chưa có endpoint tương ứng. Loading, lỗi tải và nhóm không có trong danh sách là ba trạng thái khác nhau; lỗi có nút thử lại.
+- Trong lượt UI ban đầu, tái sử dụng `GET /api/v1/servers` qua `serverApi.getAll()` và state của `MainLayout` để chọn nhóm. Từ 2026-10-13, `GroupChatPage` đọc riêng `serverApi.getById(serverId)` theo mục 9; dock vẫn dùng danh sách. Loading và lỗi trang chi tiết độc lập với danh sách ở dock.
 - Bố cục tham khảo Discord, dùng màu DenHub: dock nhóm → cột kênh → vùng trò chuyện/ô nhập → thành viên. Từ 1200 px có panel thành viên bật/tắt; dưới 1200 px dùng Drawer thành viên, dưới 992 px dùng Drawer kênh. Không có voice, category hoặc trạng thái online giả.
 - Chưa có API đọc danh sách kênh, thành viên hoặc lịch sử trong source. Tạo server hiện chưa tạo general. UI hiển thị dữ liệu chưa sẵn sàng và khóa composer; không tạo kênh/thành viên/tin nhắn giả, không hardcode channelId, không gọi WebSocket cũ.
 - `MessageInput` nhận props `channelId`, `channelName`, `disabled`, `onSend`, `onSent`. `onSend(channelId, { content })` phải trả Promise chứa kết quả gửi thành công; `onSent(message, channelId)` báo về cha sau thành công. Đây là giao diện component nội bộ, không bổ sung DTO/endpoint.
@@ -493,3 +494,48 @@ Ba câu kiểm tra để Duy trả lời trước khi chuyển đợt:
 1. `onSend` reject thì input và nút Gửi thay đổi thế nào?
 2. Nếu lấy `response.data` thay vì `response.data.data`, component cha sẽ nhận gì?
 3. Vì sao route Group hiện chưa được mở gửi thật dù đã có MessageInput?
+
+## 9. Đọc chi tiết phần vỏ Server (`CONFIRMED`, 2026-10-13)
+
+Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer khác. Lượt đầu bổ sung API đọc và nối FE trên nhánh `feature/server-detail`; không thay database hoặc API tạo/list. Lượt sửa 6 bug được duyệt sau đó mở rộng riêng phần tạo/list, audit Server và FE như mục 9.4; không thay role, Join, Channel, Message, Invite hoặc WebSocket.
+
+### 9.1 REST contract
+
+- `GET /api/v1/servers/{serverId}`; dùng prefix hiện có của `ServerResource` và hàm `serverApi.getById` đã tồn tại. Không có request body hoặc endpoint alias mới.
+- Bearer JWT theo Security hiện có. Service từ chối anonymous, Authentication chưa xác thực, subject trống, User không tồn tại hoặc chưa activated. Owner được xác định qua `Server.ownerId`; thành viên được kiểm bằng `existsByServerIdAndUserId` đúng Server. `ROLE_ADMIN` toàn hệ thống không bỏ qua điều kiện này.
+- HTTP `200`, `ServerResponseDTO` nằm trong `data` của wrapper mục 4.1; gồm `id`, `name`, `iconUrl` (có thể null), `ownerId`, `createdDate` (`Instant`, JSON ISO-8601 UTC). `message` dùng mặc định `Call API success!`, `error` là null. Không trả Entity, audit hoặc danh sách Channel.
+- `401`: thiếu/JWT sai, hết hạn, session sai hoặc tài khoản không hợp lệ; `403`: User hợp lệ nhưng không phải Owner/Member; `404`: Server không tồn tại; `400`: ID không chuyển được sang Long. Lỗi qua handler hiện có, `application/problem+json`; không bọc success.
+- `ServerService.getServerDetail` dùng transaction `readOnly`; không tạo membership hoặc thay dữ liệu khi đọc. Owner có thể đọc ngay cả khi chưa có bản ghi membership, thống nhất cách lấy danh sách Server hiện có.
+
+### 9.2 Frontend
+
+- Khi mở, reload hoặc chuyển `/servers/:serverId`, `GroupChatPage` gọi `GET /api/v1/servers/{serverId}` và đọc `response.data.data`. Dock ở `MainLayout` tiếp tục dùng API danh sách.
+- Trang chi tiết độc lập với thành công/thất bại của danh sách; không suy ra thiếu quyền chỉ vì Server chưa nằm trong state dock.
+- Loading riêng; API chi tiết trả `403` thì FE chuyển về Home `/` bằng `replace`, không hiển thị thông báo thiếu quyền, không logout. Đường dẫn bị từ chối được thay trong history để Back quay về trang trước đó. `404`/`400` vẫn có thông báo an toàn, lỗi mạng/5xx có thể thử lại. `401` sử dụng interceptor đã có để xóa phiên và về login. Không hiển thị nguyên chi tiết hạ tầng từ response lỗi.
+- Effect cleanup bỏ qua response thành công/thất bại của request cũ; render kiểm tra serverId để tránh hiển thị nhóm cũ khi route đã đổi. Retry tải lại chi tiết của Server hiện tại.
+- Duy duyệt thay đổi redirect bằng “oke duyệt” ngày 2026-10-13. BE vẫn trả `403` và kiểm Owner/Member; redirect chỉ áp dụng cho lỗi chi tiết của Server hiện tại. Response `403` cũ không được điều hướng về Home. URL tiếp tục dùng ID số; UUID/publicId cần kế hoạch và phê duyệt riêng.
+- Giữ khung Channel/Member và composer chưa tích hợp của lượt UI trước; không tự tạo kênh hoặc bật gửi tin.
+
+### 9.3 Verification và giới hạn
+
+- `ServerServiceTest`: thêm 7 cases đọc/authorization/identity; `ServerResourceTest`: thêm case ánh xạ đúng ID. Standalone test chỉ kiểm Controller; wrapper/errors/filters được kiểm trong suite bên dưới.
+- Lượt API ban đầu: `ServerSecurityIT` có 13 cases chạy HTTP/MockMvc → JWT ký thật/filters → Service → JPA/H2, không mock Service/Repository. Kiểm Owner không có membership, Member, outsider dù có ROLE_ADMIN, membership Server khác, 404, ID sai, token thiếu/malformed/sai chữ ký/hết hạn, session sai, User inactive/missing; assertions wrapper/Problem Details và đọc không làm thay dữ liệu. Fixture rollback sau test. Lượt sửa bug dùng spy Repository riêng để gây lỗi membership có kiểm soát; xem mục 9.4.
+- Từ `server/`: `.\gradlew.bat compileJava test check --no-daemon` **PASS 128/128**, 0 failure/error/skip.
+- Từ `client/`: `node --test tests/messageInput.test.mjs` **PASS 5/5**; `npm run build` **PASS**; với Playwright sẵn có qua NODE_PATH, `node --test tests/group-chat.browser.test.mjs` **PASS 14/14** trên Edge headless.
+- Browser tests kiểm DTO chi tiết khác snapshot danh sách, ID/reload, list lỗi/rỗng, loading/503/404, 403, lỗi mạng/retry, 401/logout, response cũ thành công/lỗi, route guard, responsive và regression composer. API là fixture trong test; không kiểm thử FE gọi BE/SQL Server thật.
+- Lượt redirect `403` (2026-10-13): cập nhật case mở URL trực tiếp về Home, không hiện thiếu quyền và không mất token; thêm case mở từ dock và Back về Server trước đó; bổ sung assertion URL cho response cũ. `node --test tests/group-chat.browser.test.mjs` với NODE_PATH như lượt trước **PASS 15/15**, 0 failure/skip; `npm run build` **PASS**. Chỉ đổi FE/tests/docs, không chạy lại backend hoặc Node logic tests trong lượt này. Số 14/14 bên trên là kết quả trước thay đổi redirect.
+- PRE-EXISTING ISSUE: build có warning chunk >500 kB; browser có warning Ant Design Spin tip, Modal destroyOnClose và Empty imageStyle. Không đổi dependency hoặc sửa module khác.
+- Kiểm tra lại trước commit (2026-10-13): `.\gradlew.bat compileJava test check --no-daemon --rerun-tasks` **PASS 128/128**; với NODE_PATH Playwright như lượt trước, `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` **PASS 20/20**; `npm run build` **PASS**. Duy đã trực tiếp yêu cầu chia commit và push nhánh `feature/server-detail`; xem log RELEASE-SERVER-DETAIL trong docs/00.
+- Chưa kiểm thử SQL Server thật; không khởi động app với cấu hình production hoặc thay schema.
+
+### 9.4 Sửa 6 bug phần Server CRUD (`CONFIRMED`, 2026-10-13)
+
+- Duy duyệt kế hoạch bằng “triển khai”; không triển khai UUID/publicId, Join hoặc Channel. Endpoint và DTO thành công giữ nguyên.
+- `POST /api/v1/servers` và `GET /api/v1/servers` dùng cùng kiểm tra identity với chi tiết: Authentication đã xác thực, không anonymous, subject email hợp lệ, User tồn tại và `activated = true`. Vi phạm trả `401` Problem Details; không lưu Server/membership hoặc đọc danh sách trước khi qua kiểm tra. Email được trim/lowercase khi tìm User, audit vẫn giữ identity đầy đủ.
+- Tạo Server vẫn nằm trong một transaction cùng membership Owner. Nickname Owner tự sinh theo quy tắc docs/01 mục 5; không đổi tên User hoặc mở rộng cột nickname. Nếu lưu membership lỗi, Server cũng rollback. Audit Server riêng hỗ trợ email 254 ký tự theo docs/03 mục 4.4.
+- `CreateServerModal` khóa nút tạo và kiểm tra upload đang chờ trong handler submit, kể cả Enter/Form submit. Upload thành công cập nhật `iconUrl` trước khi cho tạo.
+- Mỗi upload có request ID. Đóng/mở lại modal, chọn preset/template hoặc file mới làm request trước đó hết hiệu lực. Success, error và finally của request cũ không được sửa icon/form/loading hoặc hiển thị toast của phiên mới. Bỏ qua response không xóa file đã upload trên máy chủ; quản lý file dùng chung ngoài phạm vi này.
+- Home sử dụng `serversLoading`, `serversError`, `refreshServers` từ MainLayout: loading riêng, lỗi mạng/5xx có nút Thử lại, chỉ hiển thị “Bạn chưa có Server nào” và số lượng khi tải danh sách thành công. Không hiển thị nguyên lỗi hạ tầng.
+- Verification: từ `server/`, `.\gradlew.bat compileJava test check --no-daemon` **PASS 150/150**, 0 failure/error/skip sau sửa fixture email biên trong test. Thêm 13 unit cases nickname/identity và 9 integration cases create/list, email 55/254, tên rỗng/dài/emoji, rollback. `ServerMemberRepository` là spy gọi thật mặc định; duy nhất case rollback stub lỗi save, chạy ngoài transaction test để xác nhận transaction Service rollback.
+- Từ `client/`, với NODE_PATH Playwright như mục 8.2, `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` **PASS 25/25** (20 Edge browser + 5 logic); `npm run build` **PASS**. Năm browser tests mới kiểm loading/503/retry/empty, submit pending, icon gửi đúng, response cũ, file mới/preset/template và lỗi upload hiện tại. Không có pageerror trong các cases.
+- H2 và browser mock không chứng minh FE → BE → SQL Server thật. Script SQL Server chỉ đã chuẩn bị/review nội dung, chưa thực thi; cần review/apply trên database đích. Các warning Ant Design và chunk >500 kB có sẵn vẫn còn. Không có npm script lint/test để chạy.
