@@ -3,6 +3,7 @@ import {
   PlusOutlined,
   ThunderboltFilled,
   CompassOutlined,
+  NumberOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -12,7 +13,15 @@ const { Title, Text, Paragraph } = Typography;
 export default function HomePage() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const { servers = [], serversLoading = false, serversError, refreshServers, openCreateModal, openJoinModal } = useOutletContext() || {};
+  const {
+    servers = [],
+    serversLoading = false,
+    serversError,
+    refreshServers,
+    openCreateModal,
+    openJoinModal,
+    openCreateChannelModal
+  } = useOutletContext() || {};
 
   return (
     <div style={{ padding: '36px 40px', maxWidth: 1100, margin: '0 auto' }}>
@@ -203,9 +212,27 @@ export default function HomePage() {
                     <span style={{ color: '#64748B', fontSize: 12 }}>
                       Mã #{server.id}
                     </span>
-                    <span style={{ color: '#00F2FE', fontSize: 12, fontWeight: 600 }}>
-                      Sẵn sàng kết nối
-                    </span>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<NumberOutlined style={{ fontSize: 13 }} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openCreateChannelModal?.(server);
+                      }}
+                      style={{
+                        color: '#00F2FE',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '0 4px',
+                        height: 24,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      + Kênh Mới
+                    </Button>
                   </div>
                 </div>
               </Col>
