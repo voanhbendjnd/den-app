@@ -279,7 +279,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 | Module | FE | BE | DB | Integration | Test | Status | Last Update |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
-| **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
+| **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | DONE | TESTED | DONE | 2026-10-13 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
 | **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | IN_PROGRESS | IN_PROGRESS | 2026-10-11 |
@@ -317,6 +317,29 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 ## 11. COMPLETED WORK LOG
 
 Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` sẽ được bổ sung một entry ngắn gọn theo template dưới đây:
+
+### [2026-10-13] FEAT-SERVER-JOIN-FE — UI Tham Gia Server & Tích Hợp API
+Implemented:
+- Frontend:
+  - Bổ sung hàm `join: (serverId) => axiosClient.post('/v1/servers/' + serverId + '/join')` vào `client/src/api/serverApi.js`.
+  - Tạo mới `client/src/utils/serverJoin.js`: hàm xác thực `validateServerId` (kiểm tra rỗng, ký tự không phải số, số âm, số 0) và hàm ánh xạ lỗi thân thiện tiếng Việt `getJoinErrorMessage(err)` (xử lý `alreadymember`, `servernotfound`, 401, 403, lỗi mạng).
+  - Tạo mới `client/src/components/common/JoinServerModal.jsx`: modal phong cách Cyber-tech / Dark mode đồng bộ Ant Design, bao gồm input Server ID, validation tức thì, hint hướng dẫn, loading indicator và cơ chế chặn spam submit liên tục (`submittingRef`).
+  - Cập nhật `client/src/layouts/MainLayout.jsx`: thêm nút truy cập "Tham Gia Server" với icon `CompassOutlined` trên dock trái, state `isJoinModalOpen`, tự động gọi `fetchServers()` và điều hướng sang `/servers/:serverId` khi tham gia thành công, cung cấp `openJoinModal` qua `Outlet context`.
+  - Cập nhật `client/src/pages/home/HomePage.jsx`: gắn nút "Tham Gia Server (ID)" trên Hero Banner, khu vực tiêu đề Server List và Empty State.
+  - Tạo mới `client/tests/serverJoin.test.mjs`: 8 unit tests kiểm thử bộ validator và error mapper bằng Node native test runner.
+- Tests & Verification:
+  - `node --test tests/serverJoin.test.mjs tests/messageInput.test.mjs`: PASS 13/13 (100%).
+  - `npm run build`: PASS 100% (Vite production build thành công 0 errors).
+  - `.\gradlew.bat test`: PASS 100% (Backend tests 85/85 PASS, không có lỗi hồi quy).
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md` (Cập nhật tiến độ & Work Log).
+  - `docs/02-SYSTEM-ARCHITECTURE.md` (Cập nhật trạng thái API POST `/api/v1/servers/{serverId}/join` sang CONFIRMED).
+- Commit:
+  - `feat(server): add join server API client and validation utilities`
+  - `feat(server): implement join server modal and layout integration`
+  - `docs(server): update API architecture status and development progress`
+
+---
 
 ### [2026-10-12] FIX-REALTIME-DM-PERSISTENCE — Sửa lỗi lưu tin nhắn và hiển thị realtime 1-1 chat
 Implemented:
