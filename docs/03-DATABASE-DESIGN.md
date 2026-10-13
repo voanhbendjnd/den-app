@@ -291,8 +291,16 @@ Kết luận tại thời điểm kiểm tra schema: Entity và database thống
 Duy đã duyệt bổ sung sửa audit bằng yêu cầu “làm tiếp đi” sau khi xem lỗi email 53 ký tự gây 500 và kế hoạch tăng riêng hai cột audit của messages lên 254.
 
 - `Message` dùng `@AttributeOverrides` cho `createdBy` → `created_by` và `lastModifiedBy` → `last_modified_by`, `length = 254`. Giữ `created_by` không updatable; giữ nullability hiện có, identity audit vẫn là email lấy từ Security Context. Không rút ngắn email.
-- Đây là override riêng Entity Message; `AbstractAuditingEntity` và mapping User/Server/Channel vẫn giữ nguyên. Giới hạn audit 50 ký tự ở các Entity khác còn là rủi ro có sẵn, cần task riêng.
+- Ở lượt Message đây là override riêng Entity Message; `AbstractAuditingEntity` và mapping User/Server/Channel được giữ nguyên. Server sau đó được sửa riêng ở mục 4.4; User/Channel vẫn còn giới hạn audit 50 ký tự và cần task riêng.
 - Script thủ công: `server/scripts/sql/2026-10-11-message-audit-email.sql`. Script chỉ xét `dbo.messages.created_by` và `last_modified_by`; giữ varchar/nvarchar, collation và nullability từ metadata; chỉ mở rộng cột ngắn hơn 254, không thu hẹp cột dài hơn/MAX. Sai bảng/cột/kiểu thông thường sẽ dừng.
 - Script mặc định `@ApplyChanges = 0` để in database và SQL dự kiến. Người vận hành chọn đúng database, review rồi mới đặt `1`; hai ALTER nằm trong transaction, lỗi sẽ rollback. Script không được đăng ký chạy tự động khi ứng dụng khởi động.
 - **Chưa chạy hoặc xác minh script trên SQL Server thật**, chưa áp dụng schema thật. Trước khi triển khai, review/apply schema bằng quy trình của nhóm; không coi `ddl-auto=update` là bằng chứng migration đã thành công.
 - H2/JPA tests đã PASS với email fixture 53 và biên 254 ký tự; kiểm tra cả hai trường audit đọc lại nguyên vẹn cùng Message content/author/channel. Không thay `content`, FK, index hoặc tên cột timestamp.
+
+### 4.4 Audit của Server hỗ trợ email 254 ký tự (`CONFIRMED`, 2026-10-13)
+
+- Duy duyệt kế hoạch sửa 6 bug phần Server bằng “triển khai”. `Server` override riêng `createdBy` → `created_by` và `lastModifiedBy` → `last_modified_by`, `length = 254`, giữ `created_by` không updatable và nullability hiện có. Giữ đầy đủ email làm audit; không đổi AbstractAuditingEntity, User, Channel hoặc ServerMember.
+- Script `server/scripts/sql/2026-10-13-server-audit-email.sql` chỉ xét `dbo.servers.created_by` và `last_modified_by`. Kiểm đủ hai cột varchar/nvarchar thông thường; bảo toàn kiểu, collation và nullability; chỉ mở rộng cột ngắn hơn 254, không thu hẹp cột dài hơn hoặc MAX. Không thay index/FK/timestamps.
+- Mặc định `@ApplyChanges = 0`: hiển thị database, metadata và SQL dự kiến rồi dừng. Người vận hành chọn đúng database, review rồi đặt `1` để apply hai ALTER trong transaction; lỗi rollback. Script không chạy tự động khi khởi động ứng dụng.
+- **Chưa thực thi hoặc xác minh script trên SQL Server thật.** Cần review/apply schema trước khi coi lỗi email dài đã được xử lý trên database đang triển khai; không suy ra `ddl-auto=update` đã thực hiện thành công thay đổi này.
+- MockMvc/JWT/JPA/H2 test PASS với email 55 và 254 ký tự: tạo Server kèm membership Owner, đọc lại cả hai audit đầy đủ, cập nhật Server và đọc lại không mất email. Bản staged bug audit đã kiểm tra 130/130 backend tests PASS.

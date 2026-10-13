@@ -21,6 +21,8 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /** Real JWT/filter/service/JPA chain; fixtures use H2 and roll back after each test. */
@@ -153,6 +156,47 @@ class ServerSecurityIT {
         else reader.setActivated(false);
         entityManager.flush();
         problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, token)), 401);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {55, 254})
+    void longEmailCreatesServerAndPreservesBothAuditFields(int length) throws Exception {
+        String local = "a".repeat(60);
+        String domain = "b".repeat(60) + "." + "c".repeat(60) + "." + "d".repeat(60);
+        String email = length == 254 ? local + "@" + domain + "." + "e".repeat(5) + ".test"
+                : "a".repeat(length - "@example.test".length()) + "@example.test";
+        assertEquals(length, email.length());
+        reader.setEmail(email);
+        reader = users.saveAndFlush(reader);
+        long memberCount = members.count();
+        String json = mvc.perform(post("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Long email server\",\"iconUrl\":\"https://example.test/new.png\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.ownerId").value(reader.getId()))
+                .andReturn().getResponse().getContentAsString();
+        Long createdId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json).path("data").path("id").longValue();
+        entityManager.flush();
+        entityManager.clear();
+        Server created = servers.findById(createdId).orElseThrow();
+        assertEquals(email, created.getCreatedBy());
+        assertEquals(email, created.getLastModifiedBy());
+        assertEquals("https://example.test/new.png", created.getIconUrl());
+        assertEquals(memberCount + 1, members.count());
+        org.junit.jupiter.api.Assertions.assertTrue(members.existsByServerIdAndUserId(createdId, reader.getId()));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(email, null, List.of()));
+        try {
+            created.setName("Updated server");
+            servers.saveAndFlush(created);
+            entityManager.clear();
+            Server updated = servers.findById(createdId).orElseThrow();
+            assertEquals(email, updated.getCreatedBy());
+            assertEquals(email, updated.getLastModifiedBy());
+            assertEquals("Updated server", updated.getName());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     private void readsDetail() throws Exception {

@@ -497,7 +497,7 @@ Ba câu kiểm tra để Duy trả lời trước khi chuyển đợt:
 
 ## 9. Đọc chi tiết phần vỏ Server (`CONFIRMED`, 2026-10-13)
 
-Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer khác. Duy duyệt kế hoạch và cho tạo nhánh riêng `feature/server-detail`. Phạm vi này bổ sung API đọc và nối FE; không thay database, role, API tạo Server, Channel, Message, Invite hoặc WebSocket.
+Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer khác. Lượt đầu bổ sung API đọc và nối FE trên nhánh `feature/server-detail`; không thay database hoặc API tạo/list. Lượt sửa 6 bug được duyệt sau đó mở rộng riêng phần tạo/list, audit Server và FE như mục 9.4; không thay role, Join, Channel, Message, Invite hoặc WebSocket.
 
 ### 9.1 REST contract
 
@@ -527,3 +527,8 @@ Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer
 - PRE-EXISTING ISSUE: build có warning chunk >500 kB; browser có warning Ant Design Spin tip, Modal destroyOnClose và Empty imageStyle. Không đổi dependency hoặc sửa module khác.
 - Kiểm tra lại trước commit (2026-10-13): `.\gradlew.bat compileJava test check --no-daemon --rerun-tasks` **PASS 128/128**; với NODE_PATH Playwright như lượt trước, `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` **PASS 20/20**; `npm run build` **PASS**. Duy đã trực tiếp yêu cầu chia commit và push nhánh `feature/server-detail`; xem log RELEASE-SERVER-DETAIL trong docs/00.
 - Chưa kiểm thử SQL Server thật; không khởi động app với cấu hình production hoặc thay schema.
+
+### 9.4 Sửa bug phần Server CRUD (2026-10-13)
+
+- Duy đã duyệt kế hoạch sửa 6 bug và cho chia/push thành 6 commit theo từng bug. Phần đã có trong commit hiện tại được ghi dưới đây; Join, Channel, UUID và shared File API ngoài phạm vi.
+- Audit Server riêng hỗ trợ email 254 ký tự theo docs/03 mục 4.4. Script mặc định preview, chưa thực thi trên SQL Server thật.
