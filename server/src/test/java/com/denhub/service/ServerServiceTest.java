@@ -18,7 +18,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -221,6 +224,41 @@ class ServerServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getName()).isEqualTo("My Server");
+    }
+
+    @ParameterizedTest
+    @MethodSource("ownerNames")
+    void createServer_NormalizesOnlyGeneratedOwnerNickname(String name, String expected) {
+        User user = prepareDetailUser();
+        user.setName(name);
+        when(serverRepository.save(any(Server.class))).thenAnswer(invocation -> {
+            Server saved = invocation.getArgument(0);
+            saved.setId(10L);
+            return saved;
+        });
+        CreateServerDTO dto = new CreateServerDTO();
+        dto.setName("New server");
+
+        serverService.createServer(dto);
+
+        ArgumentCaptor<ServerMember> member = ArgumentCaptor.forClass(ServerMember.class);
+        verify(serverMemberRepository).save(member.capture());
+        assertThat(member.getValue().getServerId()).isEqualTo(10L);
+        assertThat(member.getValue().getUserId()).isEqualTo(user.getId());
+        assertThat(member.getValue().getNickname()).isEqualTo(expected);
+        assertThat(user.getName()).isEqualTo(name);
+        verify(userRepository, never()).save(any());
+    }
+
+    static java.util.stream.Stream<Arguments> ownerNames() {
+        return java.util.stream.Stream.of(
+                Arguments.of(null, "Owner"),
+                Arguments.of("", "Owner"),
+                Arguments.of(" \t\u2003 ", "Owner"),
+                Arguments.of("  Test User  ", "Test User"),
+                Arguments.of("a".repeat(50), "a".repeat(20)),
+                Arguments.of("a".repeat(19) + "🙂x", "a".repeat(19)),
+                Arguments.of("🙂".repeat(11), "🙂".repeat(10)));
     }
 
     @ParameterizedTest

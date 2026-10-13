@@ -89,7 +89,7 @@ public class ServerService {
         member.setServerId(server.getId());
         member.setUserId(currentUser.getId());
         // Mặc định dùng tên hiển thị của user làm nickname trong server
-        member.setNickname(currentUser.getName() != null ? currentUser.getName() : "Owner");
+        member.setNickname(ownerNickname(currentUser.getName()));
         serverMemberRepository.save(member);
 
         // 4. Trả về DTO
@@ -118,6 +118,18 @@ public class ServerService {
             response.setCreatedDate(server.getCreatedDate());
             return response;
         }).toList();
+    }
+
+    private String ownerNickname(String name) {
+        String nickname = name == null ? "" : name.strip();
+        if (nickname.isBlank()) return "Owner";
+        if (nickname.length() <= 20) return nickname;
+        int end = 20;
+        if (Character.isHighSurrogate(nickname.charAt(end - 1))
+                && Character.isLowSurrogate(nickname.charAt(end))) {
+            end--;
+        }
+        return nickname.substring(0, end);
     }
 
     public void joinServer(Long serverId) {

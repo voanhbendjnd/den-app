@@ -281,7 +281,7 @@ Bảng này phản ánh chính xác trạng thái thực tế của code và tà
 | **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Server Detail — phần vỏ** | IMPLEMENTED | IMPLEMENTED | REUSED | TESTED (H2 / FE mock) | PASS | DONE (phạm vi đã duyệt) | 2026-10-13 |
-| **Server CRUD — sửa 6 bug** | IN_PROGRESS | IN_PROGRESS | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 2/6; còn apply schema thật | 2026-10-13 |
+| **Server CRUD — sửa 6 bug** | IN_PROGRESS | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 3/6; còn apply schema thật | 2026-10-13 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
 | **Channel** | TODO | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
 | **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | TODO | IN_PROGRESS | IN_PROGRESS | 2026-10-11 |
@@ -296,7 +296,7 @@ Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trướ
 | Công việc | Trạng thái | Bằng chứng / bước còn lại |
 | :--- | :--- | :--- |
 | Đọc chi tiết phần vỏ Server + FE | DONE trong phạm vi code/H2/FE mock | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
-| Sửa 6 bug Server CRUD | Release 2/6; còn apply schema audit SQL Server | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi. |
+| Sửa 6 bug Server CRUD | Release 3/6; còn apply schema audit SQL Server | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi. |
 | Đồng bộ docs theo prompt | DONE | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database. |
 | Xác minh schema SQL Server | DONE | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database. |
 | Task 1.07 — API gửi tin nhắn + test | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE. |
@@ -325,16 +325,17 @@ Nhật ký công việc đã hoàn thành. Mỗi task khi đạt chuẩn `DONE` 
 ### [2026-10-13] RELEASE-SERVER-CRUD — 6 commit theo từng bug
 
 - Duy trực tiếp cho phép “chia ra nhiều commit theo từng phần commit push giúp tôi. Tôi cho phép”, sau đó chốt “nãy có 6 bug thì 6 commit theo từng bug đó đi”. Ủy quyền commit/push chỉ nhánh `feature/server-detail` và 6 bug đã duyệt, ưu tiên yêu cầu trực tiếp mới này so với quy định không push trước đó. Không force push, không đụng main/master hoặc thay AGENTS.md.
-- Commit hiện tại: bug 2/6 — create/list từ chối tài khoản inactive, gồm thay đổi hành vi, tests và tài liệu liên quan. Các bản index trung gian được xuất riêng ra thư mục tạm ngoài repo và kiểm thử trước từng commit, không sửa application code khi chia commit.
-- Verification bản staged: bug 1: 130 BE tests PASS; bug 2: 138 BE tests PASS. BE chạy `.\gradlew.bat compileJava test check --no-daemon`; FE chạy `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` với NODE_PATH Playwright có sẵn và `npm run build`.
+- Commit hiện tại: bug 3/6 — nickname Owner dài/rỗng, gồm thay đổi hành vi, tests và tài liệu liên quan. Các bản index trung gian được xuất riêng ra thư mục tạm ngoài repo và kiểm thử trước từng commit, không sửa application code khi chia commit.
+- Verification bản staged: bug 1: 130 BE tests PASS; bug 2: 138 BE tests PASS; bug 3: 150 BE tests PASS. BE chạy `.\gradlew.bat compileJava test check --no-daemon`; FE chạy `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` với NODE_PATH Playwright có sẵn và `npm run build`.
 - Verification toàn bộ implementation trước release: 150 BE + 25 FE tests và build PASS; đã sửa fixture email 254 trong lượt implement. Review staged diff và whitespace trước mỗi commit. Không có script npm lint/test, không cài dependency.
 - Còn lại: SQL script mặc định preview chưa chạy/apply trên SQL Server thật. H2 và browser API mock không chứng minh FE → BE → SQL Server thật. PRE-EXISTING ISSUE: warning Ant Design và chunk >500 kB. Không triển khai Join, Channel, UUID hoặc shared File API.
 
 Các phần đã commit và push trước commit hiện tại:
 
 - Bug 1: `3f86d64` — `fix(server): support long emails in server audit`; push thành công.
+- Bug 2: `341758c` — `fix(server): reject inactive users on create and list`; push thành công.
 
-Commit hiện tại dùng title `fix(server): reject inactive users on create and list`; kết quả push cuối xác nhận qua Git và báo sau khi hoàn tất.
+Commit hiện tại dùng title `fix(server): normalize generated owner nicknames`; kết quả push cuối xác nhận qua Git và báo sau khi hoàn tất.
 
 ### [2026-10-13] RELEASE-SERVER-DETAIL — Chia commit BE, FE và tài liệu
 
@@ -1269,9 +1270,9 @@ Commit:
 
 ## 12. CURRENT WORK / HANDOFF
 
-### Handoff hiện tại — Server CRUD release 2/6 (2026-10-13)
+### Handoff hiện tại — Server CRUD release 3/6 (2026-10-13)
 
-- Phần đã có trong commit: audit email dài, create/list từ chối tài khoản inactive. Tài liệu liên quan đồng bộ theo từng bug; nhánh `feature/server-detail`. Duy đã ủy quyền chia/push đúng 6 commit.
+- Phần đã có trong commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng. Tài liệu liên quan đồng bộ theo từng bug; nhánh `feature/server-detail`. Duy đã ủy quyền chia/push đúng 6 commit.
 - Test bản staged chạy trước từng commit như release log; toàn bộ implementation có 150 BE + 25 FE tests và build PASS. Các số 128/20 bên dưới là lịch sử release Server Detail.
 - Bước còn lại: review/apply `server/scripts/sql/2026-10-13-server-audit-email.sql` trên database đích; mặc định preview, chưa thực thi. Không coi ddl-auto=update là bằng chứng schema đã mở rộng. UUID đã hủy; Join/Channel thuộc developer khác.
 

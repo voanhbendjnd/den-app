@@ -23,9 +23,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +37,9 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
+import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /** Real JWT/filter/service/JPA chain; fixtures use H2 and roll back after each test. */
@@ -46,7 +51,7 @@ class ServerSecurityIT {
     @Autowired private JwtEncoder encoder;
     @Autowired private UserRepository users;
     @Autowired private ServerRepository servers;
-    @Autowired private ServerMemberRepository members;
+    @MockitoSpyBean private ServerMemberRepository members;
     @Autowired private EntityManager entityManager;
 
     private User reader;
@@ -214,6 +219,39 @@ class ServerSecurityIT {
             assertEquals("Updated server", updated.getName());
         } finally {
             SecurityContextHolder.clearContext();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "                     ", "12345678901234567890123456789012345678901234567890", "1234567890123456789🙂x"})
+    void validUserNameCannotBreakServerCreation(String name) throws Exception {
+        reader.setName(name);
+        reader = users.saveAndFlush(reader);
+        mvc.perform(post("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"New server\"}"))
+                .andExpect(status().isCreated());
+        entityManager.flush();
+        entityManager.clear();
+        assertEquals(name, users.findById(reader.getId()).orElseThrow().getName());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void membershipFailureRollsBackServerCreation() throws Exception {
+        long serverCount = servers.count();
+        long memberCount = members.count();
+        doThrow(new IllegalStateException("Fixture membership persistence failure"))
+                .when(members).save(any(ServerMember.class));
+        try {
+            mvc.perform(post("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, bearer())
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Rollback server\"}"))
+                    .andExpect(status().isInternalServerError());
+            assertEquals(serverCount, servers.count());
+            assertEquals(memberCount, members.count());
+        } finally {
+            reset(members);
+            servers.deleteById(server.getId());
+            users.deleteById(reader.getId());
         }
     }
 
