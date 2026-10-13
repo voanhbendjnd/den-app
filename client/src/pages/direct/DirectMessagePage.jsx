@@ -13,6 +13,7 @@ import { useDirectChat } from '../../hooks/useDirectChat';
 import conversationApi from '../../api/conversationApi';
 import fileApi from '../../api/fileApi';
 import SearchUserPanel from './SearchUserPanel';
+import { useNotification } from '../../hooks/useNotification';
 import dayjs from 'dayjs';
 
 const { Text, Title } = Typography;
@@ -116,8 +117,8 @@ export default function DirectMessagePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { currentUser } = useAuth();
+  const { notifyIncoming } = useNotification(currentUser?.id);
 
-  // Hội thoại đang chọn lấy từ URL: /direct/:conversationId
   // (vẫn hỗ trợ ?conv= để tương thích link cũ)
   const targetId =
       paramConvId && paramConvId !== 'new'
@@ -151,6 +152,10 @@ export default function DirectMessagePage() {
 
   // ── WebSocket Hook ──────────────────────────────────────────────────────
   const handleIncomingMessage = useCallback((newMsg) => {
+    // Thông báo âm thanh + tiêu đề tab
+    const senderName = newMsg?.sender?.name || newMsg?.sender?.username;
+    notifyIncoming(newMsg, senderName);
+
     setMessages((prev) => {
       // 1. Tránh duplicate nếu messageId thực tế đã tồn tại
       if (prev.some((m) => m.messageId === newMsg.messageId)) return prev;

@@ -138,4 +138,12 @@ public class SecurityUtils {
         return (Long) userId.orElse(null);
     }
 
+    public static Long getCurrentUserIdAtHolder() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+            return Long.parseLong(jwt.getSubject());
+        }
+        return null;
+    }
+
 }
