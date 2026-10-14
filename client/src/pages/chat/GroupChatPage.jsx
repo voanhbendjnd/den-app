@@ -9,10 +9,12 @@ import {
   ReloadOutlined,
   SettingOutlined,
   TeamOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
 import CreateChannelModal from '../../components/common/CreateChannelModal';
+import ServerInviteModal from '../../components/common/ServerInviteModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
 import './group-chat.css';
@@ -24,6 +26,8 @@ function ChannelSidebar({
   channelsLoading,
   channelsError,
   activeChannel,
+  isOwner,
+  onOpenInvite,
   onSelectChannel,
   onOpenCreateChannel,
   onRetryChannels,
@@ -35,7 +39,20 @@ function ChannelSidebar({
         <div className="group-sidebar__identity"><strong title={server.name}>{server.name}</strong><span>Không gian nhóm</span></div>
       </div>
       <div className="group-sidebar__body">
-        <Link className="group-back-link" to="/"><ArrowLeftOutlined /> Tổng quan</Link>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Link className="group-back-link" to="/"><ArrowLeftOutlined /> Tổng quan</Link>
+          {isOwner && (
+            <button
+              type="button"
+              className="group-sidebar-invite-btn"
+              onClick={onOpenInvite}
+              title="Mời thành viên vào Server"
+              aria-label="Mời thành viên vào Server"
+            >
+              <UserAddOutlined /> <span>Mời</span>
+            </button>
+          )}
+        </div>
 
         <div className="group-section-header">
           <h2 className="group-section-label">Kênh trò chuyện</h2>
@@ -117,6 +134,8 @@ function MembersPanel({
   loading,
   error,
   onRetry,
+  isOwner,
+  onOpenInvite,
 }) {
   return (
     <div className="group-members">
@@ -124,6 +143,17 @@ function MembersPanel({
         <h2 className="group-section-label">
           Thành viên <span className="group-members-count">({members.length})</span>
         </h2>
+        {isOwner && (
+          <button
+            type="button"
+            className="group-members-invite-btn"
+            onClick={onOpenInvite}
+            title="Mời thành viên vào Server"
+            aria-label="Mời thành viên vào Server"
+          >
+            <UserAddOutlined />
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -199,6 +229,7 @@ export default function GroupChatPage() {
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [membersVisible, setMembersVisible] = useState(true);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
 
@@ -320,6 +351,9 @@ export default function GroupChatPage() {
   }, [serverId, reload]);
 
   const server = detail.server;
+  const isOwner = Boolean(
+    server?.ownerId && currentUser?.id && String(server.ownerId) === String(currentUser.id)
+  );
 
   if (detail.serverId !== serverId || detail.loading) {
     return (
@@ -358,6 +392,8 @@ export default function GroupChatPage() {
           channelsLoading={channelsLoading}
           channelsError={channelsError}
           activeChannel={activeChannel}
+          isOwner={isOwner}
+          onOpenInvite={() => setIsInviteOpen(true)}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => setIsCreateChannelOpen(true)}
           onRetryChannels={() => fetchChannels(serverId)}
@@ -375,6 +411,16 @@ export default function GroupChatPage() {
             <span className="group-channel-badge">#{activeChannel.name}</span>
           ) : (
             <span className="group-pending-label">Chưa chọn kênh</span>
+          )}
+          {isOwner && (
+            <Button
+              type="text"
+              className="group-header-invite-btn"
+              icon={<UserAddOutlined />}
+              title="Mời thành viên vào Server"
+              aria-label="Mời thành viên vào Server"
+              onClick={() => setIsInviteOpen(true)}
+            />
           )}
           <Button
             type="text"
@@ -428,6 +474,8 @@ export default function GroupChatPage() {
             members={members}
             loading={membersLoading}
             error={membersError}
+            isOwner={isOwner}
+            onOpenInvite={() => setIsInviteOpen(true)}
             onRetry={() => fetchMembers(serverId)}
           />
         </aside>
@@ -447,6 +495,11 @@ export default function GroupChatPage() {
           channelsLoading={channelsLoading}
           channelsError={channelsError}
           activeChannel={activeChannel}
+          isOwner={isOwner}
+          onOpenInvite={() => {
+            setChannelsOpen(false);
+            setIsInviteOpen(true);
+          }}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => {
             setChannelsOpen(false);
@@ -466,6 +519,11 @@ export default function GroupChatPage() {
           members={members}
           loading={membersLoading}
           error={membersError}
+          isOwner={isOwner}
+          onOpenInvite={() => {
+            setMembersOpen(false);
+            setIsInviteOpen(true);
+          }}
           onRetry={() => fetchMembers(serverId)}
         />
       </Drawer>
@@ -475,6 +533,12 @@ export default function GroupChatPage() {
         onClose={() => setIsCreateChannelOpen(false)}
         server={server}
         onSuccess={handleChannelCreated}
+      />
+
+      <ServerInviteModal
+        open={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        server={server}
       />
     </div>
   );
