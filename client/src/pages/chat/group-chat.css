@@ -80,6 +80,18 @@
 .group-members__empty > .anticon { font-size: 28px; padding: 16px; color: #8291af; background: rgba(148, 163, 184, .05); border-radius: 16px; }
 .group-members__empty h3 { font-size: 12px; line-height: 1.8; font-weight: 600; color: #c0c9da; margin: 20px 0 8px; }
 .group-members__empty p { font-size: 11px; line-height: 1.9; color: var(--color-text-muted); }
+.group-members-count { font-size: 12px; font-weight: 400; color: var(--color-text-muted); margin-left: 4px; }
+.group-members-loading { display: flex; align-items: center; gap: 10px; padding: 24px 0; color: var(--color-text-muted); font-size: 12px; justify-content: center; }
+.group-members-error { display: flex; flex-direction: column; gap: 6px; padding: 16px 12px; margin-top: 16px; border-radius: 8px; background: rgba(239, 68, 68, .08); border: 1px solid rgba(239, 68, 68, .2); color: #fca5a5; font-size: 12px; }
+.group-members-list { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; }
+.group-member-item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background .15s ease; cursor: default; }
+.group-member-item:hover { background: rgba(255, 255, 255, .04); }
+.group-member-item__avatar { flex-shrink: 0; background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); color: #0b1120; font-weight: 600; font-size: 12px; }
+.group-member-item__info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.group-member-item__name-row { display: flex; align-items: center; gap: 6px; }
+.group-member-item__name { font-size: 13px; font-weight: 500; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.group-member-item__badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; background: rgba(245, 158, 11, .15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, .3); line-height: 1.2; flex-shrink: 0; }
+.group-member-item__username { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-top: 1px; }
 .message-composer { padding: 16px 24px 18px; flex-shrink: 0; }
 .message-composer__box { display: flex; align-items: flex-end; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, .17); background: var(--color-bg-surface); }
 .message-composer__box:focus-within { border-color: #818cf8; }

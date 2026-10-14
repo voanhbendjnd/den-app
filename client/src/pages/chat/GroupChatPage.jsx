@@ -112,15 +112,82 @@ function ChannelSidebar({
   );
 }
 
-function MembersPanel() {
+function MembersPanel({
+  members,
+  loading,
+  error,
+  onRetry,
+}) {
   return (
     <div className="group-members">
-      <h2 className="group-section-label">Thành viên</h2>
-      <div className="group-members__empty">
-        <TeamOutlined aria-hidden="true" />
-        <h3>Chưa có danh sách thành viên</h3>
-        <p>Thông tin thành viên của nhóm sẽ hiển thị tại đây khi sẵn sàng.</p>
+      <div className="group-members-header">
+        <h2 className="group-section-label">
+          Thành viên <span className="group-members-count">({members.length})</span>
+        </h2>
       </div>
+
+      {loading ? (
+        <div className="group-members-loading" role="status" aria-label="Đang tải thành viên">
+          <Spin size="small" />
+          <span>Đang tải thành viên...</span>
+        </div>
+      ) : error ? (
+        <div className="group-members-error" role="alert">
+          <span>{error}</span>
+          <Button
+            type="link"
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={onRetry}
+            style={{ color: '#00f2fe', padding: 0, height: 'auto', textAlign: 'left' }}
+          >
+            Thử lại
+          </Button>
+        </div>
+      ) : members.length === 0 ? (
+        <div className="group-members__empty">
+          <TeamOutlined aria-hidden="true" />
+          <h3>Chưa có danh sách thành viên</h3>
+          <p>Server hiện chưa có thành viên nào tham gia.</p>
+        </div>
+      ) : (
+        <div className="group-members-list" role="list">
+          {members.map((member) => {
+            const displayName = member.nickname || member.name || member.username || 'Thành viên';
+            const initial = displayName[0]?.toUpperCase() || 'U';
+            const isOwner = member.role === 'OWNER';
+
+            return (
+              <div key={member.id} className="group-member-item" role="listitem">
+                <Avatar
+                  className="group-member-item__avatar"
+                  size={32}
+                  src={member.avatar}
+                >
+                  {initial}
+                </Avatar>
+                <div className="group-member-item__info">
+                  <div className="group-member-item__name-row">
+                    <span className="group-member-item__name" title={displayName}>
+                      {displayName}
+                    </span>
+                    {isOwner && (
+                      <span className="group-member-item__badge" title="Chủ nhóm">
+                        Chủ nhóm
+                      </span>
+                    )}
+                  </div>
+                  {member.username && member.username !== displayName && (
+                    <span className="group-member-item__username" title={`@${member.username}`}>
+                      @{member.username}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -141,6 +208,51 @@ export default function GroupChatPage() {
   const [channelsError, setChannelsError] = useState(null);
   const [activeChannel, setActiveChannel] = useState(null);
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+
+  // Members state
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [membersError, setMembersError] = useState(null);
+
+  const fetchMembers = (id) => {
+    setMembersLoading(true);
+    setMembersError(null);
+    serverApi.getMembers(id)
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setMembers(list);
+      })
+      .catch((err) => {
+        setMembersError(err.response?.data?.message || 'Không thể tải danh sách thành viên.');
+      })
+      .finally(() => {
+        setMembersLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    let active = true;
+    if (serverId) {
+      setMembersLoading(true);
+      setMembersError(null);
+      serverApi.getMembers(serverId)
+        .then((res) => {
+          if (!active) return;
+          const list = res.data?.data || res.data || [];
+          setMembers(list);
+        })
+        .catch((err) => {
+          if (!active) return;
+          setMembersError(err.response?.data?.message || 'Không thể tải danh sách thành viên.');
+        })
+        .finally(() => {
+          if (active) setMembersLoading(false);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [serverId]);
 
   const fetchChannels = (id) => {
     setChannelsLoading(true);
@@ -310,7 +422,16 @@ export default function GroupChatPage() {
           disabled={!activeChannel}
         />
       </main>
-      {screens.xl && membersVisible && <aside className="group-member-column" aria-label="Thành viên của nhóm"><MembersPanel /></aside>}
+      {screens.xl && membersVisible && (
+        <aside className="group-member-column" aria-label="Thành viên của nhóm">
+          <MembersPanel
+            members={members}
+            loading={membersLoading}
+            error={membersError}
+            onRetry={() => fetchMembers(serverId)}
+          />
+        </aside>
+      )}
       <Drawer
         title="Kênh của nhóm"
         placement="left"
@@ -341,7 +462,12 @@ export default function GroupChatPage() {
         onClose={() => setMembersOpen(false)}
         styles={{ body: { padding: 0 } }}
       >
-        <MembersPanel />
+        <MembersPanel
+          members={members}
+          loading={membersLoading}
+          error={membersError}
+          onRetry={() => fetchMembers(serverId)}
+        />
       </Drawer>
 
       <CreateChannelModal
