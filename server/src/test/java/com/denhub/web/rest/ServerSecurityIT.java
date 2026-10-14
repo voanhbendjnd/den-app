@@ -255,6 +255,84 @@ class ServerSecurityIT {
         }
     }
 
+    @Test
+    void ownerReadsWrappedMembersList() throws Exception {
+        addMembership(server.getId());
+        User user2 = new User();
+        user2.setEmail("user2-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        user2.setPassword("pwd-" + UUID.randomUUID());
+        user2.setName("User Two");
+        user2.setUsername("usertwo");
+        user2.setActivated(true);
+        user2 = users.saveAndFlush(user2);
+
+        ServerMember member2 = new ServerMember();
+        member2.setServerId(server.getId());
+        member2.setUserId(user2.getId());
+        member2.setNickname("TwoNick");
+        members.saveAndFlush(member2);
+
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.message").value("Call API success!"))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].id").isNumber())
+                .andExpect(jsonPath("$.data[0].serverId").value(server.getId()))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()))
+                .andExpect(jsonPath("$.data[0].name").value(reader.getName()))
+                .andExpect(jsonPath("$.data[0].nickname").value("Reader"))
+                .andExpect(jsonPath("$.data[0].role").value("OWNER"))
+                .andExpect(jsonPath("$.data[0].email").doesNotExist())
+                .andExpect(jsonPath("$.data[0].password").doesNotExist())
+                .andExpect(jsonPath("$.data[1].id").isNumber())
+                .andExpect(jsonPath("$.data[1].serverId").value(server.getId()))
+                .andExpect(jsonPath("$.data[1].userId").value(user2.getId()))
+                .andExpect(jsonPath("$.data[1].username").value("usertwo"))
+                .andExpect(jsonPath("$.data[1].name").value("User Two"))
+                .andExpect(jsonPath("$.data[1].nickname").value("TwoNick"))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"))
+                .andExpect(jsonPath("$.data[1].email").doesNotExist())
+                .andExpect(jsonPath("$.data[1].password").doesNotExist());
+    }
+
+    @Test
+    void memberReadsMembersList() throws Exception {
+        makeReaderOutsider();
+        addMembership(server.getId());
+
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].role").value("MEMBER"));
+    }
+
+    @Test
+    void outsiderIsForbiddenFromReadingMembers() throws Exception {
+        makeReaderOutsider();
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+    }
+
+    @Test
+    void missingJwtIsUnauthorizedForMembers() throws Exception {
+        problem(mvc.perform(get(membersUrl())), 401);
+    }
+
+    @Test
+    void missingServerIsNotFoundForMembers() throws Exception {
+        problem(mvc.perform(get("/api/v1/servers/" + Long.MAX_VALUE + "/members")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void nonNumericIdIsBadRequestForMembers() throws Exception {
+        problem(mvc.perform(get("/api/v1/servers/not-a-number/members")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
     private void readsDetail() throws Exception {
         mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
                 .andExpect(status().isOk())
@@ -296,6 +374,10 @@ class ServerSecurityIT {
 
     private String detailUrl() {
         return "/api/v1/servers/" + server.getId();
+    }
+
+    private String membersUrl() {
+        return "/api/v1/servers/" + server.getId() + "/members";
     }
 
     private String bearer() {

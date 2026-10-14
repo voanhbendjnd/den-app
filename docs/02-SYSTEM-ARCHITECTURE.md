@@ -159,7 +159,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
-| **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `TBD` |
+| **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `IMPLEMENTED` |
 | **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
 | **Message** | `GET` | `/api/channels/{channelId}/messages?before={id}&limit=30` | Lấy lịch sử Message (Cursor pagination) | `CONFIRMED` |
@@ -203,7 +203,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `POST /api/servers/{serverId}/invites`: Tạo invite code
 - `POST /api/invites/{code}/join`: Tham gia server qua code
 - `DELETE /api/invites/{code}`: Thu hồi invite code
-- `GET /api/servers/{serverId}/members`: Danh sách thành viên
+- `GET /api/v1/servers/{serverId}/members`: Danh sách thành viên (Owner/Member, `ServerMemberResponseDTO`)
 - `DELETE /api/servers/{serverId}/members/{userId}`: Kick thành viên
 - `PATCH /api/servers/{serverId}/members/{userId}/role`: Phân quyền `ADMIN`/`MEMBER` (Owner)
 

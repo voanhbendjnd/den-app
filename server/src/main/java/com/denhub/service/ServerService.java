@@ -13,6 +13,7 @@ import com.denhub.repository.ServerRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.CreateServerDTO;
+import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
 import org.springframework.http.HttpStatus;
@@ -21,7 +22,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -52,6 +58,47 @@ public class ServerService {
         response.setOwnerId(server.getOwnerId());
         response.setCreatedDate(server.getCreatedDate());
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServerMemberResponseDTO> getServerMembers(Long serverId) {
+        User currentUser = getActiveCurrentUser();
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
+
+        boolean isOwner = currentUser.getId().equals(server.getOwnerId());
+        if (!isOwner && !serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Bạn không có quyền xem danh sách thành viên của Server này");
+        }
+
+        List<ServerMember> members = serverMemberRepository.findAllByServerId(serverId);
+        if (members.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> userIds = members.stream().map(ServerMember::getUserId).toList();
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        return members.stream().map(member -> {
+            ServerMemberResponseDTO dto = new ServerMemberResponseDTO();
+            dto.setId(member.getId());
+            dto.setServerId(member.getServerId());
+            dto.setUserId(member.getUserId());
+            dto.setNickname(member.getNickname());
+
+            User user = userMap.get(member.getUserId());
+            if (user != null) {
+                dto.setUsername(user.getUsername());
+                dto.setName(user.getName());
+                dto.setAvatar(user.getAvatar());
+            }
+
+            dto.setRole(member.getUserId().equals(server.getOwnerId()) ? "OWNER" : "MEMBER");
+            return dto;
+        }).toList();
     }
 
     private User getActiveCurrentUser() {

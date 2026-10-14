@@ -5,6 +5,7 @@ const serverApi = {
   getAll: () => axiosClient.get('/v1/servers'),
   getById: (id) => axiosClient.get(`/v1/servers/${id}`),
   join: (serverId) => axiosClient.post(`/v1/servers/${serverId}/join`),
+  getMembers: (serverId) => axiosClient.get(`/v1/servers/${serverId}/members`),
 };
 
 export default serverApi;

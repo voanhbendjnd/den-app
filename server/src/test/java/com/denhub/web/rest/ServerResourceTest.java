@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.denhub.service.ServerService;
 import com.denhub.service.dto.CreateServerDTO;
+import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +53,33 @@ class ServerResourceTest {
                 .andExpect(jsonPath("$.name").value("Detail server"))
                 .andExpect(jsonPath("$.ownerId").value(100));
         org.mockito.Mockito.verify(serverService).getServerDetail(12L);
+    }
+
+    @Test
+    void getServerMembers_Success() throws Exception {
+        ServerMemberResponseDTO memberDto = new ServerMemberResponseDTO();
+        memberDto.setId(101L);
+        memberDto.setServerId(12L);
+        memberDto.setUserId(1L);
+        memberDto.setUsername("nam123");
+        memberDto.setName("Hoang Nam");
+        memberDto.setNickname("Nam Boss");
+        memberDto.setAvatar("https://example.test/avatar.png");
+        memberDto.setRole("OWNER");
+
+        when(serverService.getServerMembers(12L)).thenReturn(java.util.List.of(memberDto));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/servers/12/members"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(101))
+                .andExpect(jsonPath("$[0].serverId").value(12))
+                .andExpect(jsonPath("$[0].userId").value(1))
+                .andExpect(jsonPath("$[0].username").value("nam123"))
+                .andExpect(jsonPath("$[0].name").value("Hoang Nam"))
+                .andExpect(jsonPath("$[0].nickname").value("Nam Boss"))
+                .andExpect(jsonPath("$[0].avatar").value("https://example.test/avatar.png"))
+                .andExpect(jsonPath("$[0].role").value("OWNER"));
+        org.mockito.Mockito.verify(serverService).getServerMembers(12L);
     }
 
     @Test
