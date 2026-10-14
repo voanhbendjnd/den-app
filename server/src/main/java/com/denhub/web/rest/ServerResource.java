@@ -9,10 +9,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.denhub.service.ServerService;
 import com.denhub.service.dto.CreateServerDTO;
+import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/servers")
@@ -28,6 +31,12 @@ public class ServerResource {
     @Operation(summary = "Đọc chi tiết Server", description = "Lấy thông tin Server. Yêu cầu đăng nhập và là chủ sở hữu hoặc thành viên của Server.")
     public ResponseEntity<ServerResponseDTO> getServerDetail(@PathVariable("serverId") Long serverId) {
         return ResponseEntity.ok(serverService.getServerDetail(serverId));
+    }
+
+    @GetMapping("/{serverId}/members")
+    @Operation(summary = "Lấy danh sách thành viên của Server", description = "Lấy danh sách thành viên thuộc Server chỉ định. Yêu cầu đăng nhập và là thành viên hoặc chủ sở hữu Server.")
+    public ResponseEntity<List<ServerMemberResponseDTO>> getServerMembers(@PathVariable("serverId") Long serverId) {
+        return ResponseEntity.ok(serverService.getServerMembers(serverId));
     }
 
     @PostMapping

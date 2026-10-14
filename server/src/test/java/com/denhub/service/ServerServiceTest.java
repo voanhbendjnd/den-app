@@ -12,6 +12,7 @@ import com.denhub.repository.ServerMemberRepository;
 import com.denhub.repository.ServerRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.service.dto.CreateServerDTO;
+import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
 import org.junit.jupiter.api.BeforeEach;
@@ -364,5 +365,135 @@ class ServerServiceTest {
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
 
         assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+    }
+
+    @Test
+    void getServerMembers_Success_WhenOwner() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        ServerMember member1 = new ServerMember();
+        member1.setId(101L);
+        member1.setServerId(10L);
+        member1.setUserId(1L);
+        member1.setNickname("Owner Nick");
+
+        ServerMember member2 = new ServerMember();
+        member2.setId(102L);
+        member2.setServerId(10L);
+        member2.setUserId(2L);
+        member2.setNickname("Member Nick");
+
+        when(serverMemberRepository.findAllByServerId(10L)).thenReturn(java.util.List.of(member1, member2));
+
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setUsername("owner_user");
+        user1.setName("Owner Name");
+        user1.setAvatar("https://example.test/owner.png");
+
+        User user2 = new User();
+        user2.setId(2L);
+        user2.setUsername("member_user");
+        user2.setName("Member Name");
+        user2.setAvatar("https://example.test/member.png");
+
+        when(userRepository.findAllById(java.util.List.of(1L, 2L))).thenReturn(java.util.List.of(user1, user2));
+
+        java.util.List<ServerMemberResponseDTO> result = serverService.getServerMembers(10L);
+
+        assertThat(result).hasSize(2);
+
+        ServerMemberResponseDTO res1 = result.get(0);
+        assertThat(res1.getId()).isEqualTo(101L);
+        assertThat(res1.getServerId()).isEqualTo(10L);
+        assertThat(res1.getUserId()).isEqualTo(1L);
+        assertThat(res1.getUsername()).isEqualTo("owner_user");
+        assertThat(res1.getName()).isEqualTo("Owner Name");
+        assertThat(res1.getNickname()).isEqualTo("Owner Nick");
+        assertThat(res1.getAvatar()).isEqualTo("https://example.test/owner.png");
+        assertThat(res1.getRole()).isEqualTo("OWNER");
+
+        ServerMemberResponseDTO res2 = result.get(1);
+        assertThat(res2.getId()).isEqualTo(102L);
+        assertThat(res2.getServerId()).isEqualTo(10L);
+        assertThat(res2.getUserId()).isEqualTo(2L);
+        assertThat(res2.getUsername()).isEqualTo("member_user");
+        assertThat(res2.getName()).isEqualTo("Member Name");
+        assertThat(res2.getNickname()).isEqualTo("Member Nick");
+        assertThat(res2.getAvatar()).isEqualTo("https://example.test/member.png");
+        assertThat(res2.getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void getServerMembers_Success_WhenMember() {
+        prepareDetailRequest();
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+
+        ServerMember member = new ServerMember();
+        member.setId(201L);
+        member.setServerId(10L);
+        member.setUserId(1L);
+        member.setNickname("MemberNick");
+
+        when(serverMemberRepository.findAllByServerId(10L)).thenReturn(java.util.List.of(member));
+
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("user1");
+        user.setName("User One");
+
+        when(userRepository.findAllById(java.util.List.of(1L))).thenReturn(java.util.List.of(user));
+
+        java.util.List<ServerMemberResponseDTO> result = serverService.getServerMembers(10L);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void getServerMembers_EmptyList_WhenNoMembers() {
+        prepareDetailRequest();
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+        when(serverMemberRepository.findAllByServerId(10L)).thenReturn(java.util.Collections.emptyList());
+
+        java.util.List<ServerMemberResponseDTO> result = serverService.getServerMembers(10L);
+        assertThat(result).isEmpty();
+        verify(userRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void getServerMembers_RejectsOutsider() {
+        prepareDetailRequest();
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerMembers(10L));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(serverMemberRepository, never()).findAllByServerId(any());
+    }
+
+    @Test
+    void getServerMembers_RejectsMissingServer() {
+        prepareDetailUser();
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerMembers(10L));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        verify(serverMemberRepository, never()).findAllByServerId(any());
+    }
+
+    @Test
+    void getServerMembers_RejectsMissingAuthentication() {
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerMembers(10L));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(serverRepository, serverMemberRepository);
+    }
+
+    @Test
+    void getServerMembers_RejectsInactiveUser() {
+        User user = prepareDetailUser();
+        user.setActivated(false);
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerMembers(10L));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(serverRepository, serverMemberRepository);
     }
 }
