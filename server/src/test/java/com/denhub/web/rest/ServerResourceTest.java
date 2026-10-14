@@ -158,4 +158,44 @@ class ServerResourceTest {
                     .contentType(MediaType.APPLICATION_JSON))
         ).hasCauseInstanceOf(com.denhub.web.rest.errors.BadRequestAlertException.class);
     }
+
+    @Test
+    void createServerInvite_Success() throws Exception {
+        com.denhub.service.dto.ServerInviteResponseDTO inviteDto = new com.denhub.service.dto.ServerInviteResponseDTO();
+        inviteDto.setId(1L);
+        inviteDto.setServerId(12L);
+        inviteDto.setCode("aB7kX9mQ");
+        inviteDto.setCreatedBy(5L);
+        inviteDto.setStatus("ACTIVE");
+        inviteDto.setCreatedAt(java.time.Instant.parse("2026-10-14T14:30:00Z"));
+
+        when(serverService.createServerInvite(org.mockito.ArgumentMatchers.eq(12L), any())).thenReturn(inviteDto);
+
+        mockMvc.perform(post("/api/v1/servers/12/invites")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.serverId").value(12))
+                .andExpect(jsonPath("$.code").value("aB7kX9mQ"))
+                .andExpect(jsonPath("$.createdBy").value(5))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        org.mockito.Mockito.verify(serverService).createServerInvite(org.mockito.ArgumentMatchers.eq(12L), any());
+    }
+
+    @Test
+    void joinServerByInviteCode_Success() throws Exception {
+        ServerResponseDTO dto = new ServerResponseDTO();
+        dto.setId(25L);
+        dto.setName("Joined Server");
+
+        when(serverService.joinServerByInviteCode("abc12345")).thenReturn(dto);
+
+        mockMvc.perform(post("/api/v1/servers/join-invite/abc12345"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(25))
+                .andExpect(jsonPath("$.name").value("Joined Server"));
+
+        org.mockito.Mockito.verify(serverService).joinServerByInviteCode("abc12345");
+    }
 }
