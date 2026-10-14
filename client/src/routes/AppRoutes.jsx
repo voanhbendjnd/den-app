@@ -21,6 +21,7 @@ import MeetingsPage from '../pages/meetings/MeetingsPage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
 import ProfilePage from '../pages/profile/ProfilePage';
 import DirectMessagePage from '../pages/direct/DirectMessagePage';
+import FriendRequestPage from '../pages/direct/FriendRequestPage';
 
 // Admin pages
 import AdminUsersPage from '../pages/admin/AdminUsersPage';
@@ -55,6 +56,7 @@ export default function AppRoutes() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/direct" element={<DirectMessagePage />} />
           <Route path="/direct/:conversationId" element={<DirectMessagePage />} />
+          <Route path="/friends" element={<FriendRequestPage />} />
 
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>

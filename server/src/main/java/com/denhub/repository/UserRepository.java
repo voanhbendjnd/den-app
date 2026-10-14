@@ -1,8 +1,8 @@
 package com.denhub.repository;
 
 import com.denhub.service.projection.UsernameProjection;
+import org.jspecify.annotations.NonNull;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -21,7 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying
     @Query(value = "update User u set u.sessionId = :sessionId where u.id = :userId")
     int updateSessionIdById(@Param("userId") Long userId, @Param("sessionId") String sessionId);
-
     /*
      * Email must be lowed case before call method
      * */
@@ -53,4 +52,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 
     List<User> findByIdIn(List<Long> ids);
+
+    boolean existsById(@NonNull Long id);
+
 }
