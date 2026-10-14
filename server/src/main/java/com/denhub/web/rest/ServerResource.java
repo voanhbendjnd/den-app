@@ -9,8 +9,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.denhub.service.ServerService;
 import com.denhub.service.dto.CreateServerDTO;
+import com.denhub.service.dto.CreateServerInviteRequestDTO;
+import com.denhub.service.dto.ServerInviteResponseDTO;
 import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
+import com.denhub.util.anotation.ApiMessage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -58,5 +61,23 @@ public class ServerResource {
     public ResponseEntity<Void> joinServer(@PathVariable Long serverId) {
         serverService.joinServer(serverId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{serverId}/invites")
+    @ApiMessage("Tạo mã mời thành công")
+    @Operation(summary = "Tạo mã mời tham gia Server", description = "Tạo mã mời mới cho Server. Yêu cầu đăng nhập và chỉ Server Owner mới có quyền tạo.")
+    public ResponseEntity<ServerInviteResponseDTO> createServerInvite(
+            @PathVariable("serverId") Long serverId,
+            @RequestBody(required = false) @Valid CreateServerInviteRequestDTO dto) {
+        ServerInviteResponseDTO response = serverService.createServerInvite(serverId, dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/join-invite/{code}")
+    @ApiMessage("Tham gia Server bằng mã mời thành công")
+    @Operation(summary = "Tham gia Server bằng mã mời", description = "Cho phép người dùng tham gia vào Server bằng mã mời 8 ký tự hợp lệ. Yêu cầu đăng nhập.")
+    public ResponseEntity<ServerResponseDTO> joinServerByInviteCode(@PathVariable("code") String code) {
+        ServerResponseDTO response = serverService.joinServerByInviteCode(code);
+        return ResponseEntity.ok(response);
     }
 }
