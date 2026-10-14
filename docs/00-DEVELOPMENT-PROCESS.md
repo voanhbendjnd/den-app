@@ -292,6 +292,7 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+<<<<<<< HEAD
 | Module                       |     FE      |     BE      |                  DB                  |      Integration      |  Test  |               Status               | Last Update |
 | :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----: | :--------------------------------: | :---------: |
 | **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      | TESTED |            IN_PROGRESS             | 2026-10-11  |
@@ -304,11 +305,26 @@ _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoà
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Real-time (1-1)**          |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Search User & Friendship** |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
+=======
+| Module | FE | BE | DB | Integration | Test | Status | Last Update |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
+| **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | DONE | TESTED | DONE | 2026-10-13 |
+| **Server Detail — phần vỏ** | IMPLEMENTED | IMPLEMENTED | REUSED | TESTED (H2 / FE mock) | PASS | DONE (phạm vi đã duyệt) | 2026-10-13 |
+| **Server CRUD — sửa 6 bug** | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 6/6; còn apply schema thật | 2026-10-13 |
+| **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
+| **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-13 |
+| **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-14 |
+| **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
+| **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
+| **Search User & Friendship** | IMPLEMENTED | DONE | CONFIRMED | IMPLEMENTED | PASS (build) | IN_PROGRESS | 2026-10-14 |
+>>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
 ### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
+<<<<<<< HEAD
 | Công việc                                   | Trạng thái                                                 | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                      |
 | :------------------------------------------ | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Đọc chi tiết phần vỏ Server + FE            | DONE trong phạm vi code/H2/FE mock                         | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
@@ -321,6 +337,25 @@ Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trướ
 | Task 1.12 — UI nhập và gửi tin nhắn         | IN_PROGRESS                                                | Duy duyệt làm UI trước ngày 2026-10-11. Đã có GroupChatPage và MessageInput; 5 Node tests, 9 browser tests dùng mock PASS, build PASS. Chưa nối gửi thật; chờ dữ liệu Channel và xác nhận tích hợp.                                                                                                                            |
 | Task 1.12 / khung Group và ô nhập độc lập   | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
 | Task 1.08 — API lấy lịch sử tin nhắn + test | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
+=======
+| Công việc | Trạng thái | Bằng chứng / bước còn lại |
+| :--- | :--- | :--- |
+| Đọc chi tiết phần vỏ Server + FE | DONE trong phạm vi code/H2/FE mock | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
+| Sửa 6 bug Server CRUD | Release 6/6; còn apply schema audit SQL Server | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng, chặn tạo khi icon đang upload, bỏ upload cũ, Home loading/error/retry. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi. |
+| Đồng bộ docs theo prompt | DONE | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database. |
+| Xác minh schema SQL Server | DONE | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database. |
+| Task 1.07 — API gửi tin nhắn + test | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE. |
+| Task 1.07 / lượt 1A | DONE | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B. |
+| Task 1.07 / đồng bộ wrapper thành công | DONE | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE. |
+| Task 1.12 — UI nhập và gửi tin nhắn | IN_PROGRESS | Duy duyệt làm UI trước ngày 2026-10-11. Đã có GroupChatPage và MessageInput; 5 Node tests, 9 browser tests dùng mock PASS, build PASS. Chưa nối gửi thật; chờ dữ liệu Channel và xác nhận tích hợp. |
+| Task 1.12 / khung Group và ô nhập độc lập | DONE | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE. |
+| Task 1.08 — API lấy lịch sử tin nhắn + test | DONE | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%. |
+| FEAT-FRIEND-REQUEST-UI — UI danh sách lời mời kết bạn + Realtime | DONE | 5 file FE: `friendApi.js` bổ sung `getFriendRequests`; `useFriendRequests.js` STOMP + cursor pagination; `FriendRequestPage.jsx` UI đầy đủ; route `/friends`; menu Bạn Bè. `npm run build` PASS 3192 modules. Không thay backend. |
+| FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE) | DONE | `friendApi.js` (accept/remove endpoints); `useFriendRequests.js` (`acceptRequest`, `removeRequest`, `actionLoading`); `FriendRequestPage.jsx` (Nút Đồng ý Indigo Gradient, Từ chối Dark Glass, spin loading độc lập, toast thông báo). `npm run build` PASS 3192 modules. |
+| FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) + Sửa query Friendship (BE) | DONE | Sửa typo `:status <> 'PENDING'` trong `FriendshipRepository`; `friendApi.js` (`getAllFriends`); `useFriends.js` (cursor pagination, filter search); `FriendRequestPage.jsx` (Tabs Tất cả / Chờ xử lý, FriendCard, nút Nhắn tin Direct Message); `npm run build` PASS 3193 modules. |
+| FIX-CHAT-AUTO-SCROLL — Sửa lỗi không tự động cuộn xuống đáy khi mở đoạn chat (FE) | DONE | Điều khiển `scrollTop` trực tiếp trên container; double-RAF + fallback timeout; duy trì scroll position khi load previous messages; tối ưu `DirectMessagePage.jsx` và `ChatPage.jsx`. `npm run build` PASS 3193 modules. |
+| FEAT-REMOVE-FRIEND — Chức năng Hủy kết bạn (Unfriend) (FE) | DONE | `friendApi.js` (`removeFriend`); `useFriends.js` (`unfriend`, optimistic update, toast); `FriendRequestPage.jsx` (Nút Hủy kết bạn có Popconfirm); `npm run build` PASS 3193 modules. |
+>>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
 
 Chỉ đánh dấu `TESTED` khi đã thực sự chạy và vượt qua các kiểm thử phù hợp. Kiểm tra docs không thay thế test code hoặc integration test SQL Server.
 
@@ -337,8 +372,121 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+<<<<<<< HEAD
 ### [2026-10-13] FEAT-SERVER-MEMBER-LIST — API Lấy Danh Sách Thành Viên Server & Tests
 
+=======
+### [2026-10-14] FEAT-REMOVE-FRIEND — Hủy kết bạn (Unfriend) (FE)
+Implemented:
+- Frontend:
+  - Bổ sung `removeFriend(friendId)` vào `client/src/api/friendApi.js`: gọi `POST /api/friendships/remove-friend`.
+  - Cập nhật `client/src/hooks/useFriends.js`: Bổ sung hàm `unfriend(friendId)`, quản lý `unfriendLoading` map theo từng `friendId`, loại bỏ bạn bè khỏi state ngay khi thành công, thông báo toast `message.success('Đã hủy kết bạn thành công.')`.
+  - Cập nhật `client/src/pages/direct/FriendRequestPage.jsx`: Thêm nút "Hủy kết bạn" (`UserDeleteOutlined`) trên `FriendCard` tại Tab "Tất cả", bọc qua `Popconfirm` xác nhận trước khi hủy để chống bấm nhầm.
+- Tests & Verification:
+  - `npm run build`: **PASS 100%** (3193 modules transformed, 0 errors, built in 1.07s).
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung `POST /api/friendships/remove-friend` vào bảng REST API Architecture.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật bảng theo dõi & Work Log.
+- Git:
+  - Uncommitted changes (chờ người dùng ủy quyền commit).
+
+### [2026-10-14] FIX-CHAT-AUTO-SCROLL — Khắc phục lỗi Auto-scroll xuống đáy khi mở đoạn chat (FE)
+Implemented:
+- Frontend:
+  - Khắc phục `DirectMessagePage.jsx`:
+    - Thay thế `scrollIntoView({ behavior: 'smooth' })` vốn bị kẹt do layout reflow và xung đột container cha `Content` có `overflowY: auto`.
+    - Xây dựng hàm `scrollToBottom(behavior)` trực tiếp thao tác `containerRef.current.scrollTop = containerRef.current.scrollHeight`.
+    - Ứng dụng kỹ thuật Double-RAF kết hợp fallback timeout (50ms, 150ms, 300ms) khi tải trang 0 (`initial load`) để đảm bảo ảnh, avatar và bong bóng tin nhắn vừa tính xong layout thì container sẽ lập tức nằm ở đáy.
+    - Phân biệt rõ: khi mở đoạn chat mới thì cuộn tức thì (`auto`); khi có tin nhắn mới hoặc vừa gửi thì chỉ cuộn nếu người dùng đang ở gần đáy (`< 200px`); khi cuộn lên xem lịch sử tin nhắn cũ (`page > 0`) thì duy trì vị trí tương đối `newScrollHeight - prevScrollHeight` (không bị giật xuống đáy).
+  - Khắc phục `ChatPage.jsx`: Tối ưu instant scroll khi tải tin nhắn phòng chat lần đầu và dùng direct container scroll thay vì `scrollIntoView`.
+- Tests & Verification:
+  - `npm run build`: **PASS 100%** (3193 modules transformed, 0 errors, built in 1.12s).
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật bảng theo dõi & Work Log.
+- Git:
+  - Uncommitted changes (chờ người dùng ủy quyền commit).
+
+### [2026-10-14] FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) & Sửa Query Friendship (BE)
+Implemented:
+- Backend:
+  - Khắc phục typo trong query `FriendshipRepository.java`: đổi `status <> 'PEDING'` thành `:status <> 'PENDING'`. Đảm bảo quan hệ bạn bè 2 chiều với `ACCEPT` hiển thị đúng cho cả hai phía, không bị ẩn bởi `actionUserId`.
+  - Compile Java: `.\gradlew.bat compileJava` BUILD SUCCESSFUL.
+- Frontend:
+  - Bổ sung `getAllFriends(size, cursor)` vào `client/src/api/friendApi.js`: gọi `POST /api/friendships/all-friend`.
+  - Tạo mới `client/src/hooks/useFriends.js`: Hook quản lý danh sách bạn bè đã kết bạn, cursor pagination `hasMore`/`loadMore`, tìm kiếm lọc nhanh `searchQuery` (theo username hoặc tên hiển thị).
+  - Nâng cấp `client/src/pages/direct/FriendRequestPage.jsx`:
+    - Thêm Discord-style Navigation Tabs ("Tất cả" & "Chờ xử lý") với badge số lượng động.
+    - Tab "Tất cả": Input tìm kiếm bạn bè, Card bạn bè (`FriendCard`) với avatar gradient, tên, username, badge "Bạn bè", nút "Nhắn tin" (`MessageOutlined`) mở DM 1-1 qua `conversationApi` (navigate sang `/direct/:id` hoặc `/direct/new`).
+    - Tab "Chờ xử lý": Giữ nguyên danh sách lời mời kết bạn realtime (Websocket STOMP), nút Đồng ý / Từ chối; khi Đồng ý thì tự động trigger refresh Tab "Tất cả".
+- Tests & Verification:
+  - `npm run build`: **PASS 100%** (3193 modules transformed, 0 errors, built in 1.26s).
+  - `.\gradlew.bat compileJava`: **BUILD SUCCESSFUL**.
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Đồng bộ `POST /api/friendships/all-friend` vào bảng REST API.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật bảng theo dõi & Work Log.
+- Git:
+  - Uncommitted changes (chờ người dùng ủy quyền commit).
+
+### [2026-10-14] FIX-FRIEND-REQUEST-WEBSOCKET-REALTIME — Sửa lỗi WebSocket kết bạn realtime và thông báo toàn cục (FE + BE)
+Implemented:
+- Backend:
+  - Cập nhật `WebSocketConfig.java`: Trích xuất User ID từ JWT claim `user.id` (với fallback `jwt.getSubject()` email) để gán cho `Principal.getName()` trong phiên STOMP. Khắc phục triệt để lỗi Spring UserDestinationResolver không khớp session khiến gói tin private queue bị drop.
+  - Cập nhật `NotificationFriendshipRequest.java`: Thêm cơ chế gửi kép (dual-delivery) gửi tới cả `targetId.toString()` và email fallback thông qua `UserRepository.findById(targetId)`.
+- Frontend:
+  - Tạo mới `client/src/hooks/useGlobalFriendNotification.jsx`: Lắng nghe toàn cục `/user/queue/friend-requests/received` và `/user/queue/friend-requests/accepted` trên toàn ứng dụng thông qua `MainLayout`. Hiển thị popup Ant Design Notification (`notification.open`) với avatar, tên người gửi và nút "Xem lời mời" dẫn tới `/friends`.
+  - Cập nhật `client/src/layouts/MainLayout.jsx`: Tích hợp `useGlobalFriendNotification()`, theo dõi số lượng lời mời kết bạn chưa đọc và hiển thị badge đỏ trên mục menu "Bạn Bè" (`/friends`).
+  - Cập nhật `client/src/hooks/useFriendRequests.js`: Tách hàm `handleIncomingRequest` dùng chung, lắng nghe cả WebSocket frame lẫn custom DOM event `denhub:friend-request-received` để cập nhật danh sách lời mời ngay lập tức kèm hiệu ứng highlight.
+  - Cập nhật `client/src/hooks/useFriends.js`: Lắng nghe event `denhub:friend-request-accepted` để tự động làm mới danh sách bạn bè khi đối phương chấp nhận lời mời mà không cần reload trang.
+- Tests & Verification:
+  - Backend Unit Tests: Tạo mới `NotificationFriendshipRequestTest.java` (3 test cases kiểm thử dual-delivery cho cả User ID và Email, và xử lý khi không tìm thấy user).
+  - `.\gradlew.bat test`: **BUILD SUCCESSFUL** (100% tests passed, 51s).
+  - Frontend Build: `npm run build`: **PASS 100%** (3194 modules transformed, built in 996ms, exit code 0).
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung ghi chú cơ chế xác thực WebSocket Principal và Private Queue Routing.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật Work Log.
+- Git:
+  - Uncommitted changes (chờ người dùng ủy quyền commit).
+  - Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-14] FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE)
+Implemented:
+- Frontend:
+  - Bổ sung `acceptFriendRequest(friendId)` và `removeFriendRequest(friendId)` vào `client/src/api/friendApi.js`: gọi `POST /api/friendships/accept-friend-request` và `POST /api/friendships/remove-friend-request`.
+  - Cập nhật `client/src/hooks/useFriendRequests.js`: Bổ sung state `actionLoadingMap` theo từng `senderId`; hiện thực `acceptRequest(senderId)` và `removeRequest(senderId)` cập nhật optimistic danh sách, hiển thị toast `message.success` / `message.info` / `message.error`.
+  - Cập nhật `client/src/pages/direct/FriendRequestPage.jsx`: Thêm 2 nút hành động "Đồng ý" (CheckOutlined, Gradient Indigo Cyan) và "Từ chối" (CloseOutlined, Ghost Glass border) trên từng card, gắn loading spinner riêng từng item, disabled khi đang có action đang chạy.
+- Backend: Đã kiểm tra business rules tại `FriendshipController` và `FriendshipService`:
+  - `acceptFriendRequest`: Cảnh báo và khuyến nghị backend cần thêm authorization check (`currentFs.actionUserId != currentUserId`) để ngăn sender tự accept friend request của chính mình.
+  - `removeFriendRequest`: Hoạt động đúng business rule hủy/từ chối khi trạng thái là PENDING cho cả sender và receiver.
+- Tests & Verification:
+  - `npm run build`: **PASS 100%** (3192 modules transformed, built in 24.55s, 0 errors, exit code 0).
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Đồng bộ 3 REST API endpoints của Friendship (`/friend-requests`, `/accept-friend-request`, `/remove-friend-request`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật bảng theo dõi & Work Log.
+- Git:
+  - Uncommitted changes (chờ người dùng ủy quyền commit).
+
+### [2026-10-14] FEAT-FRIEND-REQUEST-UI — Giao diện danh sách lời mời kết bạn + Realtime (FE)
+Implemented:
+- Frontend:
+  - Bổ sung `getFriendRequests(size, cursor)` vào `client/src/api/friendApi.js`: gọi `POST /api/friendships/friend-requests` theo contract `FriendshipController` hiện có.
+  - Tạo mới `client/src/hooks/useFriendRequests.js`: Hook quản lý kết nối STOMP WebSocket độc lập, subscribe `/user/queue/friend-requests/received`, nhận `FriendshipAction` realtime và inject vào đầu danh sách; load lần đầu qua API, cursor pagination bằng `cursorRef`.
+  - Tạo mới `client/src/pages/direct/FriendRequestPage.jsx`: Page danh sách lời mời kết bạn với avatar, tên, username, thời gian tương đối (dayjs vi); badge "Mới" + highlight viền glowing + shimmer animation khi lời mời nhảy vào realtime; WS status tag (Realtime/Đang kết nối); nút Load thêm cursor pagination; empty state và initial loading.
+  - Cập nhật `client/src/routes/AppRoutes.jsx`: Đăng ký route `/friends` trong ProtectedRoute → `FriendRequestPage`.
+  - Cập nhật `client/src/layouts/MainLayout.jsx`: Bổ sung `TeamOutlined` import, thêm mục menu "Bạn Bè" (`/friends`) vào `secondaryMenuItems`; cập nhật `selectedKeys` highlight đúng khi ở `/friends`.
+- Backend: Không thay đổi — `FriendshipController`, `FriendshipService`, `NotificationFriendshipRequest` đã đầy đủ.
+- Tests Added / Updated: Không thêm test (chỉ FE, không thay đổi backend). Verification:
+  - `npm run build`: **PASS 100%** (3192 modules transformed, 0 errors, exit code 0).
+  - PRE-EXISTING ISSUE: chunk >500 kB và Ant Design warnings có sẵn từ trước, không mở rộng phạm vi sửa.
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md` (Updated tiến độ & Work Log).
+- Git:
+  - Uncommitted changes (chờ người dùng ủy quyền commit).
+  - Not pushed — AI agents are not allowed to push DenHub.
+
+---
+
+### [2026-10-14] FEAT-MESSAGE-HISTORY-API — Làm API lấy lịch sử tin nhắn Channel (Cursor Pagination) + Test
+>>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
 Implemented:
 
 - Backend:

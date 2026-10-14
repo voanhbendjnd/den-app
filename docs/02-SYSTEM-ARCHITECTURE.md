@@ -146,6 +146,11 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | :--- | :---: | :--- | :--- | :---: |
 | **Search** | `GET` | `/api/users/search?username={q}` | Tìm kiếm danh sách người dùng theo username | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/requests` | Gửi yêu cầu kết bạn (hoặc chấp nhận nếu đã có pended req) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/friend-requests` | Lấy danh sách lời mời kết bạn nhận được (Cursor time pagination) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/accept-friend-request` | Chấp nhận lời mời kết bạn | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/remove-friend-request` | Hủy gửi yêu cầu kết bạn hoặc từ chối lời mời kết bạn | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/all-friend` | Lấy danh sách tất cả bạn bè đã kết bạn (Cursor time pagination) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/remove-friend` | Hủy kết bạn (Unfriend) giữa hai người dùng đã kết bạn | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
@@ -255,6 +260,10 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 | `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Nhận thông báo lời mời kết bạn được chấp nhận | `CONFIRMED` |
 | `/user/queue/direct-messages` | `SUBSCRIBE` | Nhận tin nhắn riêng tư 1-1 gửi trực tiếp cho người dùng | `TBD` |
 | `/user/queue/errors` | `SUBSCRIBE` | Nhận thông báo lỗi thời gian thực cá nhân | `TBD` |
+
+> [!NOTE]
+> **Định danh WebSocket Principal & Private Queue Routing:**  
+> Trong `WebSocketConfig`, STOMP `Principal.getName()` được trích xuất từ JWT claim `user.id` (dạng chuỗi, fallback về `jwt.getSubject()` email) để các lệnh `convertAndSendToUser(userId, ...)` như trong `NotificationFriendshipRequest` có thể định tuyến chính xác vào session của người nhận. Đồng thời, `NotificationFriendshipRequest` thực hiện dual-delivery (gửi cho cả numeric User ID và email) để đảm bảo 100% không bị thất lạc sự kiện.
 
 ### 6.3 Định dạng WebSocket Payload gửi lên 1-1 (`SendMessageReq`) (`CONFIRMED`)
 ```json

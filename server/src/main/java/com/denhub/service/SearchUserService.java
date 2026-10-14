@@ -22,7 +22,7 @@ public class SearchUserService {
     }
 
     public List<UsernameProjection> searchByUsername(String username){
-        Long currentUserId = SecurityUtils.getCurrentUserIdOrNull();
+        Long currentUserId = SecurityUtils.getCurrentUserIdAtHolder();
         if(currentUserId == null) {
             throw new AccessDeniedException("You are not logged in");
         }

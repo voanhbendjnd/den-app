@@ -145,6 +145,19 @@ export default function DirectMessagePage() {
 
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
+  const isInitialLoadRef = useRef(true);
+  const prevScrollHeightRef = useRef(0);
+
+  // ── Hàm cuộn xuống đáy container tin nhắn ─────────────────────────────
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (behavior === 'smooth') {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
 
   // Người kia (cho trường hợp "new" conversation chưa tạo)
   const targetUser = location.state?.targetUser ?? null;
@@ -208,14 +221,34 @@ export default function DirectMessagePage() {
   // ── Load lịch sử tin nhắn ─────────────────────────────────────────────
   async function loadMessages(convId, pageNum) {
     setMsgLoading(true);
+    const container = containerRef.current;
+    if (pageNum > 0 && container) {
+      prevScrollHeightRef.current = container.scrollHeight;
+    }
+
     try {
       const res = await conversationApi.getMessages(convId, pageNum, 30);
       const paged = res.data?.data ?? res.data;
       const items = paged?.content ?? paged ?? [];
       if (pageNum === 0) {
         setMessages(items);
+        isInitialLoadRef.current = true;
+        // Tự động cuộn xuống đáy ngay lập tức khi mở đoạn chat (kèm fallback để chờ paint/ảnh)
+        requestAnimationFrame(() => {
+          scrollToBottom('auto');
+          setTimeout(() => scrollToBottom('auto'), 50);
+          setTimeout(() => scrollToBottom('auto'), 150);
+          setTimeout(() => scrollToBottom('auto'), 300);
+        });
       } else {
         setMessages((prev) => [...items, ...prev]);
+        // Giữ nguyên vị trí cuộn khi tải thêm tin nhắn cũ phía trên
+        requestAnimationFrame(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+          }
+        });
       }
       setHasMore(!(paged?.last ?? items.length < 30));
     } catch {
@@ -254,14 +287,25 @@ export default function DirectMessagePage() {
     setMessages([]);
     setPage(0);
     setHasMore(true);
+    isInitialLoadRef.current = true;
     loadMessages(found.conversationId, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetId, conversations]);
 
-  // ── Auto-scroll bottom ─────────────────────────────────────────────────
+  // ── Auto-scroll khi có tin nhắn mới (chỉ cuộn nếu đang ở gần đáy) ──────
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    const isNearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+    if (isNearBottom) {
+      scrollToBottom('smooth');
+    }
+  }, [messages, scrollToBottom]);
 
   // ── Load more (scroll up) ──────────────────────────────────────────────
   const handleScroll = async () => {
@@ -298,6 +342,7 @@ export default function DirectMessagePage() {
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimistic]);
+    requestAnimationFrame(() => scrollToBottom('smooth'));
 
     try {
       sendDM(payload);
@@ -351,6 +396,7 @@ export default function DirectMessagePage() {
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, optimistic]);
+      requestAnimationFrame(() => scrollToBottom('smooth'));
     } catch {
       antMessage.error('Upload ảnh thất bại.');
     } finally {
@@ -434,13 +480,7 @@ export default function DirectMessagePage() {
                     </Text>
                   </div>
                   {/* WebSocket status */}
-                  <Tag
-                      color={connected ? 'success' : 'default'}
-                      icon={connected ? <WifiOutlined /> : <DisconnectOutlined />}
-                      style={{ borderRadius: 20, fontSize: 11, padding: '0 8px' }}
-                  >
-                    {connected ? 'Live' : 'Offline'}
-                  </Tag>
+
                 </div>
 
                 {/* Messages area */}
