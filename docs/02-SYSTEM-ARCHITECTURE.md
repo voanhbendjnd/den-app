@@ -163,6 +163,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/invites` | Tạo mã mời Server mới (duy nhất Owner) | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
 | **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `IMPLEMENTED` |
 | **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
@@ -205,8 +206,8 @@ Hiện trạng đã đọc từ source sau gộp:
 - `PATCH /api/servers/{serverId}`: Cập nhật tên/ảnh server (Owner)
 - `DELETE /api/servers/{serverId}`: Xóa server (Owner)
 - `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
-- `POST /api/servers/{serverId}/invites`: Tạo invite code
-- `POST /api/invites/{code}/join`: Tham gia server qua code
+- `POST /api/v1/servers/{serverId}/invites`: Tạo invite code (duy nhất Server Owner, mã 8 ký tự Base62 an toàn, trả `ServerInviteResponseDTO` trong wrapper `RestResponse`)
+- `POST /api/v1/servers/join-invite/{code}`: Tham gia server qua invite code (Người dùng đã đăng nhập, trả `ServerResponseDTO` trong wrapper `RestResponse`)
 - `DELETE /api/invites/{code}`: Thu hồi invite code
 - `GET /api/v1/servers/{serverId}/members`: Danh sách thành viên (Owner/Member, `ServerMemberResponseDTO`)
 - `DELETE /api/servers/{serverId}/members/{userId}`: Kick thành viên

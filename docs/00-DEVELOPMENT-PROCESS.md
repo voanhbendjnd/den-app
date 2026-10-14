@@ -296,7 +296,7 @@ _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoà
 | Module                       |     FE      |     BE      |                  DB                  |      Integration      |  Test  |               Status               | Last Update |
 | :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----: | :--------------------------------: | :---------: |
 | **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      | TESTED |            IN_PROGRESS             | 2026-10-11  |
-| **Server & Invite**          | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |         DONE          | TESTED |                DONE                | 2026-10-13  |
+| **Server & Invite**          |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |  PASS  |                DONE                | 2026-10-14  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |  PASS  |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |  PASS  | Release 6/6; còn apply schema thật | 2026-10-13  |
 | **Member & Role**            |    TODO     | IMPLEMENTED |             IMPLEMENTED              |         DONE          | TESTED |            IN_PROGRESS             | 2026-10-13  |
@@ -373,6 +373,82 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 ## 11. COMPLETED WORK LOG
 
 <<<<<<< HEAD
+### [2026-10-14] FEAT-SERVER-INVITE-CREATE-FE — UI Tạo & Sao Chép Mã Mời Server
+
+Implemented:
+
+- Frontend API Service (`client/src/api/serverApi.js`):
+  - Bổ sung hàm `createInvite(serverId, data)` gọi endpoint `POST /api/v1/servers/{serverId}/invites` sử dụng `axiosClient` hiện có (với JWT interceptor, chuẩn wrapper `RestResponse`).
+- Utilities (`client/src/utils/serverInvite.js`):
+  - `copyToClipboard(text)`: Sử dụng `navigator.clipboard.writeText` với fallback `document.execCommand('copy')` an toàn, validation chặt chẽ, không ghi mã vào console/log.
+  - `getInviteErrorMessage(err)`: Ánh xạ chuẩn các mã lỗi RFC 9457 / HTTP Status (401: phiên hết hạn, 403: không có quyền (chỉ Owner), 404: server không tồn tại, 400: dữ liệu không hợp lệ, 500 / Network Error: thử lại sau) mà không làm lộ stack trace nội bộ.
+  - `formatExpiresAt(expiresAt)`: Định dạng ngày hết hạn rõ ràng bằng tiếng Việt hoặc hiển thị "Không thời hạn" khi `expiresAt` là null.
+- Component Modal (`client/src/components/common/ServerInviteModal.jsx`):
+  - Thiết kế theo phong cách Cyber Dark / Glassmorphism của DenHub và Ant Design.
+  - Phân tách rõ ràng các trạng thái: Chưa tạo, Đang gọi API (`loading` trên nút, chống gửi lặp lại `submittingRef`), Đã tạo thành công (hiển thị mã 8 ký tự với font monospace rõ ràng, nút sao chép chuyển màu xanh lá và icon check khi hoàn tất, tag trạng thái `ACTIVE`, thời hạn), và Trạng thái lỗi (hiển thị Alert kèm nút "Thử lại").
+  - Hỗ trợ tạo lại mã mới nếu cần mà không giả định thu hồi mã cũ.
+  - Tự động reset trạng thái khi chuyển Server (`server?.id`).
+- Tích hợp giao diện (`client/src/pages/chat/GroupChatPage.jsx` & `group-chat.css`):
+  - Bổ sung nút truy cập "Mời" trong Sidebar bên cạnh đường dẫn Tổng quan (`.group-sidebar-invite-btn`).
+  - Bổ sung nút "Mời thành viên" dạng icon button trong Header (`.group-header-invite-btn`).
+  - Bổ sung nút "Mời thành viên" trong bảng thành viên `MembersPanel` (`.group-members-invite-btn`).
+  - Kiểm soát phân quyền phía client: Chỉ hiển thị các nút thao tác tạo mã mời khi người dùng hiện tại là Chủ Server (`isOwner = String(server.ownerId) === String(currentUser.id)`).
+  - Tích hợp mượt mà trong cả chế độ desktop và mobile Drawer (`channelsOpen`, `membersOpen`).
+- Tests Added:
+  - `client/tests/serverInvite.test.mjs`: 7 unit tests bao phủ:
+    - `getInviteErrorMessage` (401, 403, 404, 400, network error, generic error).
+    - `formatExpiresAt` (null, undefined, ISO timestamp).
+    - `copyToClipboard` (validate input, navigator.clipboard success, clipboard failure handling).
+  - Cập nhật `client/package.json` bổ sung script `npm test` chạy toàn bộ 20 client unit tests tự động.
+- Verification (thực thi thực tế):
+  - `npm test`: **PASS 20/20** (Node native test runner).
+  - `npm run build`: **PASS** (Vite production bundle xây dựng thành công 0 lỗi).
+  - `.\gradlew.bat test --no-daemon`: **PASS** (Toàn bộ test suite backend).
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật mục 10 và 11.
+- Git Status:
+  - Uncommitted changes (Chờ người dùng ủy quyền commit).
+- Push:
+  - Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-14] FEAT-SERVER-INVITE-CREATE — API Tạo Mã Mời Server & Tests
+
+Implemented:
+
+- Backend:
+  - Tạo mới `Invite.java`: Entity ánh xạ bảng `invites` (`id`, `serverId`, `code`, `createdBy`, `expiresAt`, `status`, `createdAt`) theo đúng `docs/03-DATABASE-DESIGN.md` mục 3.5.
+  - Tạo mới `InviteStatus.java`: Enum trạng thái mã mời (`ACTIVE`, `REVOKED`).
+  - Tạo mới `InviteRepository.java`: Hỗ trợ `existsByCode`, `findByCode`, `findAllByServerId`.
+  - Tạo mới DTOs: `CreateServerInviteRequestDTO` (nhận tùy chọn `expiresAt`) và `ServerInviteResponseDTO` (trả về mã mời an toàn, không lộ thông tin nhạy cảm).
+  - Cập nhật `ServerService.java`:
+    - Bổ sung `createServerInvite(serverId, dto)` với transaction `@Transactional`.
+    - Xác thực người dùng qua JWT/Security Context, kiểm tra `activated = true`.
+    - Kiểm tra Server tồn tại (404 nếu không tìm thấy).
+    - Phân quyền nghiêm ngặt: Chỉ Server Owner (`server.getOwnerId().equals(currentUser.getId())`) mới có quyền tạo mã mời (403 nếu không phải Owner).
+    - Validate `expiresAt`: không được ở trong quá khứ (400 nếu vi phạm).
+    - Cơ chế sinh mã an toàn: `SecureRandom` kết hợp bảng ký tự Base62 sinh mã 8 ký tự với entropy $62^8 \approx 2.18 \times 10^{14}$ chống đoán mã. Xử lý trùng lặp tự động retry tối đa 5 lần.
+  - Cập nhật `ServerResource.java`: Bổ sung endpoint `POST /api/v1/servers/{serverId}/invites` với `@ApiMessage("Tạo mã mời thành công")` và HTTP Status `201 Created`.
+- Pre-existing Issue Fixed:
+  - `SearchUserServiceTest.java`: Cập nhật mock `searchByUsername` thêm tham số `currentUserId` và gắn SecurityContext fixture phù hợp với thay đổi từ PR trước trên `develop`.
+- Tests Added / Updated:
+  - `ServerServiceTest.java`: Bổ sung 10 unit tests bao phủ: Owner tạo thành công, tạo với custom `expiresAt`, từ chối non-owner (403), từ chối server không tồn tại (404), từ chối serverId không hợp lệ (400), từ chối `expiresAt` trong quá khứ (400), retry khi mã trùng, fail khi retry quá số lần (500), từ chối unauthenticated (401), từ chối inactive user (401).
+  - `ServerResourceTest.java`: Bổ sung 1 unit test `createServerInvite_Success` kiểm thử HTTP 201 và ánh xạ DTO.
+  - `ServerSecurityIT.java`: Bổ sung 9 integration tests toàn chuỗi với JWT/H2 thật: Owner tạo thành công với response wrapper `RestResponse` (`statusCode: 201`, `message`, `error: null`), lưu bản ghi vào DB, custom `expiresAt`, past `expiresAt` (400), member thường bị cấm (403), outsider bị cấm (403), thiếu JWT (401), server không tồn tại (404), non-numeric ID (400), và kiểm chứng ràng buộc `DataIntegrityViolationException` khi trùng mã trên persistence layer.
+- Verification (thực thi thực tế):
+  - `.\gradlew.bat compileJava test check --no-daemon`: **PASS 100%** (Toàn bộ test suite backend và build check).
+  - `npm run build`: **PASS 100%** (Vite production build 0 errors).
+  - `node --test tests/serverJoin.test.mjs tests/messageInput.test.mjs`: **PASS 13/13**.
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật tiến độ & Completed Work Log.
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Cập nhật endpoint `POST /api/v1/servers/{serverId}/invites` sang `IMPLEMENTED`.
+- Git Status:
+  - Uncommitted changes (Chờ người dùng ủy quyền commit).
+- Push:
+  - Not pushed — AI agents are not allowed to push DenHub.
+
+=======
+<<<<<<< HEAD
+>>>>>>> 8867d204a17499abfe4d1436c51b19a04d511e0f
 ### [2026-10-13] FEAT-SERVER-MEMBER-LIST — API Lấy Danh Sách Thành Viên Server & Tests
 
 =======
@@ -1840,8 +1916,46 @@ Related Docs:
   - AGENTS.md
   - docs/00-DEVELOPMENT-PROCESS.md
   - docs/01-PROJECT-OVERVIEW.md
+### Handoff TASK: AUDIT-SERVER-FLOW & REFACTOR (2026-10-14)
+
+```yaml
+Current Task: TASK: AUDIT-SERVER-FLOW — Kiểm Tra Tổng Thể, Tìm Lỗ Hổng & Tái Cấu Trúc Luồng Server
+Status: HOÀN TẤT TRIỂN KHAI & TESTS GREEN
+Completed:
+  - Audit tổng thể luồng Server (Tạo Server, Tham gia Server, Danh sách thành viên, Tạo mã mời, Sử dụng mã mời, UI modal).
+  - Lập và lưu trữ 3 Artifacts: SERVER-FLOW-AUDIT.md, SERVER-FLOW-TARGET-DESIGN.md, SERVER-FLOW-IMPLEMENTATION-PLAN.md.
+  - Sửa AUDIT-001: Implement endpoint POST /api/v1/servers/join-invite/{code} trong ServerResource và ServerService với đầy đủ kiểm tra (mã tồn tại, ACTIVE, chưa hết hạn, chưa là thành viên).
+  - Sửa AUDIT-003 (BR-SRV-02): Khởi tạo tự động Channel mặc định '#general' (position 0) ngay khi tạo Server trong ServerService.createServer.
+  - Sửa AUDIT-004: Thêm trường role (VARCHAR 20, default MEMBER/OWNER) và joinedAt (DATETIME2) vào ServerMember entity.
+  - Sửa AUDIT-007: Đồng bộ độ dài Server name lên NVARCHAR(100) trong Server entity và CreateServerDTO.
+  - Frontend: Thêm serverApi.joinByInvite(code); nâng cấp serverJoin.js hỗ trợ cả invite code và server ID; nâng cấp JoinServerModal.jsx để cho phép tham gia bằng mã mời hoặc ID.
+  - Tests:
+    - Backend: 230+ tests PASS (ServerServiceTest, ServerResourceTest, ServerSecurityIT).
+    - Frontend: 25 tests PASS (node --test serverInvite.test.mjs serverJoin.test.mjs messageInput.test.mjs).
+    - Client build: PASS (vite build thành công 0 errors).
+Files Changed In This Task:
+  - server/src/main/java/com/denhub/domain/ServerMember.java
+  - server/src/main/java/com/denhub/domain/Server.java
+  - server/src/main/java/com/denhub/domain/Channel.java
+  - server/src/main/java/com/denhub/service/dto/CreateServerDTO.java
+  - server/src/main/java/com/denhub/service/ServerService.java
+  - server/src/main/java/com/denhub/web/rest/ServerResource.java
+  - server/src/test/java/com/denhub/service/ServerServiceTest.java
+  - server/src/test/java/com/denhub/web/rest/ServerResourceTest.java
+  - server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java
+  - client/src/api/serverApi.js
+  - client/src/utils/serverJoin.js
+  - client/tests/serverJoin.test.mjs
+  - client/src/components/common/JoinServerModal.jsx
   - docs/02-SYSTEM-ARCHITECTURE.md
-  - docs/02-SYSTEM-ARCHITECTURE.md
+  - docs/00-DEVELOPMENT-PROCESS.md
+Verification Scope:
+  - ./gradlew.bat test --rerun --no-daemon (PASS 100%)
+  - npm test (PASS 25/25)
+  - npm run build (PASS)
+Git Status:
+  - Sẵn sàng review git diff; chờ lệnh cho phép commit nếu người dùng yêu cầu.
+  - Tuân thủ quy định: AI Agent tuyệt đối KHÔNG PUSH.
 ```
 
 ---

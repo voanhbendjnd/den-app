@@ -46,6 +46,12 @@ class ServerServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.denhub.repository.InviteRepository inviteRepository;
+
+    @Mock
+    private com.denhub.repository.ChannelRepository channelRepository;
+
     @InjectMocks
     private ServerService serverService;
 
@@ -495,5 +501,297 @@ class ServerServiceTest {
                 () -> serverService.getServerMembers(10L));
         assertThat(error.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verifyNoInteractions(serverRepository, serverMemberRepository);
+    }
+
+    @Test
+    void createServerInvite_Success_WhenOwner() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        when(inviteRepository.existsByCode(anyString())).thenReturn(false);
+        when(inviteRepository.save(any(com.denhub.domain.Invite.class))).thenAnswer(invocation -> {
+            com.denhub.domain.Invite inv = invocation.getArgument(0);
+            inv.setId(999L);
+            return inv;
+        });
+
+        com.denhub.service.dto.ServerInviteResponseDTO result = serverService.createServerInvite(10L, null);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(999L);
+        assertThat(result.getServerId()).isEqualTo(10L);
+        assertThat(result.getCode()).hasSize(8);
+        assertThat(result.getCreatedBy()).isEqualTo(1L);
+        assertThat(result.getExpiresAt()).isNull();
+        assertThat(result.getStatus()).isEqualTo("ACTIVE");
+        assertThat(result.getCreatedAt()).isNotNull();
+
+        verify(inviteRepository).save(any(com.denhub.domain.Invite.class));
+    }
+
+    @Test
+    void createServerInvite_Success_WithCustomExpiresAt() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        Instant future = Instant.now().plusSeconds(3600);
+        com.denhub.service.dto.CreateServerInviteRequestDTO dto = new com.denhub.service.dto.CreateServerInviteRequestDTO();
+        dto.setExpiresAt(future);
+
+        when(inviteRepository.existsByCode(anyString())).thenReturn(false);
+        when(inviteRepository.save(any(com.denhub.domain.Invite.class))).thenAnswer(invocation -> {
+            com.denhub.domain.Invite inv = invocation.getArgument(0);
+            inv.setId(1001L);
+            return inv;
+        });
+
+        com.denhub.service.dto.ServerInviteResponseDTO result = serverService.createServerInvite(10L, dto);
+
+        assertThat(result.getExpiresAt()).isEqualTo(future);
+        verify(inviteRepository).save(any(com.denhub.domain.Invite.class));
+    }
+
+    @Test
+    void createServerInvite_RejectsNonOwner() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(2L); // Different user is owner
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, null));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(inviteRepository, never()).save(any());
+    }
+
+    @Test
+    void createServerInvite_RejectsMissingServer() {
+        prepareDetailUser();
+        when(serverRepository.findById(10L)).thenReturn(Optional.empty());
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, null));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        verify(inviteRepository, never()).save(any());
+    }
+
+    @Test
+    void createServerInvite_RejectsInvalidServerId() {
+        ResponseStatusException error1 = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(null, null));
+        assertThat(error1.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException error2 = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(0L, null));
+        assertThat(error2.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException error3 = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(-5L, null));
+        assertThat(error3.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createServerInvite_RejectsPastExpiresAt() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        Instant past = Instant.now().minusSeconds(3600);
+        com.denhub.service.dto.CreateServerInviteRequestDTO dto = new com.denhub.service.dto.CreateServerInviteRequestDTO();
+        dto.setExpiresAt(past);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, dto));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(inviteRepository, never()).save(any());
+    }
+
+    @Test
+    void createServerInvite_RetriesOnCodeCollision() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        // First attempt collides, second attempt succeeds
+        when(inviteRepository.existsByCode(anyString())).thenReturn(true).thenReturn(false);
+        when(inviteRepository.save(any(com.denhub.domain.Invite.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.denhub.service.dto.ServerInviteResponseDTO result = serverService.createServerInvite(10L, null);
+
+        assertThat(result).isNotNull();
+        verify(inviteRepository, times(2)).existsByCode(anyString());
+        verify(inviteRepository).save(any(com.denhub.domain.Invite.class));
+    }
+
+    @Test
+    void createServerInvite_FailsWhenAllCandidatesCollide() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        // All 5 attempts collide
+        when(inviteRepository.existsByCode(anyString())).thenReturn(true);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, null));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        verify(inviteRepository, times(5)).existsByCode(anyString());
+        verify(inviteRepository, never()).save(any());
+    }
+
+    @Test
+    void createServerInvite_RejectsMissingAuthentication() {
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, null));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(serverRepository, inviteRepository);
+    }
+
+    @Test
+    void createServerInvite_RejectsInactiveUser() {
+        User user = prepareDetailUser();
+        user.setActivated(false);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, null));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(serverRepository, inviteRepository);
+    }
+
+    @Test
+    void createServer_CreatesServerMemberAndDefaultGeneralChannel() {
+        prepareDetailUser();
+
+        when(serverRepository.save(any(Server.class))).thenAnswer(inv -> {
+            Server s = inv.getArgument(0);
+            s.setId(99L);
+            return s;
+        });
+        when(serverMemberRepository.save(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(channelRepository.save(any(com.denhub.domain.Channel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        com.denhub.service.dto.CreateServerDTO dto = new com.denhub.service.dto.CreateServerDTO();
+        dto.setName("My Study Server");
+        dto.setIconUrl("https://example.test/icon.png");
+
+        ServerResponseDTO response = serverService.createServer(dto);
+
+        assertThat(response.getId()).isEqualTo(99L);
+        assertThat(response.getName()).isEqualTo("My Study Server");
+        assertThat(response.getOwnerId()).isEqualTo(1L);
+
+        // Verify ServerMember saved as OWNER
+        org.mockito.ArgumentCaptor<ServerMember> memberCaptor = org.mockito.ArgumentCaptor.forClass(ServerMember.class);
+        verify(serverMemberRepository).save(memberCaptor.capture());
+        ServerMember savedMember = memberCaptor.getValue();
+        assertThat(savedMember.getServerId()).isEqualTo(99L);
+        assertThat(savedMember.getUserId()).isEqualTo(1L);
+        assertThat(savedMember.getRole()).isEqualTo("OWNER");
+
+        // Verify default channel #general saved
+        org.mockito.ArgumentCaptor<com.denhub.domain.Channel> channelCaptor = org.mockito.ArgumentCaptor.forClass(com.denhub.domain.Channel.class);
+        verify(channelRepository).save(channelCaptor.capture());
+        com.denhub.domain.Channel savedChannel = channelCaptor.getValue();
+        assertThat(savedChannel.getServerId()).isEqualTo(99L);
+        assertThat(savedChannel.getName()).isEqualTo("general");
+        assertThat(savedChannel.getPosition()).isEqualTo(0);
+    }
+
+    @Test
+    void joinServerByInviteCode_Success() {
+        prepareDetailUser();
+
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setId(5L);
+        invite.setServerId(10L);
+        invite.setCode("valid123");
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(2L);
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setName("Target Server");
+        server.setOwnerId(2L);
+
+        when(inviteRepository.findByCode("valid123")).thenReturn(Optional.of(invite));
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+        when(serverMemberRepository.save(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ServerResponseDTO result = serverService.joinServerByInviteCode(" valid123 ");
+
+        assertThat(result.getId()).isEqualTo(10L);
+        assertThat(result.getName()).isEqualTo("Target Server");
+
+        org.mockito.ArgumentCaptor<ServerMember> captor = org.mockito.ArgumentCaptor.forClass(ServerMember.class);
+        verify(serverMemberRepository).save(captor.capture());
+        ServerMember saved = captor.getValue();
+        assertThat(saved.getServerId()).isEqualTo(10L);
+        assertThat(saved.getUserId()).isEqualTo(1L);
+        assertThat(saved.getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void joinServerByInviteCode_RejectsBlankCode() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServerByInviteCode("   "));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void joinServerByInviteCode_RejectsNonExistentInvite() {
+        prepareDetailUser();
+        when(inviteRepository.findByCode("notfound")).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServerByInviteCode("notfound"));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void joinServerByInviteCode_RejectsRevokedInvite() {
+        prepareDetailUser();
+
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setCode("revoked1");
+        invite.setStatus("REVOKED");
+
+        when(inviteRepository.findByCode("revoked1")).thenReturn(Optional.of(invite));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServerByInviteCode("revoked1"));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void joinServerByInviteCode_RejectsExpiredInvite() {
+        prepareDetailUser();
+
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setCode("expired1");
+        invite.setStatus("ACTIVE");
+        invite.setExpiresAt(Instant.now().minusSeconds(3600));
+
+        when(inviteRepository.findByCode("expired1")).thenReturn(Optional.of(invite));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServerByInviteCode("expired1"));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void joinServerByInviteCode_RejectsAlreadyMember() {
+        prepareDetailUser();
+
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setCode("already1");
+        invite.setStatus("ACTIVE");
+        invite.setServerId(10L);
+
+        Server server = new Server();
+        server.setId(10L);
+
+        when(inviteRepository.findByCode("already1")).thenReturn(Optional.of(invite));
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServerByInviteCode("already1"));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 }

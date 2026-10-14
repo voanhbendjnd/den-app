@@ -22,8 +22,8 @@ public class Server extends AbstractAuditingEntity<Long> implements Serializable
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Length(max = 20, min = 1)
-    @Column(nullable = false, length = 20, columnDefinition = "NVARCHAR(20)")
+    @Length(max = 100, min = 1)
+    @Column(nullable = false, length = 100, columnDefinition = "NVARCHAR(100)")
     private String name;
     @Column(name = "icon_url", length = 255)
     private String iconUrl;

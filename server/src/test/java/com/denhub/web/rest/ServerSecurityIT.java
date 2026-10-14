@@ -35,6 +35,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.mockito.Mockito.doThrow;
@@ -52,6 +53,7 @@ class ServerSecurityIT {
     @Autowired private UserRepository users;
     @Autowired private ServerRepository servers;
     @MockitoSpyBean private ServerMemberRepository members;
+    @Autowired private com.denhub.repository.InviteRepository invites;
     @Autowired private EntityManager entityManager;
 
     private User reader;
@@ -333,6 +335,210 @@ class ServerSecurityIT {
                 .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
     }
 
+    @Test
+    void ownerCreatesInviteSuccessfully() throws Exception {
+        mvc.perform(post(invitesUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.statusCode").value(201))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.message").value("Tạo mã mời thành công"))
+                .andExpect(jsonPath("$.data.id").isNumber())
+                .andExpect(jsonPath("$.data.serverId").value(server.getId()))
+                .andExpect(jsonPath("$.data.code").isString())
+                .andExpect(jsonPath("$.data.createdBy").value(reader.getId()))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.expiresAt").value(nullValue()))
+                .andExpect(jsonPath("$.data.createdAt").isString());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertEquals(1, invites.findAllByServerId(server.getId()).size());
+        com.denhub.domain.Invite saved = invites.findAllByServerId(server.getId()).get(0);
+        assertEquals(8, saved.getCode().length());
+        assertEquals("ACTIVE", saved.getStatus());
+        assertEquals(reader.getId(), saved.getCreatedBy());
+    }
+
+    @Test
+    void ownerCreatesInviteWithCustomExpiresAt() throws Exception {
+        String body = "{\"expiresAt\": \"2030-01-01T00:00:00Z\"}";
+        mvc.perform(post(invitesUrl())
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.statusCode").value(201))
+                .andExpect(jsonPath("$.data.expiresAt").value("2030-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void ownerCreatesInviteWithPastExpiresAtIsBadRequest() throws Exception {
+        String body = "{\"expiresAt\": \"2020-01-01T00:00:00Z\"}";
+        problem(mvc.perform(post(invitesUrl())
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)), 400);
+    }
+
+    @Test
+    void memberIsForbiddenFromCreatingInvite() throws Exception {
+        makeReaderOutsider();
+        addMembership(server.getId());
+        problem(mvc.perform(post(invitesUrl()).header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+    }
+
+    @Test
+    void outsiderIsForbiddenFromCreatingInvite() throws Exception {
+        makeReaderOutsider();
+        problem(mvc.perform(post(invitesUrl()).header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+    }
+
+    @Test
+    void missingJwtIsUnauthorizedForCreatingInvite() throws Exception {
+        problem(mvc.perform(post(invitesUrl())), 401);
+    }
+
+    @Test
+    void missingServerIsNotFoundForCreatingInvite() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/" + Long.MAX_VALUE + "/invites")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void nonNumericIdIsBadRequestForCreatingInvite() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/not-a-number/invites")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+    @Test
+    void uniqueConstraintOnInviteCodeWorks() {
+        com.denhub.domain.Invite inv1 = new com.denhub.domain.Invite();
+        inv1.setServerId(server.getId());
+        inv1.setCode("UNIQUE123");
+        inv1.setCreatedBy(reader.getId());
+        inv1.setStatus("ACTIVE");
+        invites.saveAndFlush(inv1);
+
+        com.denhub.domain.Invite inv2 = new com.denhub.domain.Invite();
+        inv2.setServerId(server.getId());
+        inv2.setCode("UNIQUE123");
+        inv2.setCreatedBy(reader.getId());
+        inv2.setStatus("ACTIVE");
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> {
+            invites.saveAndFlush(inv2);
+        });
+    }
+
+    @Test
+    void joinServerByInviteCode_Success() throws Exception {
+        User rawJoiner = new User();
+        rawJoiner.setEmail("joiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawJoiner.setPassword("fixture-" + UUID.randomUUID());
+        rawJoiner.setName("Joiner User");
+        rawJoiner.setActivated(true);
+        rawJoiner.setSessionId(UUID.randomUUID().toString());
+        final User joiner = users.saveAndFlush(rawJoiner);
+
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("joinMe12");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        invites.saveAndFlush(inv);
+
+        mvc.perform(post("/api/v1/servers/join-invite/joinMe12")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.id").value(server.getId()))
+                .andExpect(jsonPath("$.data.name").value(server.getName()));
+
+        assertEquals(true, members.existsByServerIdAndUserId(server.getId(), joiner.getId()));
+        List<ServerMember> serverMembers = members.findAllByServerId(server.getId());
+        ServerMember joinedMember = serverMembers.stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .findFirst().orElseThrow();
+        assertEquals("MEMBER", joinedMember.getRole());
+    }
+
+    @Test
+    void joinServerByInviteCode_Expired_Returns400() throws Exception {
+        User joiner = new User();
+        joiner.setEmail("joiner2-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("Joiner User 2");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("expiredCode");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        inv.setExpiresAt(Instant.now().minusSeconds(100));
+        invites.saveAndFlush(inv);
+
+        problem(mvc.perform(post("/api/v1/servers/join-invite/expiredCode")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner))), 400);
+    }
+
+    @Test
+    void joinServerByInviteCode_Revoked_Returns400() throws Exception {
+        User joiner = new User();
+        joiner.setEmail("joiner3-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("Joiner User 3");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("revokedCode");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("REVOKED");
+        invites.saveAndFlush(inv);
+
+        problem(mvc.perform(post("/api/v1/servers/join-invite/revokedCode")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner))), 400);
+    }
+
+    @Test
+    void joinServerByInviteCode_NotFound_Returns404() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/join-invite/nonexistentCode")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void joinServerByInviteCode_AlreadyMember_Returns400() throws Exception {
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("memberJoin");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        invites.saveAndFlush(inv);
+
+        addMembership(server.getId());
+
+        problem(mvc.perform(post("/api/v1/servers/join-invite/memberJoin")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+    @Test
+    void joinServerByInviteCode_MissingJwt_Returns401() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/join-invite/anyCode")), 401);
+    }
+
+    private String bearerFor(User user) {
+        JwtClaimsSet claims = JwtClaimsSet.builder().subject(user.getEmail())
+                .issuedAt(Instant.now().minusSeconds(1200)).expiresAt(Instant.now().plusSeconds(600))
+                .claim("sessionId", user.getSessionId()).claim("authorities", List.of("ROLE_USER")).build();
+        return "Bearer " + encoder.encode(JwtEncoderParameters.from(
+                JwsHeader.with(SecurityUtils.JWT_ALGORITHM).build(), claims)).getTokenValue();
+    }
+
     private void readsDetail() throws Exception {
         mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
                 .andExpect(status().isOk())
@@ -378,6 +584,10 @@ class ServerSecurityIT {
 
     private String membersUrl() {
         return "/api/v1/servers/" + server.getId() + "/members";
+    }
+
+    private String invitesUrl() {
+        return "/api/v1/servers/" + server.getId() + "/invites";
     }
 
     private String bearer() {

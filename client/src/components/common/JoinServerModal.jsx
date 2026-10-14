@@ -3,11 +3,11 @@ import { Modal, Form, Input, Button, Typography, message } from 'antd';
 import {
   CompassOutlined,
   CloseOutlined,
-  NumberOutlined,
+  QrcodeOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
 import serverApi from '../../api/serverApi';
-import { validateServerId, parseServerId, getJoinErrorMessage } from '../../utils/serverJoin';
+import { validateJoinInput, parseJoinInput, getJoinErrorMessage } from '../../utils/serverJoin';
 
 const { Title, Text } = Typography;
 
@@ -33,16 +33,16 @@ export default function JoinServerModal({ open, onClose, onSuccess }) {
   const handleSubmit = async (values) => {
     if (submittingRef.current || loading) return;
 
-    const rawId = values.serverId;
-    const validationErr = validateServerId(rawId);
+    const rawInput = values.serverInput || values.serverId;
+    const validationErr = validateJoinInput(rawInput);
     if (validationErr) {
       message.error(validationErr);
       return;
     }
 
-    const serverId = parseServerId(rawId);
-    if (!serverId) {
-      message.error('Mã Server ID không hợp lệ.');
+    const parsed = parseJoinInput(rawInput);
+    if (!parsed) {
+      message.error('Mã mời hoặc Server ID không hợp lệ.');
       return;
     }
 
@@ -50,10 +50,19 @@ export default function JoinServerModal({ open, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      await serverApi.join(serverId);
+      let joinedServer = null;
+      if (parsed.type === 'inviteCode') {
+        const response = await serverApi.joinByInvite(parsed.value);
+        joinedServer = response?.data?.data || response?.data;
+      } else {
+        const response = await serverApi.join(parsed.value);
+        joinedServer = response?.data?.data || response?.data;
+      }
+
       message.success('Tham gia không gian Server thành công!');
+      const targetServerId = joinedServer?.id || (parsed.type === 'serverId' ? parsed.value : null);
       if (onSuccess) {
-        onSuccess(serverId);
+        onSuccess(targetServerId);
       }
       handleClose();
     } catch (err) {
@@ -138,7 +147,7 @@ export default function JoinServerModal({ open, onClose, onSuccess }) {
             Tham Gia Server
           </Title>
           <Text style={{ color: '#94A3B8', fontSize: 13, display: 'block', maxWidth: 360, margin: '0 auto' }}>
-            Nhập mã định danh (Server ID) của không gian bạn muốn tham gia để bắt đầu kết nối.
+            Nhập mã mời hoặc ID của Server bạn muốn tham gia để bắt đầu kết nối.
           </Text>
         </div>
 
@@ -151,16 +160,16 @@ export default function JoinServerModal({ open, onClose, onSuccess }) {
             requiredMark={false}
           >
             <Form.Item
-              name="serverId"
+              name="serverInput"
               label={
                 <Text style={{ color: '#CBD5E1', fontSize: 13, fontWeight: 600 }}>
-                  MÃ SERVER (SERVER ID) <span style={{ color: '#F43F5E' }}>*</span>
+                  MÃ MỜI HOẶC SERVER ID <span style={{ color: '#F43F5E' }}>*</span>
                 </Text>
               }
               rules={[
                 {
                   validator: (_, value) => {
-                    const err = validateServerId(value);
+                    const err = validateJoinInput(value);
                     if (err) return Promise.reject(new Error(err));
                     return Promise.resolve();
                   },
@@ -169,8 +178,8 @@ export default function JoinServerModal({ open, onClose, onSuccess }) {
               style={{ marginBottom: 24 }}
             >
               <Input
-                prefix={<NumberOutlined style={{ color: '#64748B', marginRight: 6 }} />}
-                placeholder="Ví dụ: 10"
+                prefix={<QrcodeOutlined style={{ color: '#64748B', marginRight: 6 }} />}
+                placeholder="Ví dụ: aB9xK2Lm hoặc 10"
                 disabled={loading}
                 autoFocus
                 size="large"
@@ -199,7 +208,7 @@ export default function JoinServerModal({ open, onClose, onSuccess }) {
               }}
             >
               <Text style={{ color: '#818CF8', fontSize: 13, lineHeight: '18px' }}>
-                💡 <strong>Mẹo:</strong> Bạn có thể hỏi bạn bè hoặc quản trị viên mã Server ID để tham gia nhanh chóng.
+                💡 <strong>Mẹo:</strong> Bạn có thể dán liên kết mời hoặc mã mời gồm 8 ký tự (ví dụ: <code style={{ color: '#00F2FE' }}>aB9xK2Lm</code>) để tham gia Server.
               </Text>
             </div>
 
