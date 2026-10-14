@@ -266,6 +266,108 @@ class MessageSecurityIT {
         assertEquals(body.path("message"), body.path("detail"));
     }
 
+    @Test
+    void getMessagesSuccessReturnsSortedMessagesWhenMember() throws Exception {
+        Message m1 = new Message();
+        m1.setChannelId(channel.getId());
+        m1.setAuthorId(sender.getId());
+        m1.setContent("First message");
+        m1 = messages.saveAndFlush(m1);
+
+        Message m2 = new Message();
+        m2.setChannelId(channel.getId());
+        m2.setAuthorId(sender.getId());
+        m2.setContent("Second message");
+        m2 = messages.saveAndFlush(m2);
+
+        Message m3 = new Message();
+        m3.setChannelId(channel.getId());
+        m3.setAuthorId(sender.getId());
+        m3.setContent("Third message");
+        m3 = messages.saveAndFlush(m3);
+
+        mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.message").value("Lấy lịch sử tin nhắn thành công"))
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items[0].id").value(m3.getId()))
+                .andExpect(jsonPath("$.data.items[0].content").value("Third message"))
+                .andExpect(jsonPath("$.data.items[1].id").value(m2.getId()))
+                .andExpect(jsonPath("$.data.items[1].content").value("Second message"))
+                .andExpect(jsonPath("$.data.items[2].id").value(m1.getId()))
+                .andExpect(jsonPath("$.data.items[2].content").value("First message"))
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").value(nullValue()))
+                .andExpect(jsonPath("$.data.limit").value(30));
+    }
+
+    @Test
+    void getMessagesPaginationWithBeforeAndLimit() throws Exception {
+        Message m1 = new Message();
+        m1.setChannelId(channel.getId());
+        m1.setAuthorId(sender.getId());
+        m1.setContent("Message 1");
+        m1 = messages.saveAndFlush(m1);
+
+        Message m2 = new Message();
+        m2.setChannelId(channel.getId());
+        m2.setAuthorId(sender.getId());
+        m2.setContent("Message 2");
+        m2 = messages.saveAndFlush(m2);
+
+        Message m3 = new Message();
+        m3.setChannelId(channel.getId());
+        m3.setAuthorId(sender.getId());
+        m3.setContent("Message 3");
+        m3 = messages.saveAndFlush(m3);
+
+        mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .param("before", String.valueOf(m3.getId()))
+                        .param("limit", "1")
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(m2.getId()))
+                .andExpect(jsonPath("$.data.items[0].content").value("Message 2"))
+                .andExpect(jsonPath("$.data.hasMore").value(true))
+                .andExpect(jsonPath("$.data.nextCursor").value(m2.getId()))
+                .andExpect(jsonPath("$.data.limit").value(1));
+    }
+
+    @Test
+    void getMessagesForbiddenWhenUserNotMember() throws Exception {
+        User outsider = new User();
+        outsider.setEmail("outsider-" + UUID.randomUUID() + "@example.test");
+        outsider.setPassword("password");
+        outsider.setName("Outsider");
+        outsider.setActivated(true);
+        outsider.setSessionId(UUID.randomUUID().toString());
+        outsider = users.saveAndFlush(outsider);
+
+        String outsiderToken = "Bearer " + tokenForUser(outsider);
+
+        problem(mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .header(HttpHeaders.AUTHORIZATION, outsiderToken)), 403);
+    }
+
+    @Test
+    void getMessagesUnauthorizedWhenNoToken() throws Exception {
+        mvc.perform(get("/api/channels/{channelId}/messages", channel.getId()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getMessagesBadRequestWhenLimitOutOfRange() throws Exception {
+        problem(mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .param("limit", "150")
+                        .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+
     private void reject(Long channelId, String body, int status) throws Exception {
         problem(mvc.perform(request(channelId, body).header(HttpHeaders.AUTHORIZATION, bearer())), status);
         assertNoMessageSaved();
@@ -300,6 +402,14 @@ class MessageSecurityIT {
         JwtClaimsSet claims = JwtClaimsSet.builder().subject(sender.getEmail())
                 .issuedAt(Instant.now().minusSeconds(1200)).expiresAt(expiry)
                 .claim("sessionId", sessionId).claim("authorities", authorities).build();
+        return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(SecurityUtils.JWT_ALGORITHM).build(), claims))
+                .getTokenValue();
+    }
+
+    private String tokenForUser(User user) {
+        JwtClaimsSet claims = JwtClaimsSet.builder().subject(user.getEmail())
+                .issuedAt(Instant.now().minusSeconds(1200)).expiresAt(Instant.now().plusSeconds(600))
+                .claim("sessionId", user.getSessionId()).claim("authorities", List.of("ROLE_USER")).build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(SecurityUtils.JWT_ALGORITHM).build(), claims))
                 .getTokenValue();
     }

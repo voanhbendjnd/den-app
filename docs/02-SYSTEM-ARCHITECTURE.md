@@ -162,8 +162,9 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `IMPLEMENTED` |
 | **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
-| **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message (có pagination) | `TBD` |
-| **Message** | `DELETE`| `/api/v1/servers/{serverId}/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
+| **Message** | `GET` | `/api/channels/{channelId}/messages?before={id}&limit=30` | Lấy lịch sử Message (Cursor pagination) | `CONFIRMED` |
+| **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message server cũ | `TBD` |
+| **Message** | `DELETE`| `/api/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
 | **Channel** | `POST` | `/api/v1/channels` | Tạo mới một Channel trong Server (yêu cầu là Owner/Member) | `CONFIRMED` |
 | **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `CONFIRMED` |
 | **Media / File** | `POST` | `/api/v1/files/upload` | Tải lên file ảnh (multipart/form-data) nhận URL tĩnh | `CONFIRMED` |
@@ -411,7 +412,47 @@ Request DTO chỉ có content để client không chọn người gửi; Respons
 2. Vì sao 2000 emoji `😀` được chấp nhận còn thêm một chữ `a` bị 400?
 3. Vì sao JPA/H2 pass nhưng database SQL Server cũ vẫn cần được kiểm tra hai cột audit?
 
-Dừng tại phạm vi POST; chờ Duy trả lời và yêu cầu tiếp tục trước API GET hoặc frontend.
+### 7.7 API Lấy lịch sử tin nhắn Channel — Cursor Pagination (`IMPLEMENTED`)
+
+Endpoint: `GET /api/channels/{channelId}/messages?before={id}&limit=30`
+
+- **Xác thực & Phân quyền:** Yêu cầu Bearer JWT hợp lệ, tài khoản activated, Channel tồn tại và người dùng là thành viên Server (`ServerMember`) hoặc Owner.
+- **Tham số truy vấn:**
+  - `before` (Long, optional): Con trỏ ID tin nhắn (lấy các tin có ID nhỏ hơn con trỏ này, phục vụ cuộn lên tải tin cũ).
+  - `limit` (Integer, optional, mặc định 30): Số lượng tin nhắn tối đa mỗi trang (chấp nhận 1 đến 100).
+- **Thứ tự:** Sắp xếp ID giảm dần (mới nhất trước).
+- **Response Format (Thành công 200 OK):**
+  Wrapper `ResFormatResponse` bọc `CursorPageResponse<MessageResponse>` trong `data`:
+  ```json
+  {
+    "statusCode": 200,
+    "error": null,
+    "message": "Lấy lịch sử tin nhắn thành công",
+    "data": {
+      "items": [
+        {
+          "id": 105,
+          "channelId": 5,
+          "senderId": 2,
+          "content": "Nội dung tin nhắn",
+          "createdAt": "2026-10-10T07:30:00Z"
+        }
+      ],
+      "nextCursor": 101,
+      "hasMore": true,
+      "limit": 30
+    }
+  }
+  ```
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `channelId` <= 0, `limit` ngoài khoảng 1..100, hoặc `before` <= 0.
+  - `401 Unauthorized`: Chưa đăng nhập hoặc token không hợp lệ / tài khoản chưa kích hoạt.
+  - `403 Forbidden`: Người dùng không phải thành viên của Server chứa Channel.
+  - `404 Not Found`: Không tìm thấy Channel.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 11 unit tests kiểm thử thành công, default limit, hasMore, nextCursor, kênh rỗng, và toàn bộ các mã lỗi 400/401/403/404.
+  - `MessageResourceIT`: 4 standalone MockMvc tests kiểm thử response code, JSON paths wrapper và Problem Details.
+  - `MessageSecurityIT`: 5 SpringBootTest integration tests với JWT encoder và JPA/H2 thật kiểm thử sắp xếp giảm dần, phân trang `before`, chặn 401 khi thiếu token, chặn 403 khi không phải member, chặn 400 khi limit sai.
 
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 

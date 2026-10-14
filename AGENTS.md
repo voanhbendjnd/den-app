@@ -57,6 +57,7 @@ Before planning or modifying application code, the agent **MUST** read:
 3. [`docs/01-PROJECT-OVERVIEW.md`](./docs/01-PROJECT-OVERVIEW.md)
 4. [`docs/02-SYSTEM-ARCHITECTURE.md`](./docs/02-SYSTEM-ARCHITECTURE.md)
 5. [`docs/03-DATABASE-DESIGN.md`](./docs/03-DATABASE-DESIGN.md)
+6. [`docs/04-FRONTEND-DESIGN.md`](./docs/04-FRONTEND-DESIGN.md)
 
 The agent must then inspect the existing source code related to the requested task.
 
@@ -105,7 +106,7 @@ What currently exists in the project related to the task.
 ## Related Documentation
 Relevant sections from:
 - Project Overview
-- System Architecture
+- System Architecture (Jhipster)
 - Database Design
 
 ## Files Expected to Change
@@ -160,11 +161,9 @@ The agent **MUST NOT**:
 until the user explicitly approves the plan.
 
 Examples of approval:
-- "OK"
-- "Làm đi"
-- "Duyệt"
 - "Proceed"
 - "Implement"
+- "Làm đi nô lệ của anh"
 
 If the user requests changes to the plan:
 ```
@@ -185,6 +184,8 @@ Use:
   $\longrightarrow$ FE, BE, REST API, DTO, Security, JWT, WebSocket
 - [`docs/03-DATABASE-DESIGN.md`](./docs/03-DATABASE-DESIGN.md)  
   $\longrightarrow$ Entity, field, relationship, SQL Server, MongoDB, constraint, index
+- [`docs/04-FRONTEND-DESIGN.md`](./docs/04-FRONTEND-DESIGN.md)  
+  $\longrightarrow$ FE, UI, UX, Component, Page, Ant Design, Tailwind CSS, Cyber Glassmorphism, Discord
 - [`docs/00-DEVELOPMENT-PROCESS.md`](./docs/00-DEVELOPMENT-PROCESS.md)  
   $\longrightarrow$ Development workflow, progress, handoff, testing rules
 

@@ -47,9 +47,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(value = """
         select u.id as id, u.username as username, u.email as email, u.name as name, u.avatar as avatar
            from User u
-               where u.username like concat('',:q,'%')
+               where u.username like concat('',:q,'%') and u.id <> :currentUserId
     """)
-    List<UsernameProjection> searchByUsername(@Param("q") String q);
+    List<UsernameProjection> searchByUsername(@Param("q") String q, @Param("currentUserId") Long currentUserId);
 
 
     List<User> findByIdIn(List<Long> ids);
