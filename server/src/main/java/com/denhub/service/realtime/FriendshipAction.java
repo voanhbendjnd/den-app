@@ -14,4 +14,7 @@ public class FriendshipAction {
     String username;
     String name;
     String avatar;
+    String lastModifiedDate;
+    String event;
+    String status;
 }

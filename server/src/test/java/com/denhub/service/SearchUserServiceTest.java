@@ -2,10 +2,12 @@ package com.denhub.service;
 
 import com.denhub.repository.UserRepository;
 import com.denhub.service.projection.UsernameProjection;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -20,24 +22,25 @@ class SearchUserServiceTest {
     private UserRepository userRepository;
 
     private SearchUserService searchUserService;
+    private MockedStatic<com.denhub.security.SecurityUtils> securityUtilsMockedStatic;
 
     @BeforeEach
     void setUp() {
         searchUserService = new SearchUserService(userRepository);
-        org.springframework.security.oauth2.jwt.Jwt jwt = mock(org.springframework.security.oauth2.jwt.Jwt.class);
-        lenient().when(jwt.getClaim("user")).thenReturn(java.util.Map.of("id", 1L));
-        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
-            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(jwt, "token")
-        );
+        securityUtilsMockedStatic = mockStatic(com.denhub.security.SecurityUtils.class);
     }
 
-    @org.junit.jupiter.api.AfterEach
+    @AfterEach
     void tearDown() {
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        if (securityUtilsMockedStatic != null) {
+            securityUtilsMockedStatic.close();
+        }
     }
 
     @Test
     void searchByUsername_NullOrBlank_ReturnsEmptyList() {
+        securityUtilsMockedStatic.when(com.denhub.security.SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
         assertThat(searchUserService.searchByUsername(null)).isEmpty();
         assertThat(searchUserService.searchByUsername("")).isEmpty();
         assertThat(searchUserService.searchByUsername("   ")).isEmpty();
@@ -46,6 +49,8 @@ class SearchUserServiceTest {
 
     @Test
     void searchByUsername_ValidUsername_ReturnsResults() {
+        securityUtilsMockedStatic.when(com.denhub.security.SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
         UsernameProjection projection = mock(UsernameProjection.class);
         lenient().when(projection.getId()).thenReturn(10L);
         lenient().when(projection.getUsername()).thenReturn("john_doe");

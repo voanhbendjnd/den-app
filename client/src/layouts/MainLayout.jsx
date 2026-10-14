@@ -10,6 +10,7 @@ import {
     HomeOutlined,
     MessageOutlined,
     CompassOutlined,
+    TeamOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import CreateServerModal from '../components/common/CreateServerModal';
@@ -17,11 +18,14 @@ import JoinServerModal from '../components/common/JoinServerModal';
 import CreateChannelModal from '../components/common/CreateChannelModal';
 import serverApi from '../api/serverApi';
 import conversationApi from '../api/conversationApi';
+import { useGlobalFriendNotification } from '../hooks/useGlobalFriendNotification';
 
 const { Sider, Content } = Layout;
 const { Text } = Typography;
 
 export default function MainLayout() {
+    useGlobalFriendNotification();
+    const [pendingFriendCount, setPendingFriendCount] = useState(0);
     const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -47,6 +51,20 @@ export default function MainLayout() {
             conversationsRequest.current += 1;
         };
     }, []);
+
+    useEffect(() => {
+        const handleReceived = () => setPendingFriendCount((prev) => prev + 1);
+        window.addEventListener('denhub:friend-request-received', handleReceived);
+        return () => {
+            window.removeEventListener('denhub:friend-request-received', handleReceived);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (location.pathname === '/friends') {
+            setPendingFriendCount(0);
+        }
+    }, [location.pathname]);
 
     const fetchConversations = async () => {
         const request = ++conversationsRequest.current;
@@ -118,6 +136,29 @@ export default function MainLayout() {
             key: '/direct',
             icon: <MessageOutlined style={{ fontSize: 16 }} />,
             label: <Link to="/direct" style={{ fontWeight: 600 }}>Tin Nhắn Trực Tiếp</Link>
+        },
+        {
+            key: '/friends',
+            icon: <TeamOutlined style={{ fontSize: 16 }} />,
+            label: (
+                <Link to="/friends" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Bạn Bè</span>
+                    {pendingFriendCount > 0 && (
+                        <span style={{
+                            background: '#EF4444',
+                            color: '#fff',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '1px 6px',
+                            borderRadius: 10,
+                            lineHeight: '14px',
+                            marginLeft: 8,
+                        }}>
+                            {pendingFriendCount}
+                        </span>
+                    )}
+                </Link>
+            )
         },
     ];
 
@@ -372,9 +413,13 @@ export default function MainLayout() {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
                     {/* Nav Items */}
                     <div style={{ padding: '16px 8px 8px' }}>
-                        <Menu
+                    <Menu
                             mode="inline"
-                            selectedKeys={[location.pathname.startsWith('/direct') ? '/direct' : location.pathname]}
+                            selectedKeys={[
+                                location.pathname.startsWith('/direct') ? '/direct'
+                                : location.pathname === '/friends' ? '/friends'
+                                : location.pathname
+                            ]}
                             items={secondaryMenuItems}
                             style={{ borderRight: 0, background: 'transparent' }}
                         />
