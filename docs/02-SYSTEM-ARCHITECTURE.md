@@ -160,7 +160,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Server** | `GET` | `/api/v1/servers` | Lấy danh sách Server mà User là Member / Owner | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers` | Tạo một Server mới | `CONFIRMED` |
 | **Server** | `GET` | `/api/v1/servers/{serverId}` | Đọc thông tin phần vỏ Server; Owner/Member, contract mục 9 | `IMPLEMENTED` |
-| **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
+| **Server** | `PUT` | `/api/v1/servers/{serverId}` | Owner cập nhật tên/ảnh Server, contract mục 11 | `IMPLEMENTED` |
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/invites` | Tạo mã mời Server mới (duy nhất Owner) | `IMPLEMENTED` |
@@ -203,7 +203,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/servers`: Lấy danh sách server người dùng tham gia
 - `POST /api/servers`: Tạo server mới (transactional với `#general` channel và Owner)
 - `GET /api/v1/servers/{serverId}`: Chi tiết phần vỏ Server theo phạm vi duyệt 2026-10-13 (mục 9); trả DTO Server hiện có. Thiết kế trước đó `/api/servers/{serverId}` kèm danh sách kênh được thu hẹp cho lượt này; dữ liệu Channel thuộc module Channel, không thêm alias `/api/servers/{serverId}`.
-- `PATCH /api/servers/{serverId}`: Cập nhật tên/ảnh server (Owner)
+- `PUT /api/v1/servers/{serverId}`: Cập nhật tên/ảnh server (Owner), contract mục 11 được duyệt 2026-10-15; thay thế đề xuất cũ `PATCH /api/servers/{serverId}`, không thêm alias.
 - `DELETE /api/servers/{serverId}`: Xóa server (Owner)
 - `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
 - `POST /api/v1/servers/{serverId}/invites`: Tạo invite code (duy nhất Server Owner, mã 8 ký tự Base62 an toàn, trả `ServerInviteResponseDTO` trong wrapper `RestResponse`)
@@ -598,3 +598,30 @@ Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer
 - `.vscode` và `.env` bị Git ignore. Hướng dẫn này giúp tái tạo cấu hình trên máy khác; không commit credential. Cấu hình launch không tự áp dụng cho mọi cách chạy ngoài cấu hình Java đó.
 - `GET /api/v1/servers/{serverId}/channels` khai báo rõ `@PathVariable("serverId")`; `GET /api/v1/files/{folder}/{filename}` khai báo rõ `folder` và `filename`. Binding của hai API hoạt động cả khi IDE compiler không giữ tên tham số bằng `-parameters`; route, response và quyền truy cập hiện có được giữ nguyên.
 - Hai MockMvc regression tests tắt việc khám phá tên tham số: Channel kiểm tra ID tới service; File kiểm tra bytes PNG, MIME type và cache header. Sau sửa, toàn bộ backend PASS 228/228; `gradlew check` PASS. Đây là kiểm thử backend/MockMvc/H2 và cấu hình đường dẫn, chưa phải xác minh UI hoặc SQL Server thật sau restart.
+
+## 11. Cài đặt và chỉnh sửa Server (`CONFIRMED`, 2026-10-15)
+
+Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và FE. Contract dùng `PUT` theo prefix Controller hiện có, thống nhất mục 4.5/5.2; không đổi các API Server khác.
+
+### 11.1 REST, DTO và quyền
+
+- `PUT /api/v1/servers/{serverId}`, JSON `UpdateServerDTO`; `serverId` phải là số dương. Authentication/JWT hiện có; chỉ User active có ID trùng `Server.ownerId` được sửa. Không dùng role admin toàn hệ thống hay membership để thay thế kiểm tra Owner.
+- `name` bắt buộc, không null/rỗng/toàn khoảng trắng Unicode; tối đa 100 đơn vị UTF-16 trên request trước chuẩn hóa. `iconUrl` tối đa 255 đơn vị UTF-16; null, bỏ qua field, rỗng hoặc chỉ gồm khoảng trắng mà `String.strip()` loại bỏ sẽ gỡ ảnh. Hai trường được chuẩn hóa bằng `String.strip()` trước lưu. Đây là cập nhật toàn bộ thông tin có thể chỉnh sửa, FE gửi cả hai field.
+- Thành công `200`, thông báo `Cập nhật Server thành công`; `ServerResponseDTO` trong `RestResponse.data` với `id`, `name`, `iconUrl`, `ownerId`, `createdDate`. FE đọc `response.data.data`.
+- Lỗi dùng Problem Details hiện có: `400` JSON/ID/validation không hợp lệ, `401` JWT/session/tài khoản không hợp lệ hoặc inactive, `403` không phải Owner, `404` Server không tồn tại. Request hợp lệ vẫn không được nhận Owner/ngày tạo từ client; chỉ cập nhật tên và ảnh.
+- `ServerService.updateServer` tái sử dụng `getActiveCurrentUser`, kiểm tra DTO cả khi gọi trực tiếp Service, thực hiện trong transaction hiện có. `saveAndFlush` ghi dữ liệu và audit trước khi rời request đã xác thực. Giữ Entity, schema, membership, Channel và WebSocket; không thêm event broadcast hoặc migration. Mapping/giới hạn cũ được đối chiếu tại docs/03 mục 4.5.
+
+### 11.2 UI và đồng bộ dữ liệu
+
+- Owner mở nút bánh răng `Cài đặt Server` ở heading sidebar nhóm; trên mobile mở drawer Kênh trước. Dùng `ServerSettingsModal` trong `components/common`, CSS riêng có scope; không thêm route hay dependency.
+- Bố cục tham khảo cách tổ chức cài đặt Discord: điều hướng Tổng quan, form tên và ảnh, preview và thanh Lưu/Hủy khi có thay đổi. Dùng Ant Design, Plus Jakarta Sans và tokens nền tối/cyan/indigo hiện có. Mobile thu gọn một cột.
+- Upload tái sử dụng `POST /api/v1/files/upload`, folder `servers`, nhận URL trong wrapper hoặc response upload cũ. Chỉ JPG/JPEG/PNG/WebP/GIF, tối đa 5 MB theo service hiện có. Gỡ ảnh gửi null. Upload không tự đổi Server; chỉ PUT thành công mới thay đổi thông tin Server.
+- Chặn lưu khi upload/submit đang chờ, có guard chống gửi trùng; lỗi giữ draft. Hủy khôi phục dữ liệu đã lưu; đóng draft chưa lưu có xác nhận. Chuyển Server đóng settings; response upload/save cũ không được thay đổi phiên/modal hoặc Server mới. Response upload mới nhất thắng.
+- Sau PUT thành công, cập nhật detail của GroupChatPage và danh sách `setServers` trong Outlet context, đồng bộ header/sidebar/dock. Không xóa file upload đã bỏ chọn hoặc ảnh cũ vì file có thể được dùng chung; vòng đời file ngoài phạm vi task.
+
+### 11.3 Verification và giới hạn
+
+- Backend: `gradlew.bat test check` PASS 259/259, gồm 31 cases mới cho update: Service, binding không có compiler parameter metadata, JWT/role/active account, validation, lưu H2, audit email 53/254 và bảo toàn identity/membership.
+- FE: 17 settings browser tests PASS trên Edge headless với API mock; 23 group UI regression tests PASS trong lượt chạy kết hợp. Đã xem screenshot desktop 1440 và mobile 375; kiểm tra thêm viewport 320/768. `npm run build` PASS; không có script npm lint/test được cấu hình.
+- Playwright dùng runtime sẵn có theo mục 8.2; có thể lưu screenshot qua `SERVER_SETTINGS_ARTIFACT_DIR`, mặc định thư mục tạm `denhub-server-settings`. Không gửi fixture JWT tới backend thật.
+- Chưa kiểm thử FE → backend → SQL Server thật và chưa apply schema/audit script. Mock/H2 không chứng minh SQL Server hiện tại phù hợp mapping. Các warning Ant Design cũ và bundle lớn vẫn có sẵn.

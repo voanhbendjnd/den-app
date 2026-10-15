@@ -322,6 +322,14 @@ _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoà
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
+### Tiến độ riêng — Cài đặt / chỉnh sửa Server (2026-10-15)
+
+| Phạm vi | FE | BE | Database | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Owner đổi tên, đổi/gỡ ảnh Server | IMPLEMENTED | IMPLEMENTED | Tái sử dụng mapping, không migration | 259 BE tests; 17 settings + 23 group browser tests; build PASS | DONE trong phạm vi code/H2/browser mock đã duyệt; chưa kiểm thử SQL Server thật |
+
+Bản ghi mới này nằm ngoài các vùng merge conflict có sẵn của bảng tiến độ cũ; không chọn thay nhóm giữa các bản lịch sử.
+
 ### Kiểm tra riêng — Channel/File binding và đường dẫn ảnh local (2026-10-15)
 
 | Công việc | Trạng thái | Bằng chứng / giới hạn |
@@ -380,6 +388,19 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-15] FEAT-SERVER-SETTINGS — Owner chỉnh sửa Server, Backend và FE
+
+- Người dùng duyệt kế hoạch bằng “tiến hành”. Nhánh `feature/server-edit`, working tree sạch trước task; không tạo/chuyển nhánh, không commit hoặc push.
+- Chốt `PUT /api/v1/servers/{serverId}` thay đề xuất PATCH cũ trong docs. Thêm `UpdateServerDTO`, Controller và Service: Owner active, tên không blank Unicode/tối đa 100 UTF-16, icon tối đa 255/null để gỡ; response wrapper hiện có, lỗi Problem Details 400/401/403/404. Chuẩn hóa bằng String.strip; chỉ cập nhật hai field. saveAndFlush ghi audit trong request đã xác thực. Không đổi schema, quyền module khác hoặc WebSocket.
+- FE: `ServerSettingsModal` và CSS scope riêng, nút cài đặt ở heading sidebar nhóm (desktop/mobile), điều hướng Tổng quan, preview, đổi/gỡ ảnh và Lưu/Hủy. Dùng theme/Ant Design hiện có; chỉ Owner thấy entry. Upload/save có guard chống gửi trùng, bỏ response cũ và giữ form khi lỗi; đóng draft có xác nhận. Thành công đồng bộ detail và dock qua setServers trong Outlet context.
+- Tests mới: 31 BE cases trong ServerServiceTest/ServerResourceTest/ServerSecurityIT; 17 browser cases trong server-settings.browser.test.mjs. Tái sử dụng Playwright/Edge sẵn có; không cài dependency. Browser chặn API bằng mock, không dùng fixture JWT cho backend thật.
+- Backend lượt đầu `.\gradlew.bat test`: 258 tests, 3 FAIL do audit flush sau khi MockMvc đã xóa security context và fixture email 254 có local-part quá dài. Đã lưu/flush trước khi rời request và sửa fixture email hợp lệ; chạy lại PASS 258/258. Sau bổ sung biên Unicode NEL cho Service, lệnh cuối từ `server/`: `.\gradlew.bat test check` PASS 259/259, 0 failure/error/skip.
+- FE lượt đầu chạy kết hợp: 33/35 PASS, 2 navigation timeouts khi hai Vite workers cùng khởi động optimizer. PRE-EXISTING ISSUE trong test fixture: chưa mock GET /api/v1/conversations có sẵn của MainLayout, phát sinh unhandled rejection. Đã cập nhật fixture regression, đặt navigation timeout 30 giây và chạy tuần tự; không sửa production module Conversation. `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` PASS 35/35 tại lượt có 12 settings cases. Sau bổ sung cases, `node --test tests/server-settings.browser.test.mjs` PASS 17/17; 23 group regression cases đã PASS, tổng 40 browser cases khác nhau.
+- Từ `client/`, đặt `$env:NODE_PATH = 'C:/Users/ADMIN/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'` trước browser commands; `npm run build` PASS sau sửa UI cuối. Không có npm lint/test scripts. Đã xem screenshot desktop 1440/mobile 375; test thêm viewport 320/768 và không tràn ngang. Screenshot mặc định lưu ngoài repo trong thư mục tạm denhub-server-settings.
+- Docs: cập nhật 00 (tiến độ/log/handoff), 01 (quyền/phạm vi), 02 (contract API/DTO/UI), 03 (mapping 100/255 so với thiết kế icon 500). Đã kiểm tra docs/04; tái sử dụng design system hiện có, không cần sửa hướng dẫn thiết kế chung.
+- Giới hạn: chưa kiểm thử FE → BE → SQL Server thật; chưa apply script audit SQL Server có sẵn. PRE-EXISTING ISSUE: conflict markers docs/00, các warning Ant Design và bundle lớn được giữ ngoài phạm vi. Không tự dọn file ảnh upload đã bỏ chọn.
+- Git: thay đổi còn uncommitted để người dùng review/commit. Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-15] FIX-CHANNEL-FILE-LOCAL-RUN — Binding tham số và đường dẫn ảnh server
 
@@ -1843,6 +1864,13 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff hiện tại — Server Settings (2026-10-15)
+
+- Backend và FE đã triển khai theo kế hoạch duyệt; API/DTO/quyền tại docs/02 mục 11. 259 BE tests, 17 settings browser tests và 23 group browser regression cases PASS; FE build PASS. Giữ giới hạn H2/mock khi bàn giao.
+- Dùng tài khoản Server Owner, vào trang Server rồi chọn nút bánh răng Cài đặt Server ở heading sidebar. Mobile: mở danh sách kênh trước. Đổi tên hoặc ảnh, chọn Lưu thay đổi; tên/ảnh được đồng bộ trong nhóm và dock ngay khi PUT thành công.
+- Chưa commit task này; không tự commit/push. Không đổi .env, schema, migrations, Entity, role hierarchy hoặc các module Conversation/Message.
+- Cần kiểm thử tích hợp trên môi trường SQL Server của nhóm sau khi review/apply các mapping/audit script liên quan theo quy trình riêng. Conflict markers cũ trong docs/00 vẫn cần nhóm xử lý; không coi việc cập nhật task này là đã giải conflict.
 
 ### Handoff — Sửa Channel/File và ảnh local (2026-10-15)
 
