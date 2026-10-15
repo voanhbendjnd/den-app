@@ -1,6 +1,8 @@
 package com.denhub.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -18,9 +20,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter;
 
 @ExtendWith(MockitoExtension.class)
 class ChannelResourceTest {
@@ -113,5 +117,20 @@ class ChannelResourceTest {
                 .andExpect(jsonPath("$[1].id").value(101))
                 .andExpect(jsonPath("$[1].name").value("random"))
                 .andExpect(jsonPath("$[1].position").value(1));
+    }
+
+    @Test
+    void getChannelsByServerId_Success_WithoutParameterNameMetadata() throws Exception {
+        // Reproduce an IDE build that does not retain Java parameter names.
+        mockMvc.getDispatcherServlet().getWebApplicationContext()
+                .getBean(RequestMappingHandlerAdapter.class)
+                .setParameterNameDiscoverer(mock(ParameterNameDiscoverer.class));
+        when(channelService.getChannelsByServerId(42L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/servers/42/channels"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        verify(channelService).getChannelsByServerId(42L);
     }
 }
