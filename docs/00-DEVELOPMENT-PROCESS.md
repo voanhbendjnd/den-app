@@ -389,6 +389,13 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-15] RELEASE-SERVER-SETTINGS — Commit riêng từng file theo yêu cầu
+
+- Người dùng trực tiếp yêu cầu “commit và push giúp tôi. mỗi file sửa đổi là 1 commit”. Ủy quyền lần này áp dụng cho thay đổi Server Settings hiện có trên `feature/server-edit`, gồm 8 file modified và 4 file mới; không triển khai sửa các lỗi vừa phát hiện trong lượt review.
+- Đã tạo 12 commit code/test, từ `d01085f` đến `ab5c5ae`; kiểm tra từng commit chỉ chứa đúng một file. Tài liệu hợp đồng Server Settings đã có trong commit `3135911`; cập nhật log/handoff này được commit riêng cho một file docs.
+- Verification trước commit: từ `server/`, `.\gradlew.bat test check --rerun-tasks` PASS 259/259 trong lượt review; `.\gradlew.bat test check` ở lượt release BUILD SUCCESSFUL, các task UP-TO-DATE. Từ `client/`, `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs tests/serverJoin.test.mjs tests/serverInvite.test.mjs` PASS 60/60 trong lượt review (NODE_PATH runtime Playwright như mục 8.2); `npm run build` ở lượt release PASS, còn warning bundle lớn có sẵn.
+- Đã review diff, kiểm tra danh sách file, hash nội dung và `git diff --check` trước commit; không thêm credential, `.env`, file build hoặc ảnh upload. Các vấn đề đã báo trong review, conflict markers cũ và kiểm thử SQL Server thật vẫn cần xử lý riêng. Push chỉ tới nhánh feature theo yêu cầu trực tiếp lần này, không force push hoặc sửa main/master; trạng thái remote cần xác minh sau khi push.
+
 ### [2026-10-15] FEAT-SERVER-SETTINGS — Owner chỉnh sửa Server, Backend và FE
 
 - Người dùng duyệt kế hoạch bằng “tiến hành”. Nhánh `feature/server-edit`, working tree sạch trước task; không tạo/chuyển nhánh, không commit hoặc push.
@@ -1869,7 +1876,7 @@ Commit:
 
 - Backend và FE đã triển khai theo kế hoạch duyệt; API/DTO/quyền tại docs/02 mục 11. 259 BE tests, 17 settings browser tests và 23 group browser regression cases PASS; FE build PASS. Giữ giới hạn H2/mock khi bàn giao.
 - Dùng tài khoản Server Owner, vào trang Server rồi chọn nút bánh răng Cài đặt Server ở heading sidebar. Mobile: mở danh sách kênh trước. Đổi tên hoặc ảnh, chọn Lưu thay đổi; tên/ảnh được đồng bộ trong nhóm và dock ngay khi PUT thành công.
-- Chưa commit task này; không tự commit/push. Không đổi .env, schema, migrations, Entity, role hierarchy hoặc các module Conversation/Message.
+- Code/test Server Settings đã được commit riêng từng file theo ủy quyền trực tiếp ngày 2026-10-15; xem log RELEASE-SERVER-SETTINGS. Không đổi .env, schema, migrations, Entity, role hierarchy hoặc các module Conversation/Message. Các lỗi được báo trong lượt review sau triển khai chưa được sửa trong đợt release này.
 - Cần kiểm thử tích hợp trên môi trường SQL Server của nhóm sau khi review/apply các mapping/audit script liên quan theo quy trình riêng. Conflict markers cũ trong docs/00 vẫn cần nhóm xử lý; không coi việc cập nhật task này là đã giải conflict.
 
 ### Handoff — Sửa Channel/File và ảnh local (2026-10-15)
