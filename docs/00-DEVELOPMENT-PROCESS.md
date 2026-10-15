@@ -322,6 +322,15 @@ _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoà
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
+### Kiểm tra riêng — Channel/File binding và đường dẫn ảnh local (2026-10-15)
+
+| Công việc | Trạng thái | Bằng chứng / giới hạn |
+| :--- | :--- | :--- |
+| GET Channel và GET ảnh không phụ thuộc tên tham số compiler | TESTED | Hai regression tests tái hiện lỗi trước sửa; sau sửa toàn bộ backend PASS 228/228. |
+| Thư mục chạy VS Code cho ảnh upload | VERIFIED CONFIG | Hai cấu hình local dùng `cwd = ${workspaceFolder}/server`, giữ `envFile = ${workspaceFolder}/server/.env`; kiểm tra đường dẫn tồn tại và 5 ảnh cũ trong `server/uploads/servers`. Cần restart phiên Java để áp dụng. |
+
+Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không quyết định thay nhóm giữa hai bản tiến độ cũ. Không coi kiểm tra MockMvc/H2 và đường dẫn local là kiểm thử giao diện hoặc SQL Server thật.
+
 ### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
 <<<<<<< HEAD
@@ -371,6 +380,18 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-15] FIX-CHANNEL-FILE-LOCAL-RUN — Binding tham số và đường dẫn ảnh server
+
+- Người dùng duyệt kế hoạch bằng “làm đi”; triển khai trên `feature/server-edit`, working tree sạch trước khi sửa.
+- `ChannelResource` khai báo `@PathVariable("serverId")`; `FileResource` khai báo `@PathVariable("folder")` và `@PathVariable("filename")`. GET vẫn dùng route, DTO và quyền hiện có; không phụ thuộc compiler có giữ tên tham số Java hay không.
+- `.vscode/launch.json` local đổi `cwd` của cả hai cấu hình sang `${workspaceFolder}/server`; giữ đường dẫn `envFile`. File này bị Git ignore, không tự thêm vào tracking. Không di chuyển/xóa ảnh hoặc sửa database.
+- Thêm hai tests vào `ChannelResourceTest` và `FileResourceTest`, dùng `ParameterNameDiscoverer` trả null để tái hiện IDE build thiếu tên tham số. Channel test kiểm tra ID truyền tới service và danh sách rỗng; File test kiểm tra folder/filename có dấu chấm, HTTP 200, bytes ảnh PNG, MIME type và Cache-Control.
+- Trước sửa controller: từ `server/`, `.\gradlew.bat test --tests com.denhub.web.rest.ChannelResourceTest --tests com.denhub.web.rest.FileResourceTest` FAIL đúng hai regression tests mới (7 tests, 2 failures; thiếu tên tham số). Đây là lỗi của task, không phải lỗi ngoài phạm vi.
+- Sau sửa: `.\gradlew.bat test` PASS 228/228, 0 failure/error/skip; `.\gradlew.bat check` PASS với tasks up-to-date từ lần test vừa chạy. Kiểm tra JSON launch, cwd/envFile và 5 ảnh cũ bằng PowerShell PASS.
+- Documentation: cập nhật docs/00 (tiến độ/log/handoff), docs/02 (chạy local và binding). Đã xem xét docs/01, docs/03, docs/04; không cần đổi vì không thay nghiệp vụ, schema hoặc UI.
+- Giới hạn: chưa chạy lại UI/GET trên phiên server thật, không khởi động ứng dụng với SQL Server và không thay schema; cần restart Java bằng cấu hình đã sửa. PRE-EXISTING ISSUE: dấu merge conflict trong docs/00 được giữ nguyên ngoài phạm vi task.
+- Git: FileResource đã nằm trong commit `c63b22f`, được tạo ngoài phiên xử lý của agent và trùng nội dung vừa kiểm thử. Sau triển khai, người dùng yêu cầu commit backend trên nhánh hiện tại; phạm vi commit tiếp theo là ChannelResource, hai regression test files và docs/00, docs/02. Launch chỉ local và bị ignore. Not pushed — AI agents are not allowed to push DenHub.
 
 <<<<<<< HEAD
 ### [2026-10-14] FEAT-SERVER-INVITE-CREATE-FE — UI Tạo & Sao Chép Mã Mời Server
@@ -1822,6 +1843,13 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff — Sửa Channel/File và ảnh local (2026-10-15)
+
+- Backend binding đã sửa, 228 tests và Gradle check PASS. Cấu hình local chạy từ `server/` để đọc `server/uploads/servers`; không thay FileService hoặc đường dẫn URL lưu trong DB.
+- Dừng phiên Java cũ rồi khởi chạy lại bằng cấu hình Java đã sửa; workspace của cấu hình này là thư mục `den-app`. Nếu chạy bằng cách khác, bảo đảm working directory là `server/`; file upload được đọc/ghi tương đối với working directory.
+- `.vscode/launch.json` bị ignore nên người khác cần tự đặt cwd/envFile theo docs/02 mục 10. Không chia sẻ `.env` hoặc credential.
+- Chưa xác minh trực tiếp trình duyệt/SQL Server sau restart; nếu vẫn lỗi, đối chiếu stack trace backend và URL/status GET ảnh thực tế. Các dấu merge conflict cũ của docs/00 cần nhóm xử lý riêng.
 
 ### Handoff hiện tại — Server CRUD release 6/6 (2026-10-13)
 
