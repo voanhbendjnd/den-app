@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useOutletContext, useParams } from 'react-router-dom';
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -15,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
 import CreateChannelModal from '../../components/common/CreateChannelModal';
 import ServerInviteModal from '../../components/common/ServerInviteModal';
+import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
 import './group-chat.css';
@@ -28,6 +29,7 @@ function ChannelSidebar({
   activeChannel,
   isOwner,
   onOpenInvite,
+  onOpenSettings,
   onSelectChannel,
   onOpenCreateChannel,
   onRetryChannels,
@@ -37,6 +39,8 @@ function ChannelSidebar({
       <div className="group-sidebar__heading">
         <Avatar shape="square" src={server.iconUrl} size={36}>{server.name?.[0]?.toUpperCase()}</Avatar>
         <div className="group-sidebar__identity"><strong title={server.name}>{server.name}</strong><span>Không gian nhóm</span></div>
+        {isOwner && <button type="button" className="group-sidebar-settings-btn" onClick={onOpenSettings}
+          title="Cài đặt Server" aria-label="Cài đặt Server"><SettingOutlined /></button>}
       </div>
       <div className="group-sidebar__body">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -224,12 +228,15 @@ function MembersPanel({
 
 export default function GroupChatPage() {
   const { serverId } = useParams();
+  const { setServers } = useOutletContext();
   const { currentUser } = useAuth();
   const screens = Grid.useBreakpoint();
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [membersVisible, setMembersVisible] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  useEffect(() => { setIsSettingsOpen(false); }, [serverId]);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
 
@@ -394,6 +401,7 @@ export default function GroupChatPage() {
           activeChannel={activeChannel}
           isOwner={isOwner}
           onOpenInvite={() => setIsInviteOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => setIsCreateChannelOpen(true)}
           onRetryChannels={() => fetchChannels(serverId)}
@@ -500,6 +508,10 @@ export default function GroupChatPage() {
             setChannelsOpen(false);
             setIsInviteOpen(true);
           }}
+          onOpenSettings={() => {
+            setChannelsOpen(false);
+            setIsSettingsOpen(true);
+          }}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => {
             setChannelsOpen(false);
@@ -540,6 +552,11 @@ export default function GroupChatPage() {
         onClose={() => setIsInviteOpen(false)}
         server={server}
       />
+      <ServerSettingsModal key={serverId} open={isSettingsOpen && isOwner} server={server}
+        onClose={() => setIsSettingsOpen(false)} onSaved={updated => {
+          setDetail(previous => ({ ...previous, server: updated }));
+          setServers(previous => previous.map(item => String(item.id) === String(updated.id) ? updated : item));
+        }} />
     </div>
   );
 }

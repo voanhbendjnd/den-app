@@ -14,6 +14,7 @@ import com.denhub.repository.UserRepository;
 import com.denhub.service.dto.CreateServerDTO;
 import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
+import com.denhub.service.dto.UpdateServerDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,6 +78,78 @@ class ServerServiceTest {
         assertThat(response.getCreatedDate()).isEqualTo(createdDate);
         verifyNoInteractions(serverMemberRepository);
         verify(serverRepository, never()).save(any());
+    }
+
+    @Test
+    void updateServer_OwnerChangesOnlyEditableFields() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+        Instant createdDate = Instant.parse("2026-10-13T01:00:00Z");
+        server.setCreatedDate(createdDate);
+        when(serverRepository.saveAndFlush(server)).thenReturn(server);
+
+        ServerResponseDTO response = serverService.updateServer(10L, updateDto("  Nhóm mới  ", " https://example.test/new.png "));
+
+        assertThat(response.getName()).isEqualTo("Nhóm mới");
+        assertThat(response.getIconUrl()).isEqualTo("https://example.test/new.png");
+        assertThat(response.getId()).isEqualTo(10L);
+        assertThat(response.getOwnerId()).isEqualTo(1L);
+        assertThat(response.getCreatedDate()).isEqualTo(createdDate);
+        verifyNoInteractions(serverMemberRepository, channelRepository, inviteRepository);
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void updateServer_ClearsIcon(String icon) {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+        server.setIconUrl("https://example.test/old.png");
+        when(serverRepository.saveAndFlush(server)).thenReturn(server);
+        assertThat(serverService.updateServer(10L, updateDto("New name", icon)).getIconUrl()).isNull();
+    }
+
+    @Test
+    void updateServer_NonOwnerCannotMutateEntity() {
+        Server server = prepareDetailRequest();
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.updateServer(10L, updateDto("Changed", null)));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(server.getName()).isEqualTo("Detail server");
+        verify(serverRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @ValueSource(strings = {"   ", "\u00a0\u2003\u202f", "\u0085"})
+    void updateServer_RejectsBlankNameBeforeMutation(String name) {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> serverService.updateServer(10L, updateDto(name, null)));
+        assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(server.getName()).isEqualTo("Detail server");
+        verify(serverRepository, never()).save(any());
+    }
+
+    @Test
+    void updateServer_RejectsOversizedFieldsBeforeMutation() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+        for (UpdateServerDTO dto : java.util.List.of(updateDto("x".repeat(101), null), updateDto("Valid", "x".repeat(256)))) {
+            ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                    () -> serverService.updateServer(10L, dto));
+            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+        assertThat(server.getName()).isEqualTo("Detail server");
+        verify(serverRepository, never()).save(any());
+    }
+
+    private UpdateServerDTO updateDto(String name, String iconUrl) {
+        UpdateServerDTO dto = new UpdateServerDTO();
+        dto.setName(name);
+        dto.setIconUrl(iconUrl);
+        return dto;
     }
 
     @Test

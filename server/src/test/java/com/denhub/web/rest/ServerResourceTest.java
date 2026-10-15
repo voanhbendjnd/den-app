@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.denhub.service.ServerService;
 import com.denhub.service.dto.CreateServerDTO;
+import com.denhub.service.dto.UpdateServerDTO;
 import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,6 +54,26 @@ class ServerResourceTest {
                 .andExpect(jsonPath("$.name").value("Detail server"))
                 .andExpect(jsonPath("$.ownerId").value(100));
         org.mockito.Mockito.verify(serverService).getServerDetail(12L);
+    }
+
+    @Test
+    void updateServer_BindsIdWithoutParameterMetadataAndPassesRequest() throws Exception {
+        mockMvc.getDispatcherServlet().getWebApplicationContext()
+                .getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.class)
+                .setParameterNameDiscoverer(org.mockito.Mockito.mock(org.springframework.core.ParameterNameDiscoverer.class));
+        ServerResponseDTO response = new ServerResponseDTO();
+        response.setId(12L);
+        response.setName("New server");
+        when(serverService.updateServer(org.mockito.ArgumentMatchers.eq(12L), any(UpdateServerDTO.class))).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/servers/12")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New server\",\"iconUrl\":null}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("New server"));
+        org.mockito.ArgumentCaptor<UpdateServerDTO> request = org.mockito.ArgumentCaptor.forClass(UpdateServerDTO.class);
+        org.mockito.Mockito.verify(serverService).updateServer(org.mockito.ArgumentMatchers.eq(12L), request.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("New server", request.getValue().getName());
+        org.junit.jupiter.api.Assertions.assertNull(request.getValue().getIconUrl());
     }
 
     @Test

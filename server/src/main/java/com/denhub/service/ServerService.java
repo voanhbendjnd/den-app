@@ -22,6 +22,7 @@ import com.denhub.service.dto.CreateServerInviteRequestDTO;
 import com.denhub.service.dto.ServerInviteResponseDTO;
 import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
+import com.denhub.service.dto.UpdateServerDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -72,6 +73,41 @@ public class ServerService {
         response.setIconUrl(server.getIconUrl());
         response.setOwnerId(server.getOwnerId());
         response.setCreatedDate(server.getCreatedDate());
+        return response;
+    }
+
+    public ServerResponseDTO updateServer(Long serverId, UpdateServerDTO dto) {
+        User currentUser = getActiveCurrentUser();
+        if (serverId == null || serverId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Server ID không hợp lệ");
+        }
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
+        if (!currentUser.getId().equals(server.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ chủ sở hữu mới có quyền chỉnh sửa Server");
+        }
+
+        // Validate before mutating the managed entity, including direct service calls.
+        if (dto == null || dto.getName() == null || dto.getName().length() > 100
+                || !dto.getName().matches("(?sU).*\\S.*")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên Server phải có từ 1 đến 100 ký tự");
+        }
+        if (dto.getIconUrl() != null && dto.getIconUrl().length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Đường dẫn ảnh không được vượt quá 255 ký tự");
+        }
+
+        server.setName(dto.getName().strip());
+        String icon = dto.getIconUrl() == null ? null : dto.getIconUrl().strip();
+        server.setIconUrl(icon == null || icon.isBlank() ? null : icon);
+        // Persist and capture the audit actor before leaving the authenticated request.
+        Server saved = serverRepository.saveAndFlush(server);
+
+        ServerResponseDTO response = new ServerResponseDTO();
+        response.setId(saved.getId());
+        response.setName(saved.getName());
+        response.setIconUrl(saved.getIconUrl());
+        response.setOwnerId(saved.getOwnerId());
+        response.setCreatedDate(saved.getCreatedDate());
         return response;
     }
 

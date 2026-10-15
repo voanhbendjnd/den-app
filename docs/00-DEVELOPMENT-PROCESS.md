@@ -322,6 +322,23 @@ _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoà
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
+### Tiến độ riêng — Cài đặt / chỉnh sửa Server (2026-10-15)
+
+| Phạm vi | FE | BE | Database | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Owner đổi tên, đổi/gỡ ảnh Server | IMPLEMENTED | IMPLEMENTED | Tái sử dụng mapping, không migration | 259 BE tests; 17 settings + 23 group browser tests; build PASS | DONE trong phạm vi code/H2/browser mock đã duyệt; chưa kiểm thử SQL Server thật |
+
+Bản ghi mới này nằm ngoài các vùng merge conflict có sẵn của bảng tiến độ cũ; không chọn thay nhóm giữa các bản lịch sử.
+
+### Kiểm tra riêng — Channel/File binding và đường dẫn ảnh local (2026-10-15)
+
+| Công việc | Trạng thái | Bằng chứng / giới hạn |
+| :--- | :--- | :--- |
+| GET Channel và GET ảnh không phụ thuộc tên tham số compiler | TESTED | Hai regression tests tái hiện lỗi trước sửa; sau sửa toàn bộ backend PASS 228/228. |
+| Thư mục chạy VS Code cho ảnh upload | VERIFIED CONFIG | Hai cấu hình local dùng `cwd = ${workspaceFolder}/server`, giữ `envFile = ${workspaceFolder}/server/.env`; kiểm tra đường dẫn tồn tại và 5 ảnh cũ trong `server/uploads/servers`. Cần restart phiên Java để áp dụng. |
+
+Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không quyết định thay nhóm giữa hai bản tiến độ cũ. Không coi kiểm tra MockMvc/H2 và đường dẫn local là kiểm thử giao diện hoặc SQL Server thật.
+
 ### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
 <<<<<<< HEAD
@@ -371,6 +388,38 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-15] RELEASE-SERVER-SETTINGS — Commit riêng từng file theo yêu cầu
+
+- Người dùng trực tiếp yêu cầu “commit và push giúp tôi. mỗi file sửa đổi là 1 commit”. Ủy quyền lần này áp dụng cho thay đổi Server Settings hiện có trên `feature/server-edit`, gồm 8 file modified và 4 file mới; không triển khai sửa các lỗi vừa phát hiện trong lượt review.
+- Đã tạo 12 commit code/test, từ `d01085f` đến `ab5c5ae`; kiểm tra từng commit chỉ chứa đúng một file. Tài liệu hợp đồng Server Settings đã có trong commit `3135911`; cập nhật log/handoff này được commit riêng cho một file docs.
+- Verification trước commit: từ `server/`, `.\gradlew.bat test check --rerun-tasks` PASS 259/259 trong lượt review; `.\gradlew.bat test check` ở lượt release BUILD SUCCESSFUL, các task UP-TO-DATE. Từ `client/`, `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs tests/serverJoin.test.mjs tests/serverInvite.test.mjs` PASS 60/60 trong lượt review (NODE_PATH runtime Playwright như mục 8.2); `npm run build` ở lượt release PASS, còn warning bundle lớn có sẵn.
+- Đã review diff, kiểm tra danh sách file, hash nội dung và `git diff --check` trước commit; không thêm credential, `.env`, file build hoặc ảnh upload. Các vấn đề đã báo trong review, conflict markers cũ và kiểm thử SQL Server thật vẫn cần xử lý riêng. Push chỉ tới nhánh feature theo yêu cầu trực tiếp lần này, không force push hoặc sửa main/master; trạng thái remote cần xác minh sau khi push.
+
+### [2026-10-15] FEAT-SERVER-SETTINGS — Owner chỉnh sửa Server, Backend và FE
+
+- Người dùng duyệt kế hoạch bằng “tiến hành”. Nhánh `feature/server-edit`, working tree sạch trước task; không tạo/chuyển nhánh, không commit hoặc push.
+- Chốt `PUT /api/v1/servers/{serverId}` thay đề xuất PATCH cũ trong docs. Thêm `UpdateServerDTO`, Controller và Service: Owner active, tên không blank Unicode/tối đa 100 UTF-16, icon tối đa 255/null để gỡ; response wrapper hiện có, lỗi Problem Details 400/401/403/404. Chuẩn hóa bằng String.strip; chỉ cập nhật hai field. saveAndFlush ghi audit trong request đã xác thực. Không đổi schema, quyền module khác hoặc WebSocket.
+- FE: `ServerSettingsModal` và CSS scope riêng, nút cài đặt ở heading sidebar nhóm (desktop/mobile), điều hướng Tổng quan, preview, đổi/gỡ ảnh và Lưu/Hủy. Dùng theme/Ant Design hiện có; chỉ Owner thấy entry. Upload/save có guard chống gửi trùng, bỏ response cũ và giữ form khi lỗi; đóng draft có xác nhận. Thành công đồng bộ detail và dock qua setServers trong Outlet context.
+- Tests mới: 31 BE cases trong ServerServiceTest/ServerResourceTest/ServerSecurityIT; 17 browser cases trong server-settings.browser.test.mjs. Tái sử dụng Playwright/Edge sẵn có; không cài dependency. Browser chặn API bằng mock, không dùng fixture JWT cho backend thật.
+- Backend lượt đầu `.\gradlew.bat test`: 258 tests, 3 FAIL do audit flush sau khi MockMvc đã xóa security context và fixture email 254 có local-part quá dài. Đã lưu/flush trước khi rời request và sửa fixture email hợp lệ; chạy lại PASS 258/258. Sau bổ sung biên Unicode NEL cho Service, lệnh cuối từ `server/`: `.\gradlew.bat test check` PASS 259/259, 0 failure/error/skip.
+- FE lượt đầu chạy kết hợp: 33/35 PASS, 2 navigation timeouts khi hai Vite workers cùng khởi động optimizer. PRE-EXISTING ISSUE trong test fixture: chưa mock GET /api/v1/conversations có sẵn của MainLayout, phát sinh unhandled rejection. Đã cập nhật fixture regression, đặt navigation timeout 30 giây và chạy tuần tự; không sửa production module Conversation. `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` PASS 35/35 tại lượt có 12 settings cases. Sau bổ sung cases, `node --test tests/server-settings.browser.test.mjs` PASS 17/17; 23 group regression cases đã PASS, tổng 40 browser cases khác nhau.
+- Từ `client/`, đặt `$env:NODE_PATH = 'C:/Users/ADMIN/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'` trước browser commands; `npm run build` PASS sau sửa UI cuối. Không có npm lint/test scripts. Đã xem screenshot desktop 1440/mobile 375; test thêm viewport 320/768 và không tràn ngang. Screenshot mặc định lưu ngoài repo trong thư mục tạm denhub-server-settings.
+- Docs: cập nhật 00 (tiến độ/log/handoff), 01 (quyền/phạm vi), 02 (contract API/DTO/UI), 03 (mapping 100/255 so với thiết kế icon 500). Đã kiểm tra docs/04; tái sử dụng design system hiện có, không cần sửa hướng dẫn thiết kế chung.
+- Giới hạn: chưa kiểm thử FE → BE → SQL Server thật; chưa apply script audit SQL Server có sẵn. PRE-EXISTING ISSUE: conflict markers docs/00, các warning Ant Design và bundle lớn được giữ ngoài phạm vi. Không tự dọn file ảnh upload đã bỏ chọn.
+- Git: thay đổi còn uncommitted để người dùng review/commit. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-15] FIX-CHANNEL-FILE-LOCAL-RUN — Binding tham số và đường dẫn ảnh server
+
+- Người dùng duyệt kế hoạch bằng “làm đi”; triển khai trên `feature/server-edit`, working tree sạch trước khi sửa.
+- `ChannelResource` khai báo `@PathVariable("serverId")`; `FileResource` khai báo `@PathVariable("folder")` và `@PathVariable("filename")`. GET vẫn dùng route, DTO và quyền hiện có; không phụ thuộc compiler có giữ tên tham số Java hay không.
+- `.vscode/launch.json` local đổi `cwd` của cả hai cấu hình sang `${workspaceFolder}/server`; giữ đường dẫn `envFile`. File này bị Git ignore, không tự thêm vào tracking. Không di chuyển/xóa ảnh hoặc sửa database.
+- Thêm hai tests vào `ChannelResourceTest` và `FileResourceTest`, dùng `ParameterNameDiscoverer` trả null để tái hiện IDE build thiếu tên tham số. Channel test kiểm tra ID truyền tới service và danh sách rỗng; File test kiểm tra folder/filename có dấu chấm, HTTP 200, bytes ảnh PNG, MIME type và Cache-Control.
+- Trước sửa controller: từ `server/`, `.\gradlew.bat test --tests com.denhub.web.rest.ChannelResourceTest --tests com.denhub.web.rest.FileResourceTest` FAIL đúng hai regression tests mới (7 tests, 2 failures; thiếu tên tham số). Đây là lỗi của task, không phải lỗi ngoài phạm vi.
+- Sau sửa: `.\gradlew.bat test` PASS 228/228, 0 failure/error/skip; `.\gradlew.bat check` PASS với tasks up-to-date từ lần test vừa chạy. Kiểm tra JSON launch, cwd/envFile và 5 ảnh cũ bằng PowerShell PASS.
+- Documentation: cập nhật docs/00 (tiến độ/log/handoff), docs/02 (chạy local và binding). Đã xem xét docs/01, docs/03, docs/04; không cần đổi vì không thay nghiệp vụ, schema hoặc UI.
+- Giới hạn: chưa chạy lại UI/GET trên phiên server thật, không khởi động ứng dụng với SQL Server và không thay schema; cần restart Java bằng cấu hình đã sửa. PRE-EXISTING ISSUE: dấu merge conflict trong docs/00 được giữ nguyên ngoài phạm vi task.
+- Git: FileResource đã nằm trong commit `c63b22f`, được tạo ngoài phiên xử lý của agent và trùng nội dung vừa kiểm thử. Sau triển khai, người dùng yêu cầu commit backend trên nhánh hiện tại; phạm vi commit tiếp theo là ChannelResource, hai regression test files và docs/00, docs/02. Launch chỉ local và bị ignore. Not pushed — AI agents are not allowed to push DenHub.
 
 <<<<<<< HEAD
 ### [2026-10-14] FEAT-SERVER-INVITE-CREATE-FE — UI Tạo & Sao Chép Mã Mời Server
@@ -1822,6 +1871,20 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff hiện tại — Server Settings (2026-10-15)
+
+- Backend và FE đã triển khai theo kế hoạch duyệt; API/DTO/quyền tại docs/02 mục 11. 259 BE tests, 17 settings browser tests và 23 group browser regression cases PASS; FE build PASS. Giữ giới hạn H2/mock khi bàn giao.
+- Dùng tài khoản Server Owner, vào trang Server rồi chọn nút bánh răng Cài đặt Server ở heading sidebar. Mobile: mở danh sách kênh trước. Đổi tên hoặc ảnh, chọn Lưu thay đổi; tên/ảnh được đồng bộ trong nhóm và dock ngay khi PUT thành công.
+- Code/test Server Settings đã được commit riêng từng file theo ủy quyền trực tiếp ngày 2026-10-15; xem log RELEASE-SERVER-SETTINGS. Không đổi .env, schema, migrations, Entity, role hierarchy hoặc các module Conversation/Message. Các lỗi được báo trong lượt review sau triển khai chưa được sửa trong đợt release này.
+- Cần kiểm thử tích hợp trên môi trường SQL Server của nhóm sau khi review/apply các mapping/audit script liên quan theo quy trình riêng. Conflict markers cũ trong docs/00 vẫn cần nhóm xử lý; không coi việc cập nhật task này là đã giải conflict.
+
+### Handoff — Sửa Channel/File và ảnh local (2026-10-15)
+
+- Backend binding đã sửa, 228 tests và Gradle check PASS. Cấu hình local chạy từ `server/` để đọc `server/uploads/servers`; không thay FileService hoặc đường dẫn URL lưu trong DB.
+- Dừng phiên Java cũ rồi khởi chạy lại bằng cấu hình Java đã sửa; workspace của cấu hình này là thư mục `den-app`. Nếu chạy bằng cách khác, bảo đảm working directory là `server/`; file upload được đọc/ghi tương đối với working directory.
+- `.vscode/launch.json` bị ignore nên người khác cần tự đặt cwd/envFile theo docs/02 mục 10. Không chia sẻ `.env` hoặc credential.
+- Chưa xác minh trực tiếp trình duyệt/SQL Server sau restart; nếu vẫn lỗi, đối chiếu stack trace backend và URL/status GET ảnh thực tế. Các dấu merge conflict cũ của docs/00 cần nhóm xử lý riêng.
 
 ### Handoff hiện tại — Server CRUD release 6/6 (2026-10-13)
 

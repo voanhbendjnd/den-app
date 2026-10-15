@@ -304,3 +304,9 @@ Duy đã duyệt bổ sung sửa audit bằng yêu cầu “làm tiếp đi” s
 - Mặc định `@ApplyChanges = 0`: hiển thị database, metadata và SQL dự kiến rồi dừng. Người vận hành chọn đúng database, review rồi đặt `1` để apply hai ALTER trong transaction; lỗi rollback. Script không chạy tự động khi khởi động ứng dụng.
 - **Chưa thực thi hoặc xác minh script trên SQL Server thật.** Cần review/apply schema trước khi coi lỗi email dài đã được xử lý trên database đang triển khai; không suy ra `ddl-auto=update` đã thực hiện thành công thay đổi này.
 - MockMvc/JWT/JPA/H2 test PASS với email 55 và 254 ký tự: tạo Server kèm membership Owner, đọc lại cả hai audit đầy đủ, cập nhật Server và đọc lại không mất email. Bộ backend hiện tại PASS 150/150. Cột `server_member.nickname` giữ `NVARCHAR(20)`; xử lý tên người tạo dài/rỗng bằng nickname tự sinh ở Service theo docs/01 mục 5, không sửa schema nickname.
+
+### 4.5 Chỉnh sửa Server dùng mapping hiện có (`CONFIRMED`, 2026-10-15)
+
+- `Server.name` và request chỉnh sửa dùng giới hạn 100 đơn vị UTF-16, mapping `NVARCHAR(100)`; `Server.iconUrl` hiện map `icon_url` với `length = 255`, `CreateServerDTO` và `UpdateServerDTO` đều giới hạn 255. Bảng thiết kế mục 3.2 ghi `VARCHAR(500)` là chênh lệch thiết kế/mapping đã đối chiếu; task này theo mapping/giới hạn 255 được người dùng duyệt, không mở rộng Entity hoặc database.
+- Update chỉ thay `name`, `iconUrl` và audit sửa đổi qua cơ chế hiện có. Giữ `owner_id`, identity, created date, membership, Channel, constraints và indexes. Không thêm field, migration, DDL hoặc thay schema SQL Server.
+- H2/JPA qua PUT kiểm tra tên 100 đơn vị UTF-16 (50 emoji), icon 255, từ chối các biên 101/256 và email audit 53/254 ký tự. Script audit tại mục 4.4 vẫn chưa được thực thi/xác minh trên SQL Server thật trong task này.

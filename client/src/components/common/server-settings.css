@@ -1,0 +1,41 @@
+.server-settings-modal .ant-modal-content { padding: 0; overflow: hidden; border: 1px solid var(--border-subtle); box-shadow: 0 24px 80px rgba(0, 0, 0, .5); }
+.server-settings-modal .ant-modal-header { margin: 0; padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); }
+.server-settings-modal .ant-modal-body { max-height: calc(100vh - 140px); overflow-y: auto; }
+.server-settings { display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+.server-settings__sidebar { display: flex; flex-direction: column; align-items: flex-start; padding: 28px 20px; background: var(--color-bg-sidebar); border-right: 1px solid var(--border-subtle); gap: 10px; }
+.server-settings__sidebar > strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-main); }
+.server-settings__sidebar > span, .server-settings__sidebar p { font-size: 12px; line-height: 1.7; color: var(--color-text-muted); }
+.server-settings__sidebar p { margin-top: auto; padding-top: 36px; }
+.server-settings__nav { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 18px; padding: 12px; color: var(--color-cyan); background: rgba(99, 102, 241, .14); border-radius: var(--radius-sm); font-weight: 600; }
+.server-settings__content { min-width: 0; padding: 28px 32px; }
+.server-settings__intro h2 { margin: 0 0 6px; color: var(--color-text-main); font-size: 23px; font-weight: 700; }
+.server-settings__intro p { margin: 0; color: var(--color-text-muted); line-height: 1.7; font-size: 13px; }
+.server-settings__error { margin-top: 20px; }
+.server-settings__image-row { display: flex; align-items: center; gap: 22px; margin: 30px 0; }
+.server-settings__image { position: relative; border: 1px solid var(--border-subtle); background: var(--color-bg-elevated); border-radius: var(--radius-lg); overflow: hidden; padding: 0; flex-shrink: 0; cursor: pointer; }
+.server-settings__image .ant-avatar { display: block; border-radius: 0; font-size: 36px; background: var(--gradient-brand); }
+.server-settings__image:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 4px; }
+.server-settings__image-overlay { position: absolute; inset: auto 0 0; padding: 6px; background: rgba(8, 11, 17, .65); color: white; }
+.server-settings__image-actions h3 { margin: 0 0 6px; font-size: 14px; }
+.server-settings__image-actions p { margin: 0 0 12px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
+.server-settings__image-actions > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.server-settings__preview-label { color: var(--color-text-muted); font-size: 12px; margin: 26px 0 10px; }
+.server-settings__preview { display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--color-bg-sidebar); }
+.server-settings__preview > div { display: flex; flex-direction: column; min-width: 0; gap: 4px; }
+.server-settings__preview strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.server-settings__preview div span { color: var(--color-text-muted); font-size: 12px; }
+.server-settings__preview > .anticon { margin-left: auto; color: var(--color-emerald); }
+.server-settings__savebar { position: sticky; bottom: 0; margin-top: 30px; padding: 20px 0 0; border-top: 1px solid var(--border-subtle); background: var(--color-bg-surface); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.server-settings__savebar > span { color: var(--color-text-muted); font-size: 12px; }
+.server-settings__savebar > div { display: flex; gap: 8px; flex-shrink: 0; }
+.group-sidebar-settings-btn { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: transparent; color: var(--color-text-muted); cursor: pointer; }
+.group-sidebar-settings-btn:hover, .group-sidebar-settings-btn:focus-visible { color: var(--color-cyan); background: rgba(99, 102, 241, .14); }
+@media (max-width: 700px) {
+  .server-settings-modal { max-width: calc(100vw - 24px); margin: 12px auto; }
+  .server-settings { grid-template-columns: minmax(0, 1fr); }
+  .server-settings__sidebar { display: none; }
+  .server-settings__content { padding: 22px 18px; }
+  .server-settings__image-row { gap: 14px; }
+  .server-settings__savebar { flex-direction: column; align-items: stretch; }
+  .server-settings__savebar > div { justify-content: flex-end; }
+}
