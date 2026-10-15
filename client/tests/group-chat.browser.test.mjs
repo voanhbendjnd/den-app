@@ -85,6 +85,7 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
   contexts.push(context);
   context.setDefaultTimeout(12000);
+  context.setDefaultNavigationTimeout(30000);
   await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   await context.route('https://images.unsplash.com/**', route => route.fulfill({
     contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrZkAAAAASUVORK5CYII=', 'base64'),
@@ -116,6 +117,9 @@ async function fulfillServerRequest(route) {
   const request = route.request();
   assert.equal(request.method(), 'GET');
   const pathname = new URL(request.url()).pathname;
+  if (pathname === '/api/v1/conversations') {
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [] } });
+  }
   if (pathname === '/api/v1/servers') {
     return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
   }
