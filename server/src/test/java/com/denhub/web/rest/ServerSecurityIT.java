@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.ArgumentMatchers.any;
@@ -537,6 +538,134 @@ class ServerSecurityIT {
                 .claim("sessionId", user.getSessionId()).claim("authorities", List.of("ROLE_USER")).build();
         return "Bearer " + encoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(SecurityUtils.JWT_ALGORITHM).build(), claims)).getTokenValue();
+    }
+
+    @Test
+    void ownerUpdatesWrappedServerAndPreservesIdentityAndRelations() throws Exception {
+        addMembership(server.getId());
+        long memberCount = members.count();
+        long serverCount = servers.count();
+        entityManager.clear();
+        Instant createdDate = servers.findById(server.getId()).orElseThrow().getCreatedDate();
+
+        mvc.perform(put(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"  Nhóm mới  \",\"iconUrl\":\"https://example.test/new.png\",\"ownerId\":999}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.message").value("Cập nhật Server thành công"))
+                .andExpect(jsonPath("$.data.id").value(server.getId()))
+                .andExpect(jsonPath("$.data.name").value("Nhóm mới"))
+                .andExpect(jsonPath("$.data.ownerId").value(reader.getId()));
+        entityManager.flush();
+        entityManager.clear();
+        Server saved = servers.findById(server.getId()).orElseThrow();
+        assertEquals("Nhóm mới", saved.getName());
+        assertEquals("https://example.test/new.png", saved.getIconUrl());
+        assertEquals(reader.getId(), saved.getOwnerId());
+        assertEquals(createdDate, saved.getCreatedDate());
+        assertEquals(reader.getEmail(), saved.getLastModifiedBy());
+        assertEquals(serverCount, servers.count());
+        assertEquals(memberCount, members.count());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MEMBER", "ADMIN"})
+    void serverMemberAndAdminCannotUpdate(String role) throws Exception {
+        makeReaderOutsider();
+        addMembership(server.getId());
+        ServerMember membership = members.findAllByServerId(server.getId()).get(0);
+        membership.setRole(role);
+        members.saveAndFlush(membership);
+        problem(updateRequest(bearer(), "{\"name\":\"Forbidden\",\"iconUrl\":null}"), 403);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @Test
+    void outsiderWithGlobalAdminAuthorityCannotUpdate() throws Exception {
+        makeReaderOutsider();
+        problem(updateRequest(bearer(reader.getSessionId(), Instant.now().plusSeconds(600), List.of("ROLE_ADMIN")),
+                "{\"name\":\"Forbidden\"}"), 403);
+    }
+
+    @Test
+    void updatingMissingServerIsNotFound() throws Exception {
+        problem(mvc.perform(put("/api/v1/servers/" + Long.MAX_VALUE).header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Valid\"}")), 404);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-a-number", "0", "-1"})
+    void invalidUpdateIdIsBadRequest(String id) throws Exception {
+        problem(mvc.perform(put("/api/v1/servers/" + id).header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Valid\"}")), 400);
+    }
+
+    @Test
+    void updateRequiresValidJwtAndSession() throws Exception {
+        String body = "{\"name\":\"Changed\"}";
+        problem(mvc.perform(put(detailUrl()).contentType(MediaType.APPLICATION_JSON).content(body)), 401);
+        problem(updateRequest("Bearer not-a-jwt", body), 401);
+        problem(updateRequest(bearer(reader.getSessionId(), Instant.now().minusSeconds(600), List.of("ROLE_USER")), body), 401);
+        problem(updateRequest(bearer("wrong-session", Instant.now().plusSeconds(600), List.of("ROLE_USER")), body), 401);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void updateRejectsMissingOrInactiveAccount(boolean deleted) throws Exception {
+        String token = bearer();
+        if (deleted) users.delete(reader);
+        else reader.setActivated(false);
+        entityManager.flush();
+        problem(updateRequest(token, "{\"name\":\"Changed\"}"), 401);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"name\":null}", "{\"name\":\"\"}", "{\"name\":\"   \"}", "{\"name\":\"\u00a0\u2003\u202f\"}"})
+    void updateRejectsBlankNameWithoutWriting(String body) throws Exception {
+        problem(updateRequest(bearer(), body), 400);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @Test
+    void updateValidatesFieldBoundariesAndCanRemoveIcon() throws Exception {
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        problem(updateRequest(bearer(), mapper.writeValueAsString(java.util.Map.of("name", "x".repeat(101)))), 400);
+        problem(updateRequest(bearer(), mapper.writeValueAsString(java.util.Map.of("name", "Valid", "iconUrl", "x".repeat(256)))), 400);
+        updateRequest(bearer(), mapper.writeValueAsString(java.util.Map.of("name", "🙂".repeat(50), "iconUrl", "x".repeat(255))))
+                .andExpect(status().isOk());
+        entityManager.flush();
+        entityManager.clear();
+        Server saved = servers.findById(server.getId()).orElseThrow();
+        assertEquals("🙂".repeat(50), saved.getName());
+        assertEquals(255, saved.getIconUrl().length());
+        for (String icon : List.of("null", "\"\"", "\"   \"")) {
+            updateRequest(bearer(), "{\"name\":\"Valid\",\"iconUrl\":" + icon + "}")
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.iconUrl").value(nullValue()));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {53, 254})
+    void updatePreservesLongEmailAudit(int length) throws Exception {
+        String email = length == 254
+                ? "a".repeat(60) + "@" + "b".repeat(60) + "." + "c".repeat(60) + "." + "d".repeat(60) + "." + "e".repeat(5) + ".test"
+                : "a".repeat(length - "@example.test".length()) + "@example.test";
+        assertEquals(length, email.length());
+        reader.setEmail(email);
+        reader = users.saveAndFlush(reader);
+        updateRequest(bearer(), "{\"name\":\"Updated audit\"}").andExpect(status().isOk());
+        entityManager.flush();
+        entityManager.clear();
+        assertEquals(email, servers.findById(server.getId()).orElseThrow().getLastModifiedBy());
+    }
+
+    private ResultActions updateRequest(String token, String body) throws Exception {
+        return mvc.perform(put(detailUrl()).header(HttpHeaders.AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
     private void readsDetail() throws Exception {
