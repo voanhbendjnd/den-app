@@ -13,6 +13,7 @@ import com.denhub.service.dto.CreateServerInviteRequestDTO;
 import com.denhub.service.dto.ServerInviteResponseDTO;
 import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
+import com.denhub.service.dto.UpdateServerDTO;
 import com.denhub.util.anotation.ApiMessage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -34,6 +35,15 @@ public class ServerResource {
     @Operation(summary = "Đọc chi tiết Server", description = "Lấy thông tin Server. Yêu cầu đăng nhập và là chủ sở hữu hoặc thành viên của Server.")
     public ResponseEntity<ServerResponseDTO> getServerDetail(@PathVariable("serverId") Long serverId) {
         return ResponseEntity.ok(serverService.getServerDetail(serverId));
+    }
+
+    @PutMapping("/{serverId}")
+    @ApiMessage("Cập nhật Server thành công")
+    @Operation(summary = "Cập nhật tên và ảnh Server", description = "Chỉ Server Owner đang hoạt động được chỉnh sửa Server.", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<ServerResponseDTO> updateServer(
+            @PathVariable("serverId") Long serverId,
+            @Valid @RequestBody UpdateServerDTO dto) {
+        return ResponseEntity.ok(serverService.updateServer(serverId, dto));
     }
 
     @GetMapping("/{serverId}/members")
