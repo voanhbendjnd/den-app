@@ -33,7 +33,7 @@ public class ChannelResource {
 
     @GetMapping("/servers/{serverId}/channels")
     @Operation(summary = "Lấy danh sách Channel của một Server", description = "Lấy toàn bộ channel thuộc server chỉ định theo position tăng dần. Yêu cầu đăng nhập và là thành viên/chủ sở hữu server.")
-    public ResponseEntity<java.util.List<ChannelResponseDTO>> getChannelsByServerId(@PathVariable Long serverId) {
+    public ResponseEntity<java.util.List<ChannelResponseDTO>> getChannelsByServerId(@PathVariable("serverId") Long serverId) {
         java.util.List<ChannelResponseDTO> channels = channelService.getChannelsByServerId(serverId);
         return ResponseEntity.ok(channels);
     }
