@@ -31,6 +31,7 @@ export function useFriends() {
   const [hasMore, setHasMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [unfriendLoading, setUnfriendLoading] = useState({});
+  const [blockLoading, setBlockLoading] = useState({});
 
   const cursorRef = useRef(null);
   const loadedRef = useRef(false);
@@ -129,6 +130,30 @@ export function useFriends() {
     }
   }, []);
 
+  // ── Chặn người dùng (block user) ───────────────────────────────────────────
+  const blockUser = useCallback(async (friendId) => {
+    setBlockLoading((prev) => ({ ...prev, [friendId]: true }));
+    try {
+      await friendApi.blockUser(friendId);
+      // Xóa người này khỏi danh sách bạn bè
+      setFriends((prev) => prev.filter((f) => f.senderId !== friendId));
+      message.success('Đã chặn người dùng thành công.');
+    } catch (err) {
+      console.error('[useFriends] blockUser failed:', err);
+      const errMsg =
+        err.response?.data?.message ||
+        err.response?.data?.detail ||
+        'Không thể chặn người dùng. Vui lòng thử lại!';
+      message.error(errMsg);
+    } finally {
+      setBlockLoading((prev) => {
+        const next = { ...prev };
+        delete next[friendId];
+        return next;
+      });
+    }
+  }, []);
+
   return {
     friends,
     filteredFriends,
@@ -140,5 +165,7 @@ export function useFriends() {
     setSearchQuery,
     unfriend,
     unfriendLoading,
+    blockUser,
+    blockLoading,
   };
 }

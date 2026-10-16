@@ -150,7 +150,9 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Friendship** | `POST` | `/api/friendships/accept-friend-request` | Chấp nhận lời mời kết bạn | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/remove-friend-request` | Hủy gửi yêu cầu kết bạn hoặc từ chối lời mời kết bạn | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/all-friend` | Lấy danh sách tất cả bạn bè đã kết bạn (Cursor time pagination) | `CONFIRMED` |
-| **Friendship** | `POST` | `/api/friendships/remove-friend` | Hủy kết bạn (Unfriend) giữa hai người dùng đã kết bạn | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/block-user` | Chặn người dùng (kể cả khi chưa là bạn hoặc đã là bạn) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/block-user/remove` | Gỡ chặn người dùng (Unblock user) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
@@ -258,7 +260,7 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 | `/app/conversations/send` | `SEND` | Client gửi tin nhắn 1-1 (Text / Image) | `CONFIRMED` |
 | `/topic/conversations/{conversationId}` | `SUBSCRIBE` | Client lắng nghe tin nhắn 1-1 real-time | `CONFIRMED` |
 | `/user/queue/friend-requests/received` | `SUBSCRIBE` | Nhận thông báo có lời mời kết bạn mới | `CONFIRMED` |
-| `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Nhận thông báo lời mời kết bạn được chấp nhận | `CONFIRMED` |
+| `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Sự kiện ngầm cập nhật danh sách bạn bè khi lời mời được chấp nhận (không hiển thị popup notification để chống spam) | `CONFIRMED` |
 | `/user/queue/direct-messages` | `SUBSCRIBE` | Nhận tin nhắn riêng tư 1-1 gửi trực tiếp cho người dùng | `TBD` |
 | `/user/queue/errors` | `SUBSCRIBE` | Nhận thông báo lỗi thời gian thực cá nhân | `TBD` |
 

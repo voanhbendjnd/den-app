@@ -28,6 +28,7 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
         where (fs.userOneId = :userId or fs.userTwoId = :userId)
         and fs.status = :status
         and (:status <> 'PENDING' or fs.actionUserId <> :userId)
+        and (:status <> 'BLOCKED' or fs.actionUserId = :userId)
         and (:cursor is null or fs.lastModifiedDate < :cursor)
         order by fs.lastModifiedDate desc, fs.id desc
     """)

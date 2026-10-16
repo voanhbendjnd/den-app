@@ -69,6 +69,34 @@ const friendApi = {
    */
   removeFriend: (friendId) =>
     axiosClient.post('/friendships/remove-friend', { friendId }),
+
+  /**
+   * Chặn người dùng (block user).
+   * POST /api/friendships/block-user
+   * @param {number} friendId - ID của người muốn chặn
+   * @returns {Promise<void>}
+   */
+  blockUser: (friendId) =>
+    axiosClient.post('/friendships/block-user', { friendId }),
+
+  /**
+   * Bỏ chặn người dùng (unblock user).
+   * POST /api/friendships/block-user/remove
+   * @param {number} friendId - ID của người muốn bỏ chặn
+   * @returns {Promise<void>}
+   */
+  unblockUser: (friendId) =>
+    axiosClient.post('/friendships/block-user/remove', { friendId }),
+
+  /**
+   * Lấy danh sách người dùng đã bị chặn bởi user hiện tại (cursor pagination).
+   * POST /api/friendships/blocked-users
+   * @param {number} size - số lượng mỗi trang
+   * @param {string|null} cursor - ISO-8601 lastModifiedDate của item cuối cùng
+   * @returns {Promise<{ result, nextCursor, hasMore }>}
+   */
+  getBlockedUsers: (size = 20, cursor = null) =>
+    axiosClient.post('/friendships/blocked-users', { size, cursor }),
 };
 
 export default friendApi;

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
 import { notification, Button } from 'antd';
-import { UserAddOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { UserAddOutlined } from '@ant-design/icons';
 import { getAccessToken } from '../utils/token';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws';
@@ -64,22 +64,13 @@ export function useGlobalFriendNotification() {
           }
         });
 
-        // 2. Nhận thông báo lời mời kết bạn được chấp nhận
+        // 2. Nhận thông báo lời mời kết bạn được chấp nhận (cập nhật state nội bộ, không hiện popup thông báo để tránh spam)
         client.subscribe('/user/queue/friend-requests/accepted', (frame) => {
           try {
             const action = JSON.parse(frame.body);
             window.dispatchEvent(
               new CustomEvent('denhub:friend-request-accepted', { detail: action })
             );
-
-            const friendName = action.name || action.username || 'Người bạn';
-            notification.success({
-              message: 'Đã trở thành bạn bè',
-              description: `${friendName} đã chấp nhận lời mời kết bạn của bạn!`,
-              icon: <CheckCircleOutlined style={{ color: '#10B981' }} />,
-              placement: 'bottomRight',
-              duration: 5,
-            });
           } catch (err) {
             console.error('[GlobalFriendNotification] Parse accepted error:', err);
           }

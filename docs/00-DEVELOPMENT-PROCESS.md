@@ -339,6 +339,15 @@ Bản ghi mới này nằm ngoài các vùng merge conflict có sẵn của bả
 
 Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không quyết định thay nhóm giữa hai bản tiến độ cũ. Không coi kiểm tra MockMvc/H2 và đường dẫn local là kiểm thử giao diện hoặc SQL Server thật.
 
+### Tính năng Block & Gỡ Block User, Sửa Business Rules (2026-10-16)
+
+| Công việc | Trạng thái | Bằng chứng / bước còn lại |
+| :--- | :--- | :--- |
+| **Sửa business rule Block User (Backend)** | TESTED | `FriendshipService.blockUser`: cho phép block cả khi chưa có quan hệ và khi đã là bạn, kiểm tra user tồn tại, cập nhật `actionUserId = currentUserId`. `UserRepository.searchByUsername`: loại trừ người đã block người tìm kiếm qua điều kiện `NOT EXISTS (BLOCKED and actionUserId = u.id)`. 16 tests trong `FriendshipServiceTest` PASS 100%, toàn bộ backend suite PASS (`BUILD SUCCESSFUL`). |
+| **Tính năng Block User (Frontend)** | TESTED (BUILD) | `client/src/api/friendApi.js`: thêm `blockUser`. `client/src/hooks/useFriends.js`: thêm hàm `blockUser`, `blockLoading`, tự động xóa bạn bè khi bị chặn. `client/src/pages/direct/FriendRequestPage.jsx`: nút Chặn tại `FriendCard` kèm Popconfirm. `client/src/pages/direct/SearchUserPanel.jsx`: nút Chặn ngay trong kết quả tìm kiếm kèm Popconfirm. `npm run build` PASS 100%. |
+| **Tính năng Gỡ Block & Danh sách chặn (Backend & Frontend)** | TESTED | Backend: `FriendshipService.removeBlock` (xóa bản ghi khi unblock, chặn người bị block tự gỡ), `getAllBlockedUsers` (cursor pagination). `FriendshipController`: `/api/friendships/block-user/remove` và `/blocked-users`. 23 tests `FriendshipServiceTest` PASS 100%, backend suite PASS. Frontend: `useBlockedUsers.js`, tab "Đã chặn" trên `FriendRequestPage.jsx`, nút Bỏ chặn kèm Popconfirm. `npm run build` PASS. |
+| **Tắt realtime popup notification khi đồng ý kết bạn (BE & FE)** | TESTED | Gỡ bỏ `notificationFriendshipRequest.requestAccepted` trong BE (`acceptFriendRequest` và `sendRequestAddFriend`) và gỡ bỏ popup toast `notification.success` trong `useGlobalFriendNotification.jsx` để tránh spam màn hình khi nhiều người đồng ý kết bạn cùng lúc. Cập nhật test `FriendshipServiceTest` PASS 23/23, toàn bộ backend test suite PASS. |
+
 ### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
 <<<<<<< HEAD

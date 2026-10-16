@@ -46,7 +46,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(value = """
         select u.id as id, u.username as username, u.email as email, u.name as name, u.avatar as avatar
            from User u
-               where u.username like concat('',:q,'%') and u.id <> :currentUserId
+               where u.username like concat('',:q,'%')
+                 and u.id <> :currentUserId
+                 and not exists (
+                     select 1 from Friendship fs
+                     where ((fs.userOneId = u.id and fs.userTwoId = :currentUserId)
+                         or (fs.userOneId = :currentUserId and fs.userTwoId = u.id))
+                       and fs.status = 'BLOCKED'
+                       and fs.actionUserId = u.id
+                 )
     """)
     List<UsernameProjection> searchByUsername(@Param("q") String q, @Param("currentUserId") Long currentUserId);
 

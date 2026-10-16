@@ -53,7 +53,23 @@ public class FriendshipController {
         friendshipService.removeFriend(vm.getFriendId());
         return ResponseEntity.ok(null);
     }
+    /*
+    * block user, can block if between users haven't relationship as ACCEPT, PENDING, BLOCK
+    * */
+    @PostMapping("/block-user")
+    public ResponseEntity<Void> blockUser(@Valid @RequestBody FriendshipVM vm){
+        friendshipService.blockUser(vm.getFriendId());
+        return ResponseEntity.ok(null);
+    }
 
+    @PostMapping({"/block-user/remove", "/unblock-user"})
+    public ResponseEntity<Void> removeBlockUser(@Valid @RequestBody FriendshipVM vm){
+        friendshipService.removeBlock(vm.getFriendId());
+        return ResponseEntity.ok(null);
+    }
 
-
+    @PostMapping("/blocked-users")
+    public ResponseEntity<ResultPaginationCursorTime> getBlockedUsers(@RequestBody @Valid SizeAndCursorTimeVM vm) {
+        return ResponseEntity.ok(friendshipService.getAllBlockedUsers(vm.getSize(), vm.getCursor()));
+    }
 }

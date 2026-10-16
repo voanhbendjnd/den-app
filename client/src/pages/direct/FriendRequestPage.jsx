@@ -13,12 +13,15 @@ import {
   UsergroupAddOutlined,
   CheckCircleOutlined,
   UserDeleteOutlined,
+  StopOutlined,
+  UnlockOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/vi';
 import { useFriendRequests } from '../../hooks/useFriendRequests';
 import { useFriends } from '../../hooks/useFriends';
+import { useBlockedUsers } from '../../hooks/useBlockedUsers';
 import conversationApi from '../../api/conversationApi';
 
 dayjs.extend(relativeTime);
@@ -27,9 +30,10 @@ dayjs.locale('vi');
 const { Text, Title } = Typography;
 
 // ─── Friend Card (Đã là bạn bè) ────────────────────────────────────────────────
-function FriendCard({ friend, onStartChat, chatLoading, onUnfriend, unfriendLoading }) {
+function FriendCard({ friend, onStartChat, chatLoading, onUnfriend, unfriendLoading, onBlock, blockLoading }) {
   const isChatting = !!chatLoading[friend.senderId];
   const isUnfriending = !!unfriendLoading?.[friend.senderId];
+  const isBlocking = !!blockLoading?.[friend.senderId];
 
   return (
     <div
@@ -139,7 +143,7 @@ function FriendCard({ friend, onStartChat, chatLoading, onUnfriend, unfriendLoad
             id={`btn-unfriend-${friend.senderId}`}
             icon={<UserDeleteOutlined />}
             loading={isUnfriending}
-            disabled={isChatting}
+            disabled={isChatting || isBlocking}
             style={{
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -163,6 +167,160 @@ function FriendCard({ friend, onStartChat, chatLoading, onUnfriend, unfriendLoad
             }}
           >
             Hủy kết bạn
+          </Button>
+        </Popconfirm>
+
+        <Popconfirm
+          title="Chặn người dùng"
+          description={`Bạn có chắc muốn chặn ${friend.name || friend.username}? Hai người sẽ không còn là bạn bè và người này sẽ không tìm thấy bạn qua tìm kiếm.`}
+          okText="Chặn"
+          cancelText="Không"
+          okButtonProps={{ danger: true }}
+          onConfirm={() => onBlock(friend.senderId)}
+        >
+          <Button
+            id={`btn-block-${friend.senderId}`}
+            icon={<StopOutlined />}
+            loading={isBlocking}
+            disabled={isChatting || isUnfriending}
+            style={{
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              color: '#F87171',
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 36,
+              padding: '0 12px',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#EF4444';
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.18)';
+              e.currentTarget.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            Chặn
+          </Button>
+        </Popconfirm>
+      </div>
+    </div>
+  );
+}
+
+// ─── Blocked User Card (Đã bị chặn) ──────────────────────────────────────────
+function BlockedUserCard({ user, onUnblock, unblockLoading }) {
+  const isUnblocking = !!unblockLoading?.[user.senderId];
+
+  return (
+    <div
+      id={`blocked-card-${user.senderId}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        padding: '14px 20px',
+        borderRadius: 14,
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        transition: 'all 0.25s cubic-bezier(0.16,1,0.3,1)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)';
+        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+        e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
+    >
+      {/* Avatar */}
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <Avatar
+          size={50}
+          src={user.avatar}
+          style={{
+            background: 'linear-gradient(135deg, #EF4444, #F59E0B)',
+            fontSize: 20,
+            fontWeight: 700,
+            color: '#fff',
+            boxShadow: '0 0 12px rgba(239,68,68,0.25)',
+          }}
+        >
+          {!user.avatar && (user.name || user.username)?.[0]?.toUpperCase()}
+        </Avatar>
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+          <Text
+            style={{ color: '#F1F5F9', fontWeight: 700, fontSize: 15 }}
+            ellipsis
+          >
+            {user.name || user.username}
+          </Text>
+          <Tag
+            icon={<StopOutlined />}
+            style={{
+              borderRadius: 12,
+              fontSize: 11,
+              padding: '0 8px',
+              lineHeight: '18px',
+              fontWeight: 600,
+              background: 'rgba(239,68,68,0.12)',
+              borderColor: 'rgba(239,68,68,0.3)',
+              color: '#F87171',
+              flexShrink: 0,
+            }}
+          >
+            Đã chặn
+          </Tag>
+        </div>
+        <Text style={{ color: '#64748B', fontSize: 12 }}>@{user.username}</Text>
+      </div>
+
+      {/* Actions: Bỏ chặn */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <Popconfirm
+          title="Bỏ chặn người dùng"
+          description={`Bạn có chắc muốn bỏ chặn ${user.name || user.username}? Người này sẽ có thể tìm thấy bạn và gửi lời mời kết bạn.`}
+          okText="Bỏ chặn"
+          cancelText="Không"
+          onConfirm={() => onUnblock(user.senderId)}
+        >
+          <Button
+            id={`btn-unblock-${user.senderId}`}
+            icon={<UnlockOutlined />}
+            loading={isUnblocking}
+            style={{
+              background: 'rgba(99,102,241,0.12)',
+              border: '1px solid rgba(99,102,241,0.3)',
+              color: '#A5B4FC',
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 36,
+              padding: '0 14px',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#6366F1';
+              e.currentTarget.style.background = 'rgba(99,102,241,0.25)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)';
+              e.currentTarget.style.background = 'rgba(99,102,241,0.12)';
+            }}
+          >
+            Bỏ chặn
           </Button>
         </Popconfirm>
       </div>
@@ -372,7 +530,26 @@ export default function FriendRequestPage() {
     setSearchQuery,
     unfriend,
     unfriendLoading,
+    blockUser,
+    blockLoading,
   } = useFriends();
+
+  // Hook Người dùng đã chặn
+  const {
+    blockedUsers,
+    loading: blockedLoading,
+    hasMore: blockedHasMore,
+    loadMore: blockedLoadMore,
+    refresh: refreshBlocked,
+    unblockUser,
+    unblockLoading,
+  } = useBlockedUsers();
+
+  // Xử lý Chặn xong thì refresh lại danh sách đã chặn
+  const handleBlockAndRefresh = async (friendId) => {
+    await blockUser(friendId);
+    refreshBlocked();
+  };
 
   // Xử lý Accept xong thì refresh lại danh sách bạn bè
   const handleAcceptAndRefresh = async (senderId) => {
@@ -570,6 +747,44 @@ export default function FriendRequestPage() {
             </span>
           )}
         </button>
+
+        {/* Tab Đã chặn */}
+        <button
+          id="tab-blocked-friends"
+          type="button"
+          onClick={() => setActiveTab('blocked')}
+          style={{
+            background: activeTab === 'blocked' ? 'rgba(99,102,241,0.18)' : 'transparent',
+            border: activeTab === 'blocked' ? '1px solid rgba(99,102,241,0.4)' : '1px solid transparent',
+            color: activeTab === 'blocked' ? '#FFFFFF' : '#94A3B8',
+            borderRadius: 10,
+            padding: '7px 16px',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            transition: 'all 0.2s',
+          }}
+        >
+          <StopOutlined />
+          <span>Đã chặn</span>
+          {blockedUsers.length > 0 && (
+            <span
+              style={{
+                background: 'rgba(239, 68, 68, 0.8)',
+                color: '#fff',
+                fontSize: 11,
+                padding: '1px 7px',
+                borderRadius: 10,
+                fontWeight: 800,
+              }}
+            >
+              {blockedUsers.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* ── TAB 1: TẤT CẢ BẠN BÈ ── */}
@@ -641,6 +856,8 @@ export default function FriendRequestPage() {
                   chatLoading={chatLoading}
                   onUnfriend={unfriend}
                   unfriendLoading={unfriendLoading}
+                  onBlock={handleBlockAndRefresh}
+                  blockLoading={blockLoading}
                 />
               ))}
 
@@ -741,6 +958,74 @@ export default function FriendRequestPage() {
                     }}
                   >
                     {requestsLoading ? 'Đang tải...' : 'Tải thêm'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 3: ĐÃ CHẶN ── */}
+      {activeTab === 'blocked' && (
+        <div>
+          {blockedLoading && blockedUsers.length === 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingTop: 80,
+                gap: 16,
+              }}
+            >
+              <Spin size="large" />
+              <Text style={{ color: '#64748B' }}>Đang tải danh sách đã chặn...</Text>
+            </div>
+          ) : blockedUsers.length === 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingTop: 80,
+                gap: 16,
+              }}
+            >
+              <div style={{ fontSize: 56, lineHeight: 1 }}>🛡️</div>
+              <Title level={4} style={{ color: '#64748B', margin: 0, fontWeight: 700 }}>
+                Không có ai bị chặn
+              </Title>
+              <Text style={{ color: '#475569', textAlign: 'center', maxWidth: 320 }}>
+                Bạn chưa chặn người dùng nào.
+              </Text>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {blockedUsers.map((u) => (
+                <BlockedUserCard
+                  key={u.senderId}
+                  user={u}
+                  onUnblock={unblockUser}
+                  unblockLoading={unblockLoading}
+                />
+              ))}
+
+              {blockedHasMore && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+                  <Button
+                    onClick={blockedLoadMore}
+                    loading={blockedLoading}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      borderColor: 'rgba(255,255,255,0.1)',
+                      color: '#94A3B8',
+                      borderRadius: 8,
+                    }}
+                  >
+                    Tải thêm
                   </Button>
                 </div>
               )}
