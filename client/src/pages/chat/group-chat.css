@@ -30,12 +30,21 @@
 .group-add-channel-btn { background: transparent; border: none; color: var(--color-text-muted); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease; }
 .group-add-channel-btn:hover { color: var(--color-cyan); background: rgba(0, 242, 254, .12); }
 .group-channels-nav { display: flex; flex-direction: column; gap: 3px; }
+.group-channel-row { display: flex; align-items: center; position: relative; width: 100%; border-radius: 8px; transition: all .18s ease; }
+.group-channel-row:hover { background: rgba(99, 102, 241, .1); }
+.group-channel-row--active { background: linear-gradient(90deg, rgba(99, 102, 241, .22) 0%, rgba(0, 242, 254, .08) 100%); border-left: 3px solid #00f2fe; }
+.group-channel-row .group-channel-item { flex: 1; min-width: 0; border-radius: 8px 0 0 8px; }
+.group-channel-row:hover .group-channel-item, .group-channel-row--active .group-channel-item { background: transparent !important; }
+.group-channel-row--active .group-channel-item { border-left: none; }
 .group-channel-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; background: transparent; border: none; border-radius: 8px; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; text-align: left; transition: all .18s ease; position: relative; }
 .group-channel-item:hover { background: rgba(99, 102, 241, .1); color: #f1f5f9; }
 .group-channel-item--active { background: linear-gradient(90deg, rgba(99, 102, 241, .22) 0%, rgba(0, 242, 254, .08) 100%); color: #00f2fe; font-weight: 600; border-left: 3px solid #00f2fe; }
 .group-channel-item__hash { font-size: 16px; font-weight: 700; color: inherit; opacity: .7; flex-shrink: 0; }
 .group-channel-item__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .group-channel-item__indicator { width: 6px; height: 6px; border-radius: 50%; background: #00f2fe; box-shadow: 0 0 8px #00f2fe; flex-shrink: 0; }
+.group-channel-edit-btn { background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 13px; padding: 6px 8px; margin-right: 4px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s ease, color .18s ease, transform .18s ease; flex-shrink: 0; }
+.group-channel-row:hover .group-channel-edit-btn, .group-channel-row:focus-within .group-channel-edit-btn { opacity: 1; }
+.group-channel-edit-btn:hover { color: #00f2fe; background: rgba(0, 242, 254, .12); transform: rotate(30deg); }
 .group-channel-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; background: rgba(0, 242, 254, .1); color: #00f2fe; border: 1px solid rgba(0, 242, 254, .25); border-radius: 6px; }
 .group-channel-loading { display: flex; align-items: center; gap: 8px; padding: 12px 6px; color: var(--color-text-muted); font-size: 12px; }
 .group-channel-error { padding: 12px; border-radius: 8px; background: rgba(239, 68, 68, .1); border: 1px solid rgba(239, 68, 68, .2); color: #fca5a5; font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
@@ -62,6 +71,8 @@
 .group-pending-label { font-size: 10px; padding: 5px 9px; color: #afb8cb; border: 1px solid var(--border-subtle); border-radius: 6px; white-space: nowrap; }
 .group-header-invite-btn.ant-btn { color: #00f2fe; border: 1px solid rgba(0, 242, 254, .22); background: rgba(0, 242, 254, .06); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease; }
 .group-header-invite-btn.ant-btn:hover { background: rgba(0, 242, 254, .16) !important; color: #38bdf8 !important; border-color: rgba(0, 242, 254, .5) !important; }
+.group-header-edit-btn.ant-btn { color: #94a3b8; border: 1px solid rgba(148, 163, 184, .2); background: rgba(148, 163, 184, .05); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease; }
+.group-header-edit-btn.ant-btn:hover { background: rgba(0, 242, 254, .16) !important; color: #00f2fe !important; border-color: rgba(0, 242, 254, .4) !important; }
 .group-mobile-channels.ant-btn { display: none; }
 .group-chat__content { flex: 1; min-height: 0; overflow-y: auto; display: flex; background: radial-gradient(ellipse at 45% 33%, rgba(99, 102, 241, .07), transparent 65%); }
 .group-welcome { margin: auto; padding: 50px 32px 38px; width: 100%; max-width: 610px; text-align: center; }

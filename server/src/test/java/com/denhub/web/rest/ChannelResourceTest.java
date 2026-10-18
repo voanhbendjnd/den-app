@@ -136,7 +136,6 @@ class ChannelResourceTest {
 
         verify(channelService).getChannelsByServerId(42L);
     }
-<<<<<<< HEAD
 
     @Test
     void updateChannel_Success() throws Exception {

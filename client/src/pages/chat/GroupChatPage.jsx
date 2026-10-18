@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
 import CreateChannelModal from '../../components/common/CreateChannelModal';
+import EditChannelModal from '../../components/common/EditChannelModal';
 import ServerInviteModal from '../../components/common/ServerInviteModal';
 import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
@@ -32,6 +33,7 @@ function ChannelSidebar({
   onOpenSettings,
   onSelectChannel,
   onOpenCreateChannel,
+  onOpenEditChannel,
   onRetryChannels,
 }) {
   return (
@@ -108,17 +110,33 @@ function ChannelSidebar({
             {channels.map((ch) => {
               const isActive = activeChannel?.id === ch.id;
               return (
-                <button
+                <div
                   key={ch.id}
-                  type="button"
-                  className={`group-channel-item ${isActive ? 'group-channel-item--active' : ''}`}
-                  onClick={() => onSelectChannel(ch)}
-                  aria-current={isActive ? 'page' : undefined}
+                  className={`group-channel-row ${isActive ? 'group-channel-row--active' : ''}`}
                 >
-                  <span className="group-channel-item__hash" aria-hidden="true">#</span>
-                  <span className="group-channel-item__name" title={ch.name}>{ch.name}</span>
-                  {isActive && <span className="group-channel-item__indicator" aria-hidden="true" />}
-                </button>
+                  <button
+                    type="button"
+                    className={`group-channel-item ${isActive ? 'group-channel-item--active' : ''}`}
+                    onClick={() => onSelectChannel(ch)}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <span className="group-channel-item__hash" aria-hidden="true">#</span>
+                    <span className="group-channel-item__name" title={ch.name}>{ch.name}</span>
+                    {isActive && <span className="group-channel-item__indicator" aria-hidden="true" />}
+                  </button>
+                  <button
+                    type="button"
+                    className="group-channel-edit-btn"
+                    title={`Cài đặt kênh #${ch.name}`}
+                    aria-label={`Cài đặt kênh #${ch.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenEditChannel?.(ch);
+                    }}
+                  >
+                    <SettingOutlined />
+                  </button>
+                </div>
               );
             })}
           </nav>
@@ -236,7 +254,8 @@ export default function GroupChatPage() {
   const [membersVisible, setMembersVisible] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  useEffect(() => { setIsSettingsOpen(false); }, [serverId]);
+  const [editingChannel, setEditingChannel] = useState(null);
+  useEffect(() => { setIsSettingsOpen(false); setEditingChannel(null); }, [serverId]);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
 
@@ -336,6 +355,19 @@ export default function GroupChatPage() {
     }
   };
 
+  const handleChannelUpdated = (updatedChannel) => {
+    if (!updatedChannel) return;
+    setChannels((prevList) =>
+      prevList.map((c) => (c.id === updatedChannel.id ? updatedChannel : c))
+    );
+    setActiveChannel((prev) =>
+      prev?.id === updatedChannel.id ? updatedChannel : prev
+    );
+    if (serverId) {
+      fetchChannels(serverId);
+    }
+  };
+
   useEffect(() => {
     let active = true;
     setDetail({ serverId, server: null, loading: true, error: null });
@@ -404,6 +436,7 @@ export default function GroupChatPage() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => setIsCreateChannelOpen(true)}
+          onOpenEditChannel={(ch) => setEditingChannel(ch)}
           onRetryChannels={() => fetchChannels(serverId)}
         />
       </aside>
@@ -419,6 +452,16 @@ export default function GroupChatPage() {
             <span className="group-channel-badge">#{activeChannel.name}</span>
           ) : (
             <span className="group-pending-label">Chưa chọn kênh</span>
+          )}
+          {activeChannel && (
+            <Button
+              type="text"
+              className="group-header-edit-btn"
+              icon={<SettingOutlined />}
+              title={`Cài đặt kênh #${activeChannel.name}`}
+              aria-label={`Cài đặt kênh #${activeChannel.name}`}
+              onClick={() => setEditingChannel(activeChannel)}
+            />
           )}
           {isOwner && (
             <Button
@@ -517,6 +560,10 @@ export default function GroupChatPage() {
             setChannelsOpen(false);
             setIsCreateChannelOpen(true);
           }}
+          onOpenEditChannel={(ch) => {
+            setChannelsOpen(false);
+            setEditingChannel(ch);
+          }}
           onRetryChannels={() => fetchChannels(serverId)}
         />
       </Drawer>
@@ -545,6 +592,14 @@ export default function GroupChatPage() {
         onClose={() => setIsCreateChannelOpen(false)}
         server={server}
         onSuccess={handleChannelCreated}
+      />
+
+      <EditChannelModal
+        open={Boolean(editingChannel)}
+        channel={editingChannel}
+        server={server}
+        onClose={() => setEditingChannel(null)}
+        onSuccess={handleChannelUpdated}
       />
 
       <ServerInviteModal

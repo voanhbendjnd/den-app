@@ -438,6 +438,38 @@ Implemented:
 
 ---
 
+### [2026-10-18] FEAT-CHANNEL-UI-EDIT — Làm UI sửa Channel, kết nối API (Kỳ Anh)
+
+Implemented:
+- Tạo mới `client/src/utils/channelUtils.js`:
+  - `formatChannelName(raw)`: Tự động chuẩn hóa tên kênh sang chữ thường, thay khoảng trắng bằng dấu gạch ngang, lọc bỏ ký tự đặc biệt.
+  - `validateChannelName(name)`: Kiểm tra độ dài (2–20 ký tự), bắt buộc ký tự `a-z0-9-_`, không để trống.
+  - `validateChannelPosition(position)`: Kiểm tra số nguyên không âm (>= 0).
+  - `getChannelEditErrorMessage(err, channelName)`: Ánh xạ mã lỗi API server (`namealreadyexists`, `forbidden`, `channelnotfound`, field violations...) sang thông báo tiếng Việt thân thiện.
+- Tạo mới `client/src/components/common/EditChannelModal.jsx`:
+  - Thiết kế modal Cyber Dark với viền cyan glow, icon biểu tượng, Form Ant Design layout vertical.
+  - Tích hợp chuẩn hóa tên tức thời khi gõ phím (`onChange`), input số nguyên vị trí hiển thị (`position`).
+  - Kết nối API `channelApi.update(channel.id, payload)`.
+  - Hiển thị Alert lỗi chi tiết và message toast thông báo thành công.
+- Cập nhật `client/src/api/channelApi.js`:
+  - Bổ sung hàm `update: (channelId, data) => axiosClient.put('/v1/channels/' + channelId, data)`.
+- Cập nhật `client/src/pages/chat/group-chat.css`:
+  - Bổ sung `.group-channel-row`, `.group-channel-edit-btn` (hiển thị khi hover/focus kênh với hiệu ứng xoay nhẹ và glow cyan).
+  - Bổ sung `.group-header-edit-btn` trên chat header.
+- Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
+  - Quản lý state `editingChannel` (mở/đóng modal sửa kênh).
+  - Thêm nút setting trên từng dòng channel tại sidebar (cả desktop và drawer mobile).
+  - Thêm nút cài đặt kênh trên chat header `# {activeChannel.name}`.
+  - Xử lý callback `handleChannelUpdated(updatedChannel)` cập nhật danh sách channels và activeChannel tức thời, đồng bộ danh sách mới từ server.
+- Tests & Verification:
+  - Tạo mới `client/tests/channelEdit.test.mjs`: 6 unit tests kiểm thử toàn diện normalization, validation và error mapping.
+  - `node --test tests/channelEdit.test.mjs tests/messageInput.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs`: PASS 31/31 (100%).
+  - `npm run build`: PASS 100% (Vite production build thành công 0 errors).
+- Docs Updated:
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật tiến độ & hoàn thành task.
+
+---
+
 ### [2026-10-18] FEAT-DISCORD-AUTH-UI-REGISTER-GOOGLE-LOGIN — Triển khai Giao diện Discord, API Đăng ký và Đăng nhập Google
 
 - Triển khai toàn diện theo yêu cầu người dùng: "lamf ui , api dang ky , login with gg luon , ui phai y chang discord".
