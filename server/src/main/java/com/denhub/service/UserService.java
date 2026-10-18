@@ -14,6 +14,7 @@ import com.denhub.domain.User;
 import com.denhub.repository.AuthorityRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.AuthoritiesConstants;
+import com.denhub.service.dto.RegisterReqDTO;
 import com.denhub.service.dto.UserDTO;
 import com.denhub.web.rest.errors.LoginAlreadyUsedException;
 import tech.jhipster.security.RandomUtil;
@@ -39,11 +40,41 @@ public class UserService {
         return com.denhub.security.SecurityUtils.getCurrentUserLogin()
                 .flatMap(userRepository::findOneWithAuthoritiesByEmail);
     }
+
+    public User registerUser(RegisterReqDTO req) {
+        String normalizedEmail = req.getEmail().trim().toLowerCase(Locale.ENGLISH);
+        userRepository.findOneByEmail(normalizedEmail).ifPresent(existingUser -> {
+            boolean removed = this.removeNoneActivatedUser(existingUser);
+            if (!removed) {
+                throw new LoginAlreadyUsedException();
+            }
+        });
+        User newUser = new User();
+        newUser.setEmail(normalizedEmail);
+        String encryptedPassword = passwordEncoder.encode(req.getPassword());
+        newUser.setPassword(encryptedPassword);
+        if (req.getName() != null && !req.getName().isBlank()) {
+            newUser.setName(req.getName().trim());
+        } else {
+            newUser.setName(normalizedEmail.split("@")[0]);
+        }
+        if (req.getUsername() != null && !req.getUsername().isBlank()) {
+            newUser.setUsername(req.getUsername().trim());
+        }
+        newUser.setActivated(true);
+        Set<Authority> authorities = new HashSet<>();
+        authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
+        newUser.setAuthorities(authorities);
+        newUser = userRepository.save(newUser);
+        this.clearUserCaches(newUser);
+        return newUser;
+    }
+
     public User registerUser(UserDTO dto, String password) {
         String normalizedEmail = dto.getEmail().trim().toLowerCase(Locale.ENGLISH);
         userRepository.findOneByEmail(normalizedEmail).ifPresent(existingUser -> {
             boolean removed = this.removeNoneActivatedUser(existingUser);
-            if(!removed){
+            if (!removed) {
                 throw new LoginAlreadyUsedException();
             }
         });
@@ -51,10 +82,60 @@ public class UserService {
         newUser.setEmail(normalizedEmail);
         String encryptedPassword = passwordEncoder.encode(password);
         newUser.setPassword(encryptedPassword);
-        newUser.setActivated(false);
+        if (dto.getName() != null && !dto.getName().isBlank()) {
+            newUser.setName(dto.getName().trim());
+        } else {
+            newUser.setName(normalizedEmail.split("@")[0]);
+        }
+        newUser.setActivated(true);
         Set<Authority> authorities = new HashSet<>();
         authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
         newUser.setAuthorities(authorities);
+        newUser = userRepository.save(newUser);
+        this.clearUserCaches(newUser);
+        return newUser;
+    }
+
+    public User processGoogleUser(String email, String name, String avatar, String googleId) {
+        String normalizedEmail = email.trim().toLowerCase(Locale.ENGLISH);
+        Optional<User> existingUserOpt = userRepository.findOneWithAuthoritiesByEmail(normalizedEmail);
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            boolean changed = false;
+            if ((existingUser.getName() == null || existingUser.getName().isBlank()) && name != null && !name.isBlank()) {
+                existingUser.setName(name.trim());
+                changed = true;
+            }
+            if ((existingUser.getAvatar() == null || existingUser.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+                existingUser.setAvatar(avatar);
+                changed = true;
+            }
+            if (!Boolean.TRUE.equals(existingUser.getActivated())) {
+                existingUser.setActivated(true);
+                changed = true;
+            }
+            if (changed) {
+                userRepository.save(existingUser);
+                this.clearUserCaches(existingUser);
+            }
+            return existingUser;
+        }
+
+        User newUser = new User();
+        newUser.setEmail(normalizedEmail);
+        if (name != null && !name.isBlank()) {
+            newUser.setName(name.trim());
+        } else {
+            newUser.setName(normalizedEmail.split("@")[0]);
+        }
+        newUser.setAvatar(avatar);
+        newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        newUser.setActivated(true);
+        Set<Authority> authorities = new HashSet<>();
+        authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
+        newUser.setAuthorities(authorities);
+        newUser = userRepository.save(newUser);
+        this.clearUserCaches(newUser);
         return newUser;
     }
     /*

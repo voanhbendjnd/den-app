@@ -78,6 +78,35 @@ export function AuthProvider({ children }) {
     return normalizedUser;
   }, []);
 
+  const loginWithGoogle = useCallback(async (googleData) => {
+    const res = await authApi.googleLogin(googleData);
+    const payload = res.data?.data || res.data;
+    const accessToken = payload?.accessToken;
+    const refreshToken = payload?.refreshToken;
+    const user = payload?.user;
+
+    if (!accessToken) {
+      throw new Error('Không nhận được Access Token hợp lệ từ máy chủ');
+    }
+
+    setTokens(accessToken, refreshToken);
+    const authorities = Array.isArray(user?.authorities)
+      ? user.authorities
+      : (typeof user?.authorities === 'string' && user.authorities ? [user.authorities] : []);
+    const normalizedUser = {
+      id: user?.id,
+      email: user?.email,
+      name: user?.name,
+      displayName: user?.name || user?.email?.split('@')[0] || 'User',
+      authorities,
+      role: authorities.includes('ROLE_ADMIN') ? 'ADMIN' : 'USER',
+    };
+
+    localStorage.setItem('denhub_user', JSON.stringify(normalizedUser));
+    setCurrentUser(normalizedUser);
+    return normalizedUser;
+  }, []);
+
   const logout = useCallback(() => {
     clearTokens();
     localStorage.removeItem('denhub_user');
@@ -90,6 +119,7 @@ export function AuthProvider({ children }) {
     role: currentUser?.role || (currentUser?.authorities?.includes('ROLE_ADMIN') ? 'ADMIN' : 'USER'),
     loading,
     login,
+    loginWithGoogle,
     logout,
   };
 

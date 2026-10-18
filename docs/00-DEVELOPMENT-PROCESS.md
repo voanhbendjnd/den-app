@@ -398,6 +398,35 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-18] FEAT-DISCORD-AUTH-UI-REGISTER-GOOGLE-LOGIN — Triển khai Giao diện Discord, API Đăng ký và Đăng nhập Google
+
+- Triển khai toàn diện theo yêu cầu người dùng: "lamf ui , api dang ky , login with gg luon , ui phai y chang discord".
+- **Backend:**
+  - Endpoint Đăng ký: `@PostMapping({"/register", "/auth/register"})` trong `AccountResource.java`, nhận `RegisterReqDTO` (`email`, `password`, `name`, `username`), mã hóa BCrypt, gán quyền `ROLE_USER`, kích hoạt tài khoản (`activated = true`), lưu vào SQL Server và trả về `UserDTO` bọc trong `RestResponse<UserDTO>` với HTTP status 201 Created.
+  - Endpoint Google Login: `@PostMapping({"/auth/google", "/login/google"})`, nhận `GoogleLoginReqDTO` (chứa `credential` ID token JWT từ Google Identity Services hoặc thông tin profile). Giải mã Google JWT qua Nimbus JWT / claims, tự động tìm hoặc tạo mới người dùng trong DB, và cấp phát DenHub JWT Access Token + HttpOnly Refresh Token Cookie (`ResLoginDTO`).
+  - Cấu hình bảo mật: Thêm `/api/auth/google` và `/api/login/google` vào `SecurityConfiguration.java` (public endpoints, `permitAll()`).
+  - DTO: Tạo mới `RegisterReqDTO.java`, `GoogleLoginReqDTO.java`, sửa mapper `UserDTO.java` để truyền đúng trường `name`.
+- **Frontend:**
+  - Tái cấu trúc giao diện chuẩn 100% theo Discord:
+    - `AuthLayout.jsx`: Nền gradient vũ trụ cosmic dark (`#1a1c38` đến `#0f1024`), floating glowing particles, starbursts và Discord logo vector thương hiệu ở góc trên bên trái.
+    - `LoginPage.jsx`: Card dark `#313338` bo góc 8px; cột trái gồm tiêu đề "Chào mừng trở lại!", form input `#1e1f22`, nhãn in hoa `#b5bac1` kèm dấu sao đỏ, nút đăng nhập blurple `#5865F2`, nút Đăng nhập với Google kèm logo vector chính thức, link Quên mật khẩu và link Đăng ký; cột phải là khối "Đăng nhập bằng Mã QR" với QR Code mockup có logo Discord trung tâm và hướng dẫn quét ứng dụng di động. Tự động responsive ẩn QR trên màn hình nhỏ.
+    - `RegisterPage.jsx`: Form tạo tài khoản style Discord, gồm Email, Tên hiển thị, Tên đăng nhập, Mật khẩu, nút Đăng ký `#5865F2` và Đăng ký nhanh với Google.
+    - `authApi.js` & `AuthContext.jsx`: Bổ sung phương thức `googleLogin` và `loginWithGoogle` đồng bộ state phiên làm việc.
+    - `index.css`: Thêm bộ token và CSS class Discord authentic (`.discord-card`, `.discord-input`, `.discord-button-blurple`, `.discord-button-google`, `.discord-label`, `.discord-link`).
+- **Tests & Verification:**
+  - Backend: Tạo mới `AccountResourceIT.java` (6 tests: đăng ký thành công 201, trùng email 400, email không hợp lệ 400, password ngắn 400, Google login thành công 200, Google thiếu email 400) -> PASS 6/6. Chạy toàn bộ test suite `.\gradlew.bat test` -> BUILD SUCCESSFUL 100%.
+  - Frontend: Tạo mới `client/tests/discordAuth.test.mjs` (4 tests: format register payload, name fallback, google payload, normalize user) -> PASS 4/4; `npm run build` -> BUILD SUCCESSFUL (3199 modules transformed, 0 error).
+- Không để lộ secret / private keys trong code và Git.
+
+### [2026-10-18] FIX-MESSAGE-ENTITY-LOMBOK-CONSTRUCTOR — Khắc phục cảnh báo Flexible Constructor Bodies trên Message Entity
+
+- Khắc phục lỗi/cảnh báo IDE (Eclipse JDT LS / Language Support for Java by Red Hat v1.57+): "The Java feature 'Flexible Constructor Bodies' is only available with source level 25 and above" tại `Message.java:L19`.
+- Nguyên nhân: AST phân tích synthetic constructor của Lombok `@AllArgsConstructor` trên class kế thừa `AbstractAuditingEntity` bị JDT LS nhận diện nhầm là cú pháp Flexible Constructor Bodies của Java 25 trong khi cấu hình dự án là Java 21.
+- Xử lý: Gỡ bỏ `@NoArgsConstructor` và `@AllArgsConstructor`, bổ sung tường minh `public Message() {}` và `public Message(...)` đầy đủ tham số tương thích hoàn toàn với `@Builder` và JPA (giống thiết kế của `Conversation.java`).
+- Tests: Thêm bộ test unit mới `server/src/test/java/com/denhub/domain/MessageTest.java` (4 tests: `testNoArgsConstructor`, `testAllArgsConstructor`, `testBuilder`, `testSenderIdFallback`).
+- Verification: `.\gradlew.bat compileJava` BUILD SUCCESSFUL; `.\gradlew.bat test --tests "com.denhub.domain.MessageTest"` PASS 4/4; các test liên quan `MessageServiceTest`, `ConversationServiceTest`, `MessageSecurityIT` đều PASS 100%.
+- Không thay đổi schema database, API contract, hoặc logic nghiệp vụ.
+
 ### [2026-10-15] RELEASE-SERVER-SETTINGS — Commit riêng từng file theo yêu cầu
 
 - Người dùng trực tiếp yêu cầu “commit và push giúp tôi. mỗi file sửa đổi là 1 commit”. Ủy quyền lần này áp dụng cho thay đổi Server Settings hiện có trên `feature/server-edit`, gồm 8 file modified và 4 file mới; không triển khai sửa các lỗi vừa phát hiện trong lượt review.

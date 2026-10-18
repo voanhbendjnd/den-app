@@ -40,13 +40,16 @@ public class UserDTO {
 
     public UserDTO(User user) {
         this.id = user.getId();
+        this.name = user.getName();
         this.email = user.getEmail();
         this.activated = user.getActivated();
         this.createdBy = user.getCreatedBy();
         this.createdDate = user.getCreatedDate();
         this.lastModifiedBy = user.getLastModifiedBy();
         this.lastModifiedDate = user.getLastModifiedDate();
-        this.authorities = user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet());
+        if (user.getAuthorities() != null) {
+            this.authorities = user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet());
+        }
     }
 
 }

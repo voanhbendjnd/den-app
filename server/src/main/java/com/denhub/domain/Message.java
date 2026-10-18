@@ -15,8 +15,6 @@ import java.time.Instant;
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @AttributeOverrides({
         @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", updatable = false, length = 254)),
         @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
@@ -68,6 +66,26 @@ public class Message extends AbstractAuditingEntity<Long> implements Serializabl
     @JsonIgnore
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    public Message() {}
+
+    public Message(Long id, Long channelId, Long authorId, Long senderId, Long conversationId,
+                   String type, String content, String mediaUrl, String fileName, Long fileSize,
+                   Integer width, Integer height, Instant createdAt) {
+        this.id = id;
+        this.channelId = channelId;
+        this.authorId = authorId;
+        this.senderId = senderId;
+        this.conversationId = conversationId;
+        this.type = type;
+        this.content = content;
+        this.mediaUrl = mediaUrl;
+        this.fileName = fileName;
+        this.fileSize = fileSize;
+        this.width = width;
+        this.height = height;
+        this.createdAt = createdAt != null ? createdAt : Instant.now();
+    }
 
     @Override
     public Long getId() {

@@ -8,6 +8,10 @@ const authApi = {
   register(data) {
     return axiosClient.post('/register', data);
   },
+
+  googleLogin(data) {
+    return axiosClient.post('/auth/google', data);
+  },
 };
 
 export default authApi;

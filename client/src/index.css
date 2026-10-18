@@ -211,3 +211,128 @@ input:-webkit-autofill:active {
 .glow-on-hover:hover {
   filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
 }
+
+/* =============================================
+   Discord Authentic Auth Theme
+============================================= */
+.discord-auth-bg {
+  min-height: 100vh;
+  width: 100%;
+  background: radial-gradient(circle at 10% 20%, rgba(88, 101, 242, 0.18) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(88, 101, 242, 0.22) 0%, transparent 45%),
+              radial-gradient(circle at 50% 50%, #1a1c38 0%, #0f1024 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.discord-card {
+  background-color: #313338;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px 0 rgba(0, 0, 0, 0.24), 0 8px 30px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  position: relative;
+  z-index: 10;
+}
+
+.discord-label {
+  color: #b5bac1 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.02em !important;
+  margin-bottom: 8px !important;
+  display: block;
+}
+
+.discord-label .required-star {
+  color: #f23f43;
+  margin-left: 4px;
+}
+
+.discord-input,
+.discord-input .ant-input,
+.discord-input.ant-input-password {
+  background-color: #1e1f22 !important;
+  border: none !important;
+  border-radius: 3px !important;
+  color: #dbdee1 !important;
+  font-size: 15px !important;
+  box-shadow: none !important;
+}
+
+.discord-input.ant-input-affix-wrapper {
+  background-color: #1e1f22 !important;
+  border: none !important;
+  border-radius: 3px !important;
+}
+
+.discord-input input {
+  background-color: transparent !important;
+  color: #dbdee1 !important;
+}
+
+.discord-input:focus,
+.discord-input.ant-input-affix-wrapper-focused {
+  outline: none !important;
+  box-shadow: 0 0 0 1px #5865F2 !important;
+}
+
+.discord-button-blurple {
+  background-color: #5865F2 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 3px !important;
+  font-weight: 500 !important;
+  font-size: 16px !important;
+  height: 44px !important;
+  transition: background-color 0.17s ease, color 0.17s ease !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.discord-button-blurple:hover {
+  background-color: #4752c4 !important;
+}
+
+.discord-button-blurple:active {
+  background-color: #3c45a5 !important;
+}
+
+.discord-button-google {
+  background-color: #2b2d31 !important;
+  color: #f2f3f5 !important;
+  border: 1px solid #3f4147 !important;
+  border-radius: 3px !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  height: 42px !important;
+  transition: background-color 0.17s ease, border-color 0.17s ease !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+}
+
+.discord-button-google:hover {
+  background-color: #35373c !important;
+  border-color: #4e5058 !important;
+}
+
+.discord-link {
+  color: #00a8fc !important;
+  font-size: 14px !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: text-decoration 0.15s ease;
+}
+
+.discord-link:hover {
+  text-decoration: underline !important;
+}

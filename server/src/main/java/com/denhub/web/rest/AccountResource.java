@@ -25,8 +25,12 @@ import com.denhub.security.CustomUserDetails;
 import com.denhub.service.AuthService;
 import com.denhub.service.MailService;
 import com.denhub.service.UserService;
+import com.denhub.service.dto.GoogleLoginReqDTO;
+import com.denhub.service.dto.RegisterReqDTO;
 import com.denhub.service.dto.ResLoginDTO;
+import com.denhub.service.dto.UserDTO;
 import com.denhub.service.errors.InvalidPasswordException;
+import com.denhub.util.anotation.ApiMessage;
 import com.denhub.web.rest.vm.KeyAndPasswordVM;
 import com.denhub.web.rest.vm.LoginVM;
 import com.denhub.web.rest.vm.ManagedUserVM;
@@ -56,6 +60,63 @@ public class AccountResource {
             super(message);
         }
     }
+
+    @PostMapping({"/register", "/auth/register"})
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiMessage("Đăng ký tài khoản thành công")
+    @Operation(summary = "Đăng ký tài khoản", description = "Đăng ký tài khoản người dùng mới.")
+    public ResponseEntity<UserDTO> registerAccount(@Valid @RequestBody RegisterReqDTO req) {
+        User user = userService.registerUser(req);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(user));
+    }
+
+    @PostMapping({"/auth/google", "/login/google"})
+    @ApiMessage("Đăng nhập bằng Google thành công")
+    @Operation(summary = "Đăng nhập bằng Google", description = "Đăng nhập hoặc đăng ký tài khoản thông qua Google OAuth.")
+    public ResponseEntity<ResLoginDTO> loginWithGoogle(@RequestBody GoogleLoginReqDTO req) {
+        String email = req.getEmail();
+        String name = req.getName();
+        String picture = req.getAvatar();
+        String googleId = req.getGoogleId();
+
+        if (req.getCredential() != null && !req.getCredential().isBlank()) {
+            try {
+                com.nimbusds.jwt.SignedJWT signedJWT = com.nimbusds.jwt.SignedJWT.parse(req.getCredential());
+                com.nimbusds.jwt.JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
+                if (claims.getClaim("email") != null) {
+                    email = (String) claims.getClaim("email");
+                }
+                if (claims.getClaim("name") != null) {
+                    name = (String) claims.getClaim("name");
+                }
+                if (claims.getClaim("picture") != null) {
+                    picture = (String) claims.getClaim("picture");
+                }
+                if (claims.getSubject() != null) {
+                    googleId = claims.getSubject();
+                }
+            } catch (Exception ex) {
+                log.warn("Could not parse Google ID token credential as SignedJWT: {}", ex.getMessage());
+            }
+        }
+
+        if (email == null || email.isBlank()) {
+            throw new AccountResourceException("Google email is required");
+        }
+
+        User user = userService.processGoogleUser(email, name, picture, googleId);
+        ResLoginDTO res = authService.generateResLoginDTO(user);
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", res.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(refreshTokenExpiration)
+                .sameSite("Strict")
+                .build();
+        res.setRefreshToken(null);
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(res);
+    }
+
     @GetMapping({"/account", "/users/me"})
     public ResponseEntity<ResLoginDTO.UserLogin> getAccount() {
         return userService.getUserWithAuthorities()

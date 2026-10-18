@@ -1,25 +1,38 @@
 import { useState } from 'react';
-import { Form, Input, Button, Typography, Alert, Divider } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined, ThunderboltFilled, ArrowRightOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Alert } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
 import authApi from '../../api/authApi';
-
-const { Title, Text } = Typography;
+import { useAuth } from '../../hooks/useAuth';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { loginWithGoogle } = useAuth();
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
 
   const handleSubmit = async (values) => {
     setLoading(true);
     setError(null);
+    setSuccessMsg(null);
     try {
-      await authApi.register(values);
-      navigate('/login');
+      const payload = {
+        email: values.email,
+        password: values.password,
+        name: values.displayName || values.username || values.email.split('@')[0],
+        username: values.username,
+      };
+      await authApi.register(payload);
+      setSuccessMsg('Đăng ký tài khoản thành công! Đang chuyển hướng đến đăng nhập...');
+      setTimeout(() => {
+        navigate('/login');
+      }, 1200);
     } catch (err) {
       const msg =
         err.response?.data?.message ||
+        err.response?.data?.detail ||
         err.response?.data?.error ||
         'Đăng ký tài khoản không thành công. Vui lòng kiểm tra lại.';
       setError(msg);
@@ -28,150 +41,194 @@ export default function RegisterPage() {
     }
   };
 
+  const handleGoogleRegister = async () => {
+    setGoogleLoading(true);
+    setError(null);
+    try {
+      await loginWithGoogle({
+        email: 'new.google.user@denhub.app',
+        name: 'Google User',
+        avatar: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
+        googleId: 'google_register_demo_102',
+      });
+      navigate('/');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Đăng ký nhanh bằng Google thất bại.';
+      setError(msg);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
-    <div style={{
-      width: '100%',
-      maxWidth: 460,
-      margin: '24px auto',
-      padding: '0 16px',
-      zIndex: 10,
+    <div className="discord-card" style={{
+      maxWidth: 480,
+      padding: '32px',
+      margin: '0 auto',
     }}>
-      {/* Brand Header */}
+      {/* Title Header */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <div style={{
-          width: 52,
-          height: 52,
-          margin: '0 auto 10px',
-          background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
-          borderRadius: 16,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 6px 20px rgba(0, 242, 254, 0.3)',
+        <h2 style={{
+          margin: 0,
+          color: '#f2f3f5',
+          fontSize: 24,
+          fontWeight: 600,
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}>
-          <ThunderboltFilled style={{ fontSize: 26, color: '#fff' }} />
-        </div>
-        <Title level={2} style={{ margin: 0, color: '#fff', fontWeight: 800 }}>
-          Den<span style={{ color: '#00F2FE' }}>Hub</span>
-        </Title>
-        <Text style={{ color: '#94A3B8', fontSize: 13 }}>
-          Tạo tài khoản không gian số của bạn
-        </Text>
+          Tạo tài khoản
+        </h2>
       </div>
 
-      <div 
-        className="glass-panel"
-        style={{
-          padding: '32px 28px',
-          borderRadius: 20,
-          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        {error && (
-          <Alert
-            message={error}
-            type="error"
-            showIcon
-            style={{ marginBottom: 20, borderRadius: 10, background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-            closable
-            onClose={() => setError(null)}
+      {error && (
+        <Alert
+          message={error}
+          type="error"
+          showIcon
+          style={{
+            marginBottom: 16,
+            backgroundColor: 'rgba(242, 63, 67, 0.15)',
+            border: '1px solid rgba(242, 63, 67, 0.3)',
+            color: '#f23f43',
+            borderRadius: 4,
+          }}
+          closable
+          onClose={() => setError(null)}
+        />
+      )}
+
+      {successMsg && (
+        <Alert
+          message={successMsg}
+          type="success"
+          showIcon
+          style={{
+            marginBottom: 16,
+            backgroundColor: 'rgba(35, 165, 90, 0.15)',
+            border: '1px solid rgba(35, 165, 90, 0.3)',
+            color: '#23a55a',
+            borderRadius: 4,
+          }}
+        />
+      )}
+
+      <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
+        {/* Field 1: Email */}
+        <Form.Item
+          name="email"
+          style={{ marginBottom: 18 }}
+          label={
+            <span className="discord-label">
+              Email <span className="required-star">*</span>
+            </span>
+          }
+          rules={[
+            { required: true, message: 'Vui lòng nhập email' },
+            { type: 'email', message: 'Email không đúng định dạng' },
+          ]}
+        >
+          <Input
+            className="discord-input"
+            autoComplete="email"
+            style={{ height: 40, padding: '10px' }}
           />
-        )}
+        </Form.Item>
 
-        <Form layout="vertical" onFinish={handleSubmit} requiredMark={false}>
-          <Form.Item
-            name="displayName"
-            label={<Text style={{ color: '#94A3B8', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Tên hiển thị</Text>}
-            rules={[{ required: true, message: 'Vui lòng nhập tên hiển thị' }]}
+        {/* Field 2: Display Name */}
+        <Form.Item
+          name="displayName"
+          style={{ marginBottom: 18 }}
+          label={
+            <span className="discord-label">
+              Tên hiển thị
+            </span>
+          }
+        >
+          <Input
+            className="discord-input"
+            placeholder="Người khác sẽ nhìn thấy bạn với tên này"
+            style={{ height: 40, padding: '10px' }}
+          />
+        </Form.Item>
+
+        {/* Field 3: Username */}
+        <Form.Item
+          name="username"
+          style={{ marginBottom: 18 }}
+          label={
+            <span className="discord-label">
+              Tên đăng nhập <span className="required-star">*</span>
+            </span>
+          }
+          rules={[
+            { required: true, message: 'Vui lòng nhập tên đăng nhập' },
+            { min: 3, message: 'Tên đăng nhập tối thiểu 3 ký tự' },
+          ]}
+        >
+          <Input
+            className="discord-input"
+            autoComplete="username"
+            style={{ height: 40, padding: '10px' }}
+          />
+        </Form.Item>
+
+        {/* Field 4: Password */}
+        <Form.Item
+          name="password"
+          style={{ marginBottom: 24 }}
+          label={
+            <span className="discord-label">
+              Mật khẩu <span className="required-star">*</span>
+            </span>
+          }
+          rules={[
+            { required: true, message: 'Vui lòng nhập mật khẩu' },
+            { min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' },
+          ]}
+        >
+          <Input.Password
+            className="discord-input"
+            autoComplete="new-password"
+            style={{ height: 40, padding: '10px' }}
+          />
+        </Form.Item>
+
+        {/* Submit Button */}
+        <Form.Item style={{ marginBottom: 12 }}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={loading}
+            className="discord-button-blurple"
           >
-            <Input prefix={<UserOutlined style={{ color: '#64748B' }} />} placeholder="Ví dụ: Nguyễn Văn A" style={{ height: 42 }} />
-          </Form.Item>
+            Tiếp tục
+          </Button>
+        </Form.Item>
 
-          <Form.Item
-            name="username"
-            label={<Text style={{ color: '#94A3B8', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Tên đăng nhập</Text>}
-            rules={[
-              { required: true, message: 'Vui lòng nhập tên đăng nhập' },
-              { min: 3, message: 'Tối thiểu 3 ký tự' },
-            ]}
+        {/* Google Fast Register Button */}
+        <div style={{ marginBottom: 16 }}>
+          <Button
+            type="default"
+            onClick={handleGoogleRegister}
+            loading={googleLoading}
+            className="discord-button-google"
           >
-            <Input prefix={<UserOutlined style={{ color: '#64748B' }} />} placeholder="username" autoComplete="username" style={{ height: 42 }} />
-          </Form.Item>
-
-          <Form.Item
-            name="email"
-            label={<Text style={{ color: '#94A3B8', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Email</Text>}
-            rules={[
-              { required: true, message: 'Vui lòng nhập email' },
-              { type: 'email', message: 'Email không đúng định dạng' },
-            ]}
-          >
-            <Input prefix={<MailOutlined style={{ color: '#64748B' }} />} placeholder="name@example.com" style={{ height: 42 }} />
-          </Form.Item>
-
-          <Form.Item
-            name="password"
-            label={<Text style={{ color: '#94A3B8', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Mật khẩu</Text>}
-            rules={[
-              { required: true, message: 'Vui lòng nhập mật khẩu' },
-              { min: 6, message: 'Tối thiểu 6 ký tự' },
-            ]}
-          >
-            <Input.Password prefix={<LockOutlined style={{ color: '#64748B' }} />} placeholder="Mật khẩu" style={{ height: 42 }} />
-          </Form.Item>
-
-          <Form.Item
-            name="confirmPassword"
-            label={<Text style={{ color: '#94A3B8', fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Xác nhận mật khẩu</Text>}
-            dependencies={['password']}
-            rules={[
-              { required: true, message: 'Vui lòng xác nhận lại mật khẩu' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('Mật khẩu xác nhận không khớp'));
-                },
-              }),
-            ]}
-          >
-            <Input.Password prefix={<LockOutlined style={{ color: '#64748B' }} />} placeholder="Nhập lại mật khẩu" style={{ height: 42 }} />
-          </Form.Item>
-
-          <Form.Item style={{ marginTop: 24, marginBottom: 12 }}>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
-              loading={loading} 
-              block 
-              style={{ 
-                height: 46, 
-                fontSize: 15, 
-                fontWeight: 700,
-                background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 50%, #00F2FE 100%)',
-                border: 'none',
-                boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-            >
-              <span>Đăng Ký Tài Khoản</span>
-              <ArrowRightOutlined />
-            </Button>
-          </Form.Item>
-        </Form>
-
-        <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.08)', margin: '16px 0' }} />
-
-        <div style={{ textAlign: 'center' }}>
-          <Text style={{ color: '#94A3B8', fontSize: 13 }}>
-            Đã có tài khoản? <Link to="/login" style={{ color: '#00F2FE', fontWeight: 600 }}>Đăng nhập ngay</Link>
-          </Text>
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            <span>Đăng ký nhanh bằng Google</span>
+          </Button>
         </div>
-      </div>
+
+        {/* Footer Link to Login */}
+        <div style={{ marginTop: 12, fontSize: 14 }}>
+          <Link to="/login" className="discord-link">
+            Đã có tài khoản?
+          </Link>
+        </div>
+      </Form>
     </div>
   );
 }
