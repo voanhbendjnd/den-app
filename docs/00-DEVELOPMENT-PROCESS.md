@@ -398,6 +398,46 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-18] FEAT-CHANNEL-UPDATE — Làm API Cập nhật Channel & Tests
+
+Implemented:
+- Tạo mới `UpdateChannelDTO.java`:
+  - `name`: `@NotBlank`, `@Pattern(regexp = "(?sU).*\\S.*")`, `@Size(min = 2, max = 20)`.
+  - `position`: `@Min(value = 0)`, tùy chọn (nếu null giữ nguyên position hiện tại).
+- Cập nhật `ChannelRepository.java`:
+  - Thêm phương thức `existsByServerIdAndNameAndIdNot(Long serverId, String name, Long id)` để kiểm tra trùng tên kênh trong server nhưng loại trừ chính kênh đang sửa.
+- Cập nhật `ChannelService.java`:
+  - Bổ sung `updateChannel(Long channelId, UpdateChannelDTO dto)`:
+    - Xác thực người dùng đăng nhập (`getCurrentUser()`).
+    - Tìm kiếm kênh theo ID, trả về `channelnotfound` (404/400) nếu không tồn tại.
+    - Kiểm tra quyền truy cập Server (`validateServerAccess`), yêu cầu người thực hiện là Server Owner hoặc Thành viên trong server (`forbidden` nếu vi phạm).
+    - Chuẩn hóa tên kênh bằng `trim()`, kiểm tra trùng lặp tên kênh trong cùng server (`namealreadyexists` nếu trùng tên với kênh khác).
+    - Cập nhật tên và vị trí (nếu có), lưu vào cơ sở dữ liệu và trả về `ChannelResponseDTO`.
+- Cập nhật `ChannelResource.java`:
+  - Thêm endpoint `PUT /api/v1/channels/{channelId}` với Swagger annotations `@Operation`, `@Tag(name = "Channel")`, `@SecurityRequirement(name = "bearerAuth")`.
+- Tests Added:
+  - `ChannelServiceTest.java`: Thêm 7 unit tests bao phủ:
+    - `updateChannel_Success_WhenOwner`
+    - `updateChannel_Success_WhenMember`
+    - `updateChannel_Success_WhenKeepingSameName`
+    - `updateChannel_Fail_WhenNotLoggedIn`
+    - `updateChannel_Fail_WhenChannelNotFound`
+    - `updateChannel_Fail_WhenNotMemberOrOwner`
+    - `updateChannel_Fail_WhenNameDuplicate`
+  - `ChannelResourceTest.java`: Thêm 3 MockMvc tests bao phủ:
+    - `updateChannel_Success` (HTTP 200)
+    - `updateChannel_Fail_WhenNameTooShort` (HTTP 400)
+    - `updateChannel_Fail_WhenNameBlank` (HTTP 400)
+- Verification:
+  - `.\gradlew.bat compileJava`: BUILD SUCCESSFUL.
+  - `.\gradlew.bat test --tests "com.denhub.service.ChannelServiceTest" --tests "com.denhub.web.rest.ChannelResourceTest"`: PASS 100%.
+  - `.\gradlew.bat test`: BUILD SUCCESSFUL (Toàn bộ test suite backend).
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md` (Cập nhật endpoint `PUT /api/v1/channels/{channelId}`).
+  - `docs/00-DEVELOPMENT-PROCESS.md` (Cập nhật completed work log).
+
+---
+
 ### [2026-10-18] FEAT-DISCORD-AUTH-UI-REGISTER-GOOGLE-LOGIN — Triển khai Giao diện Discord, API Đăng ký và Đăng nhập Google
 
 - Triển khai toàn diện theo yêu cầu người dùng: "lamf ui , api dang ky , login with gg luon , ui phai y chang discord".
