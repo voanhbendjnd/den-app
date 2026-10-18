@@ -1,11 +1,13 @@
 package com.denhub.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import java.util.List;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -13,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.denhub.service.ChannelService;
 import com.denhub.service.dto.ChannelResponseDTO;
 import com.denhub.service.dto.CreateChannelDTO;
+import com.denhub.service.dto.UpdateChannelDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -132,5 +135,51 @@ class ChannelResourceTest {
                 .andExpect(jsonPath("$").isEmpty());
 
         verify(channelService).getChannelsByServerId(42L);
+    }
+
+    @Test
+    void updateChannel_Success() throws Exception {
+        UpdateChannelDTO dto = new UpdateChannelDTO();
+        dto.setName("renamed-channel");
+        dto.setPosition(3);
+
+        ChannelResponseDTO responseDto = new ChannelResponseDTO();
+        responseDto.setId(100L);
+        responseDto.setServerId(10L);
+        responseDto.setName("renamed-channel");
+        responseDto.setPosition(3);
+
+        when(channelService.updateChannel(eq(100L), any(UpdateChannelDTO.class))).thenReturn(responseDto);
+
+        mockMvc.perform(put("/api/v1/channels/100")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(100))
+                .andExpect(jsonPath("$.serverId").value(10))
+                .andExpect(jsonPath("$.name").value("renamed-channel"))
+                .andExpect(jsonPath("$.position").value(3));
+    }
+
+    @Test
+    void updateChannel_Fail_WhenNameTooShort() throws Exception {
+        UpdateChannelDTO dto = new UpdateChannelDTO();
+        dto.setName("x"); // length < 2
+
+        mockMvc.perform(put("/api/v1/channels/100")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateChannel_Fail_WhenNameBlank() throws Exception {
+        UpdateChannelDTO dto = new UpdateChannelDTO();
+        dto.setName("   ");
+
+        mockMvc.perform(put("/api/v1/channels/100")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest());
     }
 }
