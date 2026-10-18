@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useOutletContext, useParams } from 'react-router-dom';
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -9,10 +9,13 @@ import {
   ReloadOutlined,
   SettingOutlined,
   TeamOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
 import CreateChannelModal from '../../components/common/CreateChannelModal';
+import ServerInviteModal from '../../components/common/ServerInviteModal';
+import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
 import './group-chat.css';
@@ -24,6 +27,9 @@ function ChannelSidebar({
   channelsLoading,
   channelsError,
   activeChannel,
+  isOwner,
+  onOpenInvite,
+  onOpenSettings,
   onSelectChannel,
   onOpenCreateChannel,
   onRetryChannels,
@@ -33,9 +39,24 @@ function ChannelSidebar({
       <div className="group-sidebar__heading">
         <Avatar shape="square" src={server.iconUrl} size={36}>{server.name?.[0]?.toUpperCase()}</Avatar>
         <div className="group-sidebar__identity"><strong title={server.name}>{server.name}</strong><span>Không gian nhóm</span></div>
+        {isOwner && <button type="button" className="group-sidebar-settings-btn" onClick={onOpenSettings}
+          title="Cài đặt Server" aria-label="Cài đặt Server"><SettingOutlined /></button>}
       </div>
       <div className="group-sidebar__body">
-        <Link className="group-back-link" to="/"><ArrowLeftOutlined /> Tổng quan</Link>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Link className="group-back-link" to="/"><ArrowLeftOutlined /> Tổng quan</Link>
+          {isOwner && (
+            <button
+              type="button"
+              className="group-sidebar-invite-btn"
+              onClick={onOpenInvite}
+              title="Mời thành viên vào Server"
+              aria-label="Mời thành viên vào Server"
+            >
+              <UserAddOutlined /> <span>Mời</span>
+            </button>
+          )}
+        </div>
 
         <div className="group-section-header">
           <h2 className="group-section-label">Kênh trò chuyện</h2>
@@ -112,26 +133,110 @@ function ChannelSidebar({
   );
 }
 
-function MembersPanel() {
+function MembersPanel({
+  members,
+  loading,
+  error,
+  onRetry,
+  isOwner,
+  onOpenInvite,
+}) {
   return (
     <div className="group-members">
-      <h2 className="group-section-label">Thành viên</h2>
-      <div className="group-members__empty">
-        <TeamOutlined aria-hidden="true" />
-        <h3>Chưa có danh sách thành viên</h3>
-        <p>Thông tin thành viên của nhóm sẽ hiển thị tại đây khi sẵn sàng.</p>
+      <div className="group-members-header">
+        <h2 className="group-section-label">
+          Thành viên <span className="group-members-count">({members.length})</span>
+        </h2>
+        {isOwner && (
+          <button
+            type="button"
+            className="group-members-invite-btn"
+            onClick={onOpenInvite}
+            title="Mời thành viên vào Server"
+            aria-label="Mời thành viên vào Server"
+          >
+            <UserAddOutlined />
+          </button>
+        )}
       </div>
+
+      {loading ? (
+        <div className="group-members-loading" role="status" aria-label="Đang tải thành viên">
+          <Spin size="small" />
+          <span>Đang tải thành viên...</span>
+        </div>
+      ) : error ? (
+        <div className="group-members-error" role="alert">
+          <span>{error}</span>
+          <Button
+            type="link"
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={onRetry}
+            style={{ color: '#00f2fe', padding: 0, height: 'auto', textAlign: 'left' }}
+          >
+            Thử lại
+          </Button>
+        </div>
+      ) : members.length === 0 ? (
+        <div className="group-members__empty">
+          <TeamOutlined aria-hidden="true" />
+          <h3>Chưa có danh sách thành viên</h3>
+          <p>Server hiện chưa có thành viên nào tham gia.</p>
+        </div>
+      ) : (
+        <div className="group-members-list" role="list">
+          {members.map((member) => {
+            const displayName = member.nickname || member.name || member.username || 'Thành viên';
+            const initial = displayName[0]?.toUpperCase() || 'U';
+            const isOwner = member.role === 'OWNER';
+
+            return (
+              <div key={member.id} className="group-member-item" role="listitem">
+                <Avatar
+                  className="group-member-item__avatar"
+                  size={32}
+                  src={member.avatar}
+                >
+                  {initial}
+                </Avatar>
+                <div className="group-member-item__info">
+                  <div className="group-member-item__name-row">
+                    <span className="group-member-item__name" title={displayName}>
+                      {displayName}
+                    </span>
+                    {isOwner && (
+                      <span className="group-member-item__badge" title="Chủ nhóm">
+                        Chủ nhóm
+                      </span>
+                    )}
+                  </div>
+                  {member.username && member.username !== displayName && (
+                    <span className="group-member-item__username" title={`@${member.username}`}>
+                      @{member.username}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function GroupChatPage() {
   const { serverId } = useParams();
+  const { setServers } = useOutletContext();
   const { currentUser } = useAuth();
   const screens = Grid.useBreakpoint();
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [membersVisible, setMembersVisible] = useState(true);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  useEffect(() => { setIsSettingsOpen(false); }, [serverId]);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
 
@@ -141,6 +246,51 @@ export default function GroupChatPage() {
   const [channelsError, setChannelsError] = useState(null);
   const [activeChannel, setActiveChannel] = useState(null);
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+
+  // Members state
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [membersError, setMembersError] = useState(null);
+
+  const fetchMembers = (id) => {
+    setMembersLoading(true);
+    setMembersError(null);
+    serverApi.getMembers(id)
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setMembers(list);
+      })
+      .catch((err) => {
+        setMembersError(err.response?.data?.message || 'Không thể tải danh sách thành viên.');
+      })
+      .finally(() => {
+        setMembersLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    let active = true;
+    if (serverId) {
+      setMembersLoading(true);
+      setMembersError(null);
+      serverApi.getMembers(serverId)
+        .then((res) => {
+          if (!active) return;
+          const list = res.data?.data || res.data || [];
+          setMembers(list);
+        })
+        .catch((err) => {
+          if (!active) return;
+          setMembersError(err.response?.data?.message || 'Không thể tải danh sách thành viên.');
+        })
+        .finally(() => {
+          if (active) setMembersLoading(false);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [serverId]);
 
   const fetchChannels = (id) => {
     setChannelsLoading(true);
@@ -208,6 +358,9 @@ export default function GroupChatPage() {
   }, [serverId, reload]);
 
   const server = detail.server;
+  const isOwner = Boolean(
+    server?.ownerId && currentUser?.id && String(server.ownerId) === String(currentUser.id)
+  );
 
   if (detail.serverId !== serverId || detail.loading) {
     return (
@@ -246,6 +399,9 @@ export default function GroupChatPage() {
           channelsLoading={channelsLoading}
           channelsError={channelsError}
           activeChannel={activeChannel}
+          isOwner={isOwner}
+          onOpenInvite={() => setIsInviteOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => setIsCreateChannelOpen(true)}
           onRetryChannels={() => fetchChannels(serverId)}
@@ -263,6 +419,16 @@ export default function GroupChatPage() {
             <span className="group-channel-badge">#{activeChannel.name}</span>
           ) : (
             <span className="group-pending-label">Chưa chọn kênh</span>
+          )}
+          {isOwner && (
+            <Button
+              type="text"
+              className="group-header-invite-btn"
+              icon={<UserAddOutlined />}
+              title="Mời thành viên vào Server"
+              aria-label="Mời thành viên vào Server"
+              onClick={() => setIsInviteOpen(true)}
+            />
           )}
           <Button
             type="text"
@@ -310,7 +476,18 @@ export default function GroupChatPage() {
           disabled={!activeChannel}
         />
       </main>
-      {screens.xl && membersVisible && <aside className="group-member-column" aria-label="Thành viên của nhóm"><MembersPanel /></aside>}
+      {screens.xl && membersVisible && (
+        <aside className="group-member-column" aria-label="Thành viên của nhóm">
+          <MembersPanel
+            members={members}
+            loading={membersLoading}
+            error={membersError}
+            isOwner={isOwner}
+            onOpenInvite={() => setIsInviteOpen(true)}
+            onRetry={() => fetchMembers(serverId)}
+          />
+        </aside>
+      )}
       <Drawer
         title="Kênh của nhóm"
         placement="left"
@@ -326,6 +503,15 @@ export default function GroupChatPage() {
           channelsLoading={channelsLoading}
           channelsError={channelsError}
           activeChannel={activeChannel}
+          isOwner={isOwner}
+          onOpenInvite={() => {
+            setChannelsOpen(false);
+            setIsInviteOpen(true);
+          }}
+          onOpenSettings={() => {
+            setChannelsOpen(false);
+            setIsSettingsOpen(true);
+          }}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => {
             setChannelsOpen(false);
@@ -341,7 +527,17 @@ export default function GroupChatPage() {
         onClose={() => setMembersOpen(false)}
         styles={{ body: { padding: 0 } }}
       >
-        <MembersPanel />
+        <MembersPanel
+          members={members}
+          loading={membersLoading}
+          error={membersError}
+          isOwner={isOwner}
+          onOpenInvite={() => {
+            setMembersOpen(false);
+            setIsInviteOpen(true);
+          }}
+          onRetry={() => fetchMembers(serverId)}
+        />
       </Drawer>
 
       <CreateChannelModal
@@ -350,6 +546,17 @@ export default function GroupChatPage() {
         server={server}
         onSuccess={handleChannelCreated}
       />
+
+      <ServerInviteModal
+        open={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        server={server}
+      />
+      <ServerSettingsModal key={serverId} open={isSettingsOpen && isOwner} server={server}
+        onClose={() => setIsSettingsOpen(false)} onSaved={updated => {
+          setDetail(previous => ({ ...previous, server: updated }));
+          setServers(previous => previous.map(item => String(item.id) === String(updated.id) ? updated : item));
+        }} />
     </div>
   );
 }

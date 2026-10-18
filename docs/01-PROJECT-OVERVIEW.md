@@ -91,6 +91,7 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 | **SERVER** | Creator có vai trò gì khi tạo Server? | `CONFIRMED` | Creator nhận vai trò `OWNER`. Server tự tạo kênh `#general`. |
 | **SERVER** | Owner có thể rời Server không? | `CONFIRMED` | Không. Owner chỉ có thể chuyển quyền hoặc xóa Server (BR-SRV-01). |
 | **SERVER** | Ai có quyền xóa Server? | `CONFIRMED` | Duy nhất Server `OWNER`. |
+| **SERVER** | Ai được chỉnh sửa thông tin Server? | `CONFIRMED` (2026-10-15) | Duy nhất Server `OWNER`, đã xác thực và tài khoản active, được đổi tên, đổi hoặc gỡ ảnh. Vai trò Server `ADMIN`/`MEMBER` hoặc quyền admin toàn hệ thống không tự cấp quyền sửa. Giữ nguyên chủ sở hữu, ngày tạo, thành viên và kênh. UI yêu cầu lưu rõ ràng; hủy không cập nhật Server. |
 | **CHANNEL** | Loại kênh trong MVP? | `CONFIRMED` | Kênh văn bản (Text Channel). Tên kênh dạng slug chữ thường `[a-z0-9-]`. |
 | **CHANNEL** | Kênh `#general` có thể bị xóa không? | `CONFIRMED` | Không. Luôn duy trì ít nhất kênh `#general` trong Server (BR-SRV-02). |
 | **MEMBER** | Ma trận quyền hạn Server? | `CONFIRMED` | Phân cấp `OWNER > ADMIN > MEMBER` với Hierarchy Kick Shield (BR-MEM-02). |

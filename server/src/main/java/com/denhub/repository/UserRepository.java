@@ -1,8 +1,8 @@
 package com.denhub.repository;
 
 import com.denhub.service.projection.UsernameProjection;
+import org.jspecify.annotations.NonNull;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -21,7 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying
     @Query(value = "update User u set u.sessionId = :sessionId where u.id = :userId")
     int updateSessionIdById(@Param("userId") Long userId, @Param("sessionId") String sessionId);
-
     /*
      * Email must be lowed case before call method
      * */
@@ -48,9 +47,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
         select u.id as id, u.username as username, u.email as email, u.name as name, u.avatar as avatar
            from User u
                where u.username like concat('',:q,'%')
+                 and u.id <> :currentUserId
+                 and not exists (
+                     select 1 from Friendship fs
+                     where ((fs.userOneId = u.id and fs.userTwoId = :currentUserId)
+                         or (fs.userOneId = :currentUserId and fs.userTwoId = u.id))
+                       and fs.status = 'BLOCKED'
+                       and fs.actionUserId = u.id
+                 )
     """)
-    List<UsernameProjection> searchByUsername(@Param("q") String q);
+    List<UsernameProjection> searchByUsername(@Param("q") String q, @Param("currentUserId") Long currentUserId);
 
 
     List<User> findByIdIn(List<Long> ids);
+
+    boolean existsById(@NonNull Long id);
+
 }

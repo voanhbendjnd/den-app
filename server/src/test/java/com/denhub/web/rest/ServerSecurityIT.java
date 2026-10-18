@@ -35,8 +35,10 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,6 +54,7 @@ class ServerSecurityIT {
     @Autowired private UserRepository users;
     @Autowired private ServerRepository servers;
     @MockitoSpyBean private ServerMemberRepository members;
+    @Autowired private com.denhub.repository.InviteRepository invites;
     @Autowired private EntityManager entityManager;
 
     private User reader;
@@ -255,6 +258,416 @@ class ServerSecurityIT {
         }
     }
 
+    @Test
+    void ownerReadsWrappedMembersList() throws Exception {
+        addMembership(server.getId());
+        User user2 = new User();
+        user2.setEmail("user2-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        user2.setPassword("pwd-" + UUID.randomUUID());
+        user2.setName("User Two");
+        user2.setUsername("usertwo");
+        user2.setActivated(true);
+        user2 = users.saveAndFlush(user2);
+
+        ServerMember member2 = new ServerMember();
+        member2.setServerId(server.getId());
+        member2.setUserId(user2.getId());
+        member2.setNickname("TwoNick");
+        members.saveAndFlush(member2);
+
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.message").value("Call API success!"))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].id").isNumber())
+                .andExpect(jsonPath("$.data[0].serverId").value(server.getId()))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()))
+                .andExpect(jsonPath("$.data[0].name").value(reader.getName()))
+                .andExpect(jsonPath("$.data[0].nickname").value("Reader"))
+                .andExpect(jsonPath("$.data[0].role").value("OWNER"))
+                .andExpect(jsonPath("$.data[0].email").doesNotExist())
+                .andExpect(jsonPath("$.data[0].password").doesNotExist())
+                .andExpect(jsonPath("$.data[1].id").isNumber())
+                .andExpect(jsonPath("$.data[1].serverId").value(server.getId()))
+                .andExpect(jsonPath("$.data[1].userId").value(user2.getId()))
+                .andExpect(jsonPath("$.data[1].username").value("usertwo"))
+                .andExpect(jsonPath("$.data[1].name").value("User Two"))
+                .andExpect(jsonPath("$.data[1].nickname").value("TwoNick"))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"))
+                .andExpect(jsonPath("$.data[1].email").doesNotExist())
+                .andExpect(jsonPath("$.data[1].password").doesNotExist());
+    }
+
+    @Test
+    void memberReadsMembersList() throws Exception {
+        makeReaderOutsider();
+        addMembership(server.getId());
+
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].role").value("MEMBER"));
+    }
+
+    @Test
+    void outsiderIsForbiddenFromReadingMembers() throws Exception {
+        makeReaderOutsider();
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+    }
+
+    @Test
+    void missingJwtIsUnauthorizedForMembers() throws Exception {
+        problem(mvc.perform(get(membersUrl())), 401);
+    }
+
+    @Test
+    void missingServerIsNotFoundForMembers() throws Exception {
+        problem(mvc.perform(get("/api/v1/servers/" + Long.MAX_VALUE + "/members")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void nonNumericIdIsBadRequestForMembers() throws Exception {
+        problem(mvc.perform(get("/api/v1/servers/not-a-number/members")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+    @Test
+    void ownerCreatesInviteSuccessfully() throws Exception {
+        mvc.perform(post(invitesUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.statusCode").value(201))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.message").value("Tạo mã mời thành công"))
+                .andExpect(jsonPath("$.data.id").isNumber())
+                .andExpect(jsonPath("$.data.serverId").value(server.getId()))
+                .andExpect(jsonPath("$.data.code").isString())
+                .andExpect(jsonPath("$.data.createdBy").value(reader.getId()))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.expiresAt").value(nullValue()))
+                .andExpect(jsonPath("$.data.createdAt").isString());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertEquals(1, invites.findAllByServerId(server.getId()).size());
+        com.denhub.domain.Invite saved = invites.findAllByServerId(server.getId()).get(0);
+        assertEquals(8, saved.getCode().length());
+        assertEquals("ACTIVE", saved.getStatus());
+        assertEquals(reader.getId(), saved.getCreatedBy());
+    }
+
+    @Test
+    void ownerCreatesInviteWithCustomExpiresAt() throws Exception {
+        String body = "{\"expiresAt\": \"2030-01-01T00:00:00Z\"}";
+        mvc.perform(post(invitesUrl())
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.statusCode").value(201))
+                .andExpect(jsonPath("$.data.expiresAt").value("2030-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void ownerCreatesInviteWithPastExpiresAtIsBadRequest() throws Exception {
+        String body = "{\"expiresAt\": \"2020-01-01T00:00:00Z\"}";
+        problem(mvc.perform(post(invitesUrl())
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)), 400);
+    }
+
+    @Test
+    void memberIsForbiddenFromCreatingInvite() throws Exception {
+        makeReaderOutsider();
+        addMembership(server.getId());
+        problem(mvc.perform(post(invitesUrl()).header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+    }
+
+    @Test
+    void outsiderIsForbiddenFromCreatingInvite() throws Exception {
+        makeReaderOutsider();
+        problem(mvc.perform(post(invitesUrl()).header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+    }
+
+    @Test
+    void missingJwtIsUnauthorizedForCreatingInvite() throws Exception {
+        problem(mvc.perform(post(invitesUrl())), 401);
+    }
+
+    @Test
+    void missingServerIsNotFoundForCreatingInvite() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/" + Long.MAX_VALUE + "/invites")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void nonNumericIdIsBadRequestForCreatingInvite() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/not-a-number/invites")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+    @Test
+    void uniqueConstraintOnInviteCodeWorks() {
+        com.denhub.domain.Invite inv1 = new com.denhub.domain.Invite();
+        inv1.setServerId(server.getId());
+        inv1.setCode("UNIQUE123");
+        inv1.setCreatedBy(reader.getId());
+        inv1.setStatus("ACTIVE");
+        invites.saveAndFlush(inv1);
+
+        com.denhub.domain.Invite inv2 = new com.denhub.domain.Invite();
+        inv2.setServerId(server.getId());
+        inv2.setCode("UNIQUE123");
+        inv2.setCreatedBy(reader.getId());
+        inv2.setStatus("ACTIVE");
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> {
+            invites.saveAndFlush(inv2);
+        });
+    }
+
+    @Test
+    void joinServerByInviteCode_Success() throws Exception {
+        User rawJoiner = new User();
+        rawJoiner.setEmail("joiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawJoiner.setPassword("fixture-" + UUID.randomUUID());
+        rawJoiner.setName("Joiner User");
+        rawJoiner.setActivated(true);
+        rawJoiner.setSessionId(UUID.randomUUID().toString());
+        final User joiner = users.saveAndFlush(rawJoiner);
+
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("joinMe12");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        invites.saveAndFlush(inv);
+
+        mvc.perform(post("/api/v1/servers/join-invite/joinMe12")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.id").value(server.getId()))
+                .andExpect(jsonPath("$.data.name").value(server.getName()));
+
+        assertEquals(true, members.existsByServerIdAndUserId(server.getId(), joiner.getId()));
+        List<ServerMember> serverMembers = members.findAllByServerId(server.getId());
+        ServerMember joinedMember = serverMembers.stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .findFirst().orElseThrow();
+        assertEquals("MEMBER", joinedMember.getRole());
+    }
+
+    @Test
+    void joinServerByInviteCode_Expired_Returns400() throws Exception {
+        User joiner = new User();
+        joiner.setEmail("joiner2-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("Joiner User 2");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("expiredCode");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        inv.setExpiresAt(Instant.now().minusSeconds(100));
+        invites.saveAndFlush(inv);
+
+        problem(mvc.perform(post("/api/v1/servers/join-invite/expiredCode")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner))), 400);
+    }
+
+    @Test
+    void joinServerByInviteCode_Revoked_Returns400() throws Exception {
+        User joiner = new User();
+        joiner.setEmail("joiner3-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("Joiner User 3");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("revokedCode");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("REVOKED");
+        invites.saveAndFlush(inv);
+
+        problem(mvc.perform(post("/api/v1/servers/join-invite/revokedCode")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner))), 400);
+    }
+
+    @Test
+    void joinServerByInviteCode_NotFound_Returns404() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/join-invite/nonexistentCode")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void joinServerByInviteCode_AlreadyMember_Returns400() throws Exception {
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("memberJoin");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        invites.saveAndFlush(inv);
+
+        addMembership(server.getId());
+
+        problem(mvc.perform(post("/api/v1/servers/join-invite/memberJoin")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+    @Test
+    void joinServerByInviteCode_MissingJwt_Returns401() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/join-invite/anyCode")), 401);
+    }
+
+    private String bearerFor(User user) {
+        JwtClaimsSet claims = JwtClaimsSet.builder().subject(user.getEmail())
+                .issuedAt(Instant.now().minusSeconds(1200)).expiresAt(Instant.now().plusSeconds(600))
+                .claim("sessionId", user.getSessionId()).claim("authorities", List.of("ROLE_USER")).build();
+        return "Bearer " + encoder.encode(JwtEncoderParameters.from(
+                JwsHeader.with(SecurityUtils.JWT_ALGORITHM).build(), claims)).getTokenValue();
+    }
+
+    @Test
+    void ownerUpdatesWrappedServerAndPreservesIdentityAndRelations() throws Exception {
+        addMembership(server.getId());
+        long memberCount = members.count();
+        long serverCount = servers.count();
+        entityManager.clear();
+        Instant createdDate = servers.findById(server.getId()).orElseThrow().getCreatedDate();
+
+        mvc.perform(put(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"  Nhóm mới  \",\"iconUrl\":\"https://example.test/new.png\",\"ownerId\":999}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.message").value("Cập nhật Server thành công"))
+                .andExpect(jsonPath("$.data.id").value(server.getId()))
+                .andExpect(jsonPath("$.data.name").value("Nhóm mới"))
+                .andExpect(jsonPath("$.data.ownerId").value(reader.getId()));
+        entityManager.flush();
+        entityManager.clear();
+        Server saved = servers.findById(server.getId()).orElseThrow();
+        assertEquals("Nhóm mới", saved.getName());
+        assertEquals("https://example.test/new.png", saved.getIconUrl());
+        assertEquals(reader.getId(), saved.getOwnerId());
+        assertEquals(createdDate, saved.getCreatedDate());
+        assertEquals(reader.getEmail(), saved.getLastModifiedBy());
+        assertEquals(serverCount, servers.count());
+        assertEquals(memberCount, members.count());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MEMBER", "ADMIN"})
+    void serverMemberAndAdminCannotUpdate(String role) throws Exception {
+        makeReaderOutsider();
+        addMembership(server.getId());
+        ServerMember membership = members.findAllByServerId(server.getId()).get(0);
+        membership.setRole(role);
+        members.saveAndFlush(membership);
+        problem(updateRequest(bearer(), "{\"name\":\"Forbidden\",\"iconUrl\":null}"), 403);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @Test
+    void outsiderWithGlobalAdminAuthorityCannotUpdate() throws Exception {
+        makeReaderOutsider();
+        problem(updateRequest(bearer(reader.getSessionId(), Instant.now().plusSeconds(600), List.of("ROLE_ADMIN")),
+                "{\"name\":\"Forbidden\"}"), 403);
+    }
+
+    @Test
+    void updatingMissingServerIsNotFound() throws Exception {
+        problem(mvc.perform(put("/api/v1/servers/" + Long.MAX_VALUE).header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Valid\"}")), 404);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-a-number", "0", "-1"})
+    void invalidUpdateIdIsBadRequest(String id) throws Exception {
+        problem(mvc.perform(put("/api/v1/servers/" + id).header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Valid\"}")), 400);
+    }
+
+    @Test
+    void updateRequiresValidJwtAndSession() throws Exception {
+        String body = "{\"name\":\"Changed\"}";
+        problem(mvc.perform(put(detailUrl()).contentType(MediaType.APPLICATION_JSON).content(body)), 401);
+        problem(updateRequest("Bearer not-a-jwt", body), 401);
+        problem(updateRequest(bearer(reader.getSessionId(), Instant.now().minusSeconds(600), List.of("ROLE_USER")), body), 401);
+        problem(updateRequest(bearer("wrong-session", Instant.now().plusSeconds(600), List.of("ROLE_USER")), body), 401);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void updateRejectsMissingOrInactiveAccount(boolean deleted) throws Exception {
+        String token = bearer();
+        if (deleted) users.delete(reader);
+        else reader.setActivated(false);
+        entityManager.flush();
+        problem(updateRequest(token, "{\"name\":\"Changed\"}"), 401);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"name\":null}", "{\"name\":\"\"}", "{\"name\":\"   \"}", "{\"name\":\"\u00a0\u2003\u202f\"}"})
+    void updateRejectsBlankNameWithoutWriting(String body) throws Exception {
+        problem(updateRequest(bearer(), body), 400);
+        assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
+    }
+
+    @Test
+    void updateValidatesFieldBoundariesAndCanRemoveIcon() throws Exception {
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        problem(updateRequest(bearer(), mapper.writeValueAsString(java.util.Map.of("name", "x".repeat(101)))), 400);
+        problem(updateRequest(bearer(), mapper.writeValueAsString(java.util.Map.of("name", "Valid", "iconUrl", "x".repeat(256)))), 400);
+        updateRequest(bearer(), mapper.writeValueAsString(java.util.Map.of("name", "🙂".repeat(50), "iconUrl", "x".repeat(255))))
+                .andExpect(status().isOk());
+        entityManager.flush();
+        entityManager.clear();
+        Server saved = servers.findById(server.getId()).orElseThrow();
+        assertEquals("🙂".repeat(50), saved.getName());
+        assertEquals(255, saved.getIconUrl().length());
+        for (String icon : List.of("null", "\"\"", "\"   \"")) {
+            updateRequest(bearer(), "{\"name\":\"Valid\",\"iconUrl\":" + icon + "}")
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.iconUrl").value(nullValue()));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {53, 254})
+    void updatePreservesLongEmailAudit(int length) throws Exception {
+        String email = length == 254
+                ? "a".repeat(60) + "@" + "b".repeat(60) + "." + "c".repeat(60) + "." + "d".repeat(60) + "." + "e".repeat(5) + ".test"
+                : "a".repeat(length - "@example.test".length()) + "@example.test";
+        assertEquals(length, email.length());
+        reader.setEmail(email);
+        reader = users.saveAndFlush(reader);
+        updateRequest(bearer(), "{\"name\":\"Updated audit\"}").andExpect(status().isOk());
+        entityManager.flush();
+        entityManager.clear();
+        assertEquals(email, servers.findById(server.getId()).orElseThrow().getLastModifiedBy());
+    }
+
+    private ResultActions updateRequest(String token, String body) throws Exception {
+        return mvc.perform(put(detailUrl()).header(HttpHeaders.AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
     private void readsDetail() throws Exception {
         mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
                 .andExpect(status().isOk())
@@ -296,6 +709,14 @@ class ServerSecurityIT {
 
     private String detailUrl() {
         return "/api/v1/servers/" + server.getId();
+    }
+
+    private String membersUrl() {
+        return "/api/v1/servers/" + server.getId() + "/members";
+    }
+
+    private String invitesUrl() {
+        return "/api/v1/servers/" + server.getId() + "/invites";
     }
 
     private String bearer() {

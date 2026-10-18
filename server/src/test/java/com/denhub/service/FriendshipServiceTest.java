@@ -140,7 +140,7 @@ class FriendshipServiceTest {
         verify(friendshipRepository).save(existingFs);
         assertThat(existingFs.getStatus()).isEqualTo(FriendshipStatus.ACCEPT.name());
 
-        verify(notificationFriendshipRequest).requestAccepted(any(FriendshipAction.class), eq(2L));
+        verify(notificationFriendshipRequest, never()).requestAccepted(any(FriendshipAction.class), any(Long.class));
     }
 
     @Test
@@ -159,5 +159,180 @@ class FriendshipServiceTest {
 
         assertThatThrownBy(() -> friendshipService.sendRequestAddFriend(2L))
                 .isInstanceOf(FriendReqAlreadySentException.class);
+    }
+
+    @Test
+    void blockUser_Unauthorized_ThrowsAccessDeniedException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(null);
+
+        assertThatThrownBy(() -> friendshipService.blockUser(2L))
+                .isInstanceOf(com.denhub.service.errors.AccessDeniedException.class);
+    }
+
+    @Test
+    void blockUser_SelfBlock_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        assertThatThrownBy(() -> friendshipService.blockUser(1L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("Cannot block my self");
+    }
+
+    @Test
+    void blockUser_UserNotFound_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(999L)).thenReturn(false);
+
+        assertThatThrownBy(() -> friendshipService.blockUser(999L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("User not found");
+    }
+
+    @Test
+    void blockUser_AlreadyBlocked_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(2L)).thenReturn(true);
+
+        Friendship existingFs = new Friendship();
+        existingFs.setUserOneId(1L);
+        existingFs.setUserTwoId(2L);
+        existingFs.setStatus(FriendshipStatus.BLOCKED.name());
+        existingFs.setActionUserId(1L);
+
+        when(friendshipRepository.findByUserOneIdAndUserTwoId(1L, 2L)).thenReturn(Optional.of(existingFs));
+
+        assertThatThrownBy(() -> friendshipService.blockUser(2L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("This user already blocked");
+    }
+
+    @Test
+    void blockUser_ExistingFriendship_UpdatesStatusAndActionUser() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(2L)).thenReturn(true);
+
+        Friendship existingFs = new Friendship();
+        existingFs.setUserOneId(1L);
+        existingFs.setUserTwoId(2L);
+        existingFs.setStatus(FriendshipStatus.ACCEPT.name());
+        existingFs.setActionUserId(2L);
+
+        when(friendshipRepository.findByUserOneIdAndUserTwoId(1L, 2L)).thenReturn(Optional.of(existingFs));
+
+        friendshipService.blockUser(2L);
+
+        assertThat(existingFs.getStatus()).isEqualTo(FriendshipStatus.BLOCKED.name());
+        assertThat(existingFs.getActionUserId()).isEqualTo(1L);
+        verify(friendshipRepository).save(existingFs);
+    }
+
+    @Test
+    void blockUser_NoExistingFriendship_CreatesNewBlockedRecord() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(2L)).thenReturn(true);
+        when(friendshipRepository.findByUserOneIdAndUserTwoId(1L, 2L)).thenReturn(Optional.empty());
+
+        friendshipService.blockUser(2L);
+
+        ArgumentCaptor<Friendship> captor = ArgumentCaptor.forClass(Friendship.class);
+        verify(friendshipRepository).save(captor.capture());
+
+        Friendship saved = captor.getValue();
+        assertThat(saved.getUserOneId()).isEqualTo(1L);
+        assertThat(saved.getUserTwoId()).isEqualTo(2L);
+        assertThat(saved.getStatus()).isEqualTo(FriendshipStatus.BLOCKED.name());
+        assertThat(saved.getActionUserId()).isEqualTo(1L);
+    }
+
+    @Test
+    void removeBlock_Unauthorized_ThrowsAccessDeniedException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(null);
+
+        assertThatThrownBy(() -> friendshipService.removeBlock(2L))
+                .isInstanceOf(com.denhub.service.errors.AccessDeniedException.class);
+    }
+
+    @Test
+    void removeBlock_SelfRemoveBlock_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        assertThatThrownBy(() -> friendshipService.removeBlock(1L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("Cannot remove block my self");
+    }
+
+    @Test
+    void removeBlock_UserNotFound_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(999L)).thenReturn(false);
+
+        assertThatThrownBy(() -> friendshipService.removeBlock(999L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("User not found");
+    }
+
+    @Test
+    void removeBlock_FriendshipNotFound_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(2L)).thenReturn(true);
+        when(friendshipRepository.findByUserOneIdAndUserTwoId(1L, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> friendshipService.removeBlock(2L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("Friendship not found");
+    }
+
+    @Test
+    void removeBlock_NotBlockedStatus_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(2L)).thenReturn(true);
+
+        Friendship existingFs = new Friendship();
+        existingFs.setUserOneId(1L);
+        existingFs.setUserTwoId(2L);
+        existingFs.setStatus(FriendshipStatus.ACCEPT.name());
+        existingFs.setActionUserId(1L);
+
+        when(friendshipRepository.findByUserOneIdAndUserTwoId(1L, 2L)).thenReturn(Optional.of(existingFs));
+
+        assertThatThrownBy(() -> friendshipService.removeBlock(2L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("Friendship status not blocked");
+    }
+
+    @Test
+    void removeBlock_NotActionUser_ThrowsException() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(2L)).thenReturn(true);
+
+        Friendship existingFs = new Friendship();
+        existingFs.setUserOneId(1L);
+        existingFs.setUserTwoId(2L);
+        existingFs.setStatus(FriendshipStatus.BLOCKED.name());
+        existingFs.setActionUserId(2L); // 2L blocked 1L, so 1L cannot unblock
+
+        when(friendshipRepository.findByUserOneIdAndUserTwoId(1L, 2L)).thenReturn(Optional.of(existingFs));
+
+        assertThatThrownBy(() -> friendshipService.removeBlock(2L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasMessageContaining("You cannot remove block for this user");
+    }
+
+    @Test
+    void removeBlock_Success_DeletesRecord() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+        when(userRepository.existsById(2L)).thenReturn(true);
+
+        Friendship existingFs = new Friendship();
+        existingFs.setUserOneId(1L);
+        existingFs.setUserTwoId(2L);
+        existingFs.setStatus(FriendshipStatus.BLOCKED.name());
+        existingFs.setActionUserId(1L); // 1L blocked 2L, so 1L can unblock
+
+        when(friendshipRepository.findByUserOneIdAndUserTwoId(1L, 2L)).thenReturn(Optional.of(existingFs));
+
+        friendshipService.removeBlock(2L);
+
+        verify(friendshipRepository).delete(existingFs);
     }
 }

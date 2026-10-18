@@ -24,6 +24,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 import java.util.List;
+import java.util.Map;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -80,7 +81,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         String token = authHeader.substring(7);
                         try {
                             Jwt jwt = jwtDecoder.decode(token);
-                            Authentication auth = new UsernamePasswordAuthenticationToken(jwt.getSubject(), null, List.of());
+                            Object userClaim = jwt.getClaim("user");
+                            String principalName = jwt.getSubject();
+                            if (userClaim instanceof Map<?, ?> userMap) {
+                                Object idObj = userMap.get("id");
+                                if (idObj != null) {
+                                    principalName = idObj.toString();
+                                }
+                            }
+                            Authentication auth = new UsernamePasswordAuthenticationToken(principalName, null, List.of());
                             accessor.setUser(auth);
                         } catch (Exception ignored) {
                             // Token decode failure or unauthenticated

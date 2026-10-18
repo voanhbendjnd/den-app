@@ -137,5 +137,24 @@ public class SecurityUtils {
         Optional<Long> userId = getCurrentUserId();
         return (Long) userId.orElse(null);
     }
+    /*
+    * get id from access token at security context holder
+    * */
+    public static Long getCurrentUserIdAtHolder() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+            Object userClaim = jwt.getClaim("user");
+            if(userClaim instanceof Map<?,?> userMap){
+                Object idObj = userMap.get("id");
+                if(idObj instanceof Number n) {
+                    return n.longValue();
+                }
+                if(idObj instanceof String s) {
+                    return Long.parseLong(s);
+                }
+            }
+        }
+        return null;
+    }
 
 }

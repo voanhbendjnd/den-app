@@ -146,6 +146,13 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | :--- | :---: | :--- | :--- | :---: |
 | **Search** | `GET` | `/api/users/search?username={q}` | Tìm kiếm danh sách người dùng theo username | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/requests` | Gửi yêu cầu kết bạn (hoặc chấp nhận nếu đã có pended req) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/friend-requests` | Lấy danh sách lời mời kết bạn nhận được (Cursor time pagination) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/accept-friend-request` | Chấp nhận lời mời kết bạn | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/remove-friend-request` | Hủy gửi yêu cầu kết bạn hoặc từ chối lời mời kết bạn | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/all-friend` | Lấy danh sách tất cả bạn bè đã kết bạn (Cursor time pagination) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/block-user` | Chặn người dùng (kể cả khi chưa là bạn hoặc đã là bạn) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/block-user/remove` | Gỡ chặn người dùng (Unblock user) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
@@ -155,15 +162,17 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Server** | `GET` | `/api/v1/servers` | Lấy danh sách Server mà User là Member / Owner | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers` | Tạo một Server mới | `CONFIRMED` |
 | **Server** | `GET` | `/api/v1/servers/{serverId}` | Đọc thông tin phần vỏ Server; Owner/Member, contract mục 9 | `IMPLEMENTED` |
-| **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
+| **Server** | `PUT` | `/api/v1/servers/{serverId}` | Owner cập nhật tên/ảnh Server, contract mục 11 | `IMPLEMENTED` |
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
-| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `IMPLEMENTED` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/invites` | Tạo mã mời Server mới (duy nhất Owner) | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
-| **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `TBD` |
+| **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `IMPLEMENTED` |
 | **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
-| **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message (có pagination) | `TBD` |
-| **Message** | `DELETE`| `/api/v1/servers/{serverId}/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
+| **Message** | `GET` | `/api/channels/{channelId}/messages?before={id}&limit=30` | Lấy lịch sử Message (Cursor pagination) | `CONFIRMED` |
+| **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message server cũ | `TBD` |
+| **Message** | `DELETE`| `/api/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
 | **Channel** | `POST` | `/api/v1/channels` | Tạo mới một Channel trong Server (yêu cầu là Owner/Member) | `CONFIRMED` |
 | **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `CONFIRMED` |
 | **Media / File** | `POST` | `/api/v1/files/upload` | Tải lên file ảnh (multipart/form-data) nhận URL tĩnh | `CONFIRMED` |
@@ -185,10 +194,11 @@ Hiện trạng đã đọc từ source sau gộp:
 ## 5. Danh mục REST API Chuẩn hóa (`CONFIRMED`)
 
 ### 5.1 Authentication & User
-- `POST /api/auth/register`: Đăng ký tài khoản mới
-- `POST /api/auth/login`: Đăng nhập, nhận Access Token JWT và cookie Refresh Token
+- `POST /api/register` & `POST /api/auth/register`: Đăng ký tài khoản mới (`RegisterReqDTO`: email, password, name, username), lưu người dùng, trả `UserDTO` bọc trong `RestResponse<UserDTO>` (201 Created).
+- `POST /api/login` & `POST /api/auth/login`: Đăng nhập, nhận Access Token JWT và cookie Refresh Token (`ResLoginDTO`).
+- `POST /api/auth/google` & `POST /api/login/google`: Đăng nhập hoặc đăng ký tài khoản qua Google OAuth / Google Identity Services (`GoogleLoginReqDTO`: credential, email, name, avatar, googleId), trả về `ResLoginDTO` (200 OK).
 - `POST /api/auth/logout`: Đăng xuất, hủy refresh token
-- `GET /api/users/me`: Thông tin người dùng hiện tại
+- `GET /api/account` & `GET /api/users/me`: Thông tin người dùng hiện tại
 - `PATCH /api/users/me`: Cập nhật display name, avatar
 - `GET /api/users/search?q={query}`: Tìm kiếm người dùng theo tên
 
@@ -196,13 +206,13 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/servers`: Lấy danh sách server người dùng tham gia
 - `POST /api/servers`: Tạo server mới (transactional với `#general` channel và Owner)
 - `GET /api/v1/servers/{serverId}`: Chi tiết phần vỏ Server theo phạm vi duyệt 2026-10-13 (mục 9); trả DTO Server hiện có. Thiết kế trước đó `/api/servers/{serverId}` kèm danh sách kênh được thu hẹp cho lượt này; dữ liệu Channel thuộc module Channel, không thêm alias `/api/servers/{serverId}`.
-- `PATCH /api/servers/{serverId}`: Cập nhật tên/ảnh server (Owner)
+- `PUT /api/v1/servers/{serverId}`: Cập nhật tên/ảnh server (Owner), contract mục 11 được duyệt 2026-10-15; thay thế đề xuất cũ `PATCH /api/servers/{serverId}`, không thêm alias.
 - `DELETE /api/servers/{serverId}`: Xóa server (Owner)
 - `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
-- `POST /api/servers/{serverId}/invites`: Tạo invite code
-- `POST /api/invites/{code}/join`: Tham gia server qua code
+- `POST /api/v1/servers/{serverId}/invites`: Tạo invite code (duy nhất Server Owner, mã 8 ký tự Base62 an toàn, trả `ServerInviteResponseDTO` trong wrapper `RestResponse`)
+- `POST /api/v1/servers/join-invite/{code}`: Tham gia server qua invite code (Người dùng đã đăng nhập, trả `ServerResponseDTO` trong wrapper `RestResponse`)
 - `DELETE /api/invites/{code}`: Thu hồi invite code
-- `GET /api/servers/{serverId}/members`: Danh sách thành viên
+- `GET /api/v1/servers/{serverId}/members`: Danh sách thành viên (Owner/Member, `ServerMemberResponseDTO`)
 - `DELETE /api/servers/{serverId}/members/{userId}`: Kick thành viên
 - `PATCH /api/servers/{serverId}/members/{userId}/role`: Phân quyền `ADMIN`/`MEMBER` (Owner)
 
@@ -251,9 +261,13 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 | `/app/conversations/send` | `SEND` | Client gửi tin nhắn 1-1 (Text / Image) | `CONFIRMED` |
 | `/topic/conversations/{conversationId}` | `SUBSCRIBE` | Client lắng nghe tin nhắn 1-1 real-time | `CONFIRMED` |
 | `/user/queue/friend-requests/received` | `SUBSCRIBE` | Nhận thông báo có lời mời kết bạn mới | `CONFIRMED` |
-| `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Nhận thông báo lời mời kết bạn được chấp nhận | `CONFIRMED` |
+| `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Sự kiện ngầm cập nhật danh sách bạn bè khi lời mời được chấp nhận (không hiển thị popup notification để chống spam) | `CONFIRMED` |
 | `/user/queue/direct-messages` | `SUBSCRIBE` | Nhận tin nhắn riêng tư 1-1 gửi trực tiếp cho người dùng | `TBD` |
 | `/user/queue/errors` | `SUBSCRIBE` | Nhận thông báo lỗi thời gian thực cá nhân | `TBD` |
+
+> [!NOTE]
+> **Định danh WebSocket Principal & Private Queue Routing:**  
+> Trong `WebSocketConfig`, STOMP `Principal.getName()` được trích xuất từ JWT claim `user.id` (dạng chuỗi, fallback về `jwt.getSubject()` email) để các lệnh `convertAndSendToUser(userId, ...)` như trong `NotificationFriendshipRequest` có thể định tuyến chính xác vào session của người nhận. Đồng thời, `NotificationFriendshipRequest` thực hiện dual-delivery (gửi cho cả numeric User ID và email) để đảm bảo 100% không bị thất lạc sự kiện.
 
 ### 6.3 Định dạng WebSocket Payload gửi lên 1-1 (`SendMessageReq`) (`CONFIRMED`)
 ```json
@@ -411,7 +425,47 @@ Request DTO chỉ có content để client không chọn người gửi; Respons
 2. Vì sao 2000 emoji `😀` được chấp nhận còn thêm một chữ `a` bị 400?
 3. Vì sao JPA/H2 pass nhưng database SQL Server cũ vẫn cần được kiểm tra hai cột audit?
 
-Dừng tại phạm vi POST; chờ Duy trả lời và yêu cầu tiếp tục trước API GET hoặc frontend.
+### 7.7 API Lấy lịch sử tin nhắn Channel — Cursor Pagination (`IMPLEMENTED`)
+
+Endpoint: `GET /api/channels/{channelId}/messages?before={id}&limit=30`
+
+- **Xác thực & Phân quyền:** Yêu cầu Bearer JWT hợp lệ, tài khoản activated, Channel tồn tại và người dùng là thành viên Server (`ServerMember`) hoặc Owner.
+- **Tham số truy vấn:**
+  - `before` (Long, optional): Con trỏ ID tin nhắn (lấy các tin có ID nhỏ hơn con trỏ này, phục vụ cuộn lên tải tin cũ).
+  - `limit` (Integer, optional, mặc định 30): Số lượng tin nhắn tối đa mỗi trang (chấp nhận 1 đến 100).
+- **Thứ tự:** Sắp xếp ID giảm dần (mới nhất trước).
+- **Response Format (Thành công 200 OK):**
+  Wrapper `ResFormatResponse` bọc `CursorPageResponse<MessageResponse>` trong `data`:
+  ```json
+  {
+    "statusCode": 200,
+    "error": null,
+    "message": "Lấy lịch sử tin nhắn thành công",
+    "data": {
+      "items": [
+        {
+          "id": 105,
+          "channelId": 5,
+          "senderId": 2,
+          "content": "Nội dung tin nhắn",
+          "createdAt": "2026-10-10T07:30:00Z"
+        }
+      ],
+      "nextCursor": 101,
+      "hasMore": true,
+      "limit": 30
+    }
+  }
+  ```
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `channelId` <= 0, `limit` ngoài khoảng 1..100, hoặc `before` <= 0.
+  - `401 Unauthorized`: Chưa đăng nhập hoặc token không hợp lệ / tài khoản chưa kích hoạt.
+  - `403 Forbidden`: Người dùng không phải thành viên của Server chứa Channel.
+  - `404 Not Found`: Không tìm thấy Channel.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 11 unit tests kiểm thử thành công, default limit, hasMore, nextCursor, kênh rỗng, và toàn bộ các mã lỗi 400/401/403/404.
+  - `MessageResourceIT`: 4 standalone MockMvc tests kiểm thử response code, JSON paths wrapper và Problem Details.
+  - `MessageSecurityIT`: 5 SpringBootTest integration tests với JWT encoder và JPA/H2 thật kiểm thử sắp xếp giảm dần, phân trang `before`, chặn 401 khi thiếu token, chặn 403 khi không phải member, chặn 400 khi limit sai.
 
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 
@@ -539,3 +593,38 @@ Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer
 - Verification: từ `server/`, `.\gradlew.bat compileJava test check --no-daemon` **PASS 150/150**, 0 failure/error/skip sau sửa fixture email biên trong test. Thêm 13 unit cases nickname/identity và 9 integration cases create/list, email 55/254, tên rỗng/dài/emoji, rollback. `ServerMemberRepository` là spy gọi thật mặc định; duy nhất case rollback stub lỗi save, chạy ngoài transaction test để xác nhận transaction Service rollback.
 - Từ `client/`, với NODE_PATH Playwright như mục 8.2, `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` **PASS 25/25** (20 Edge browser + 5 logic); `npm run build` **PASS**. Năm browser tests mới kiểm loading/503/retry/empty, submit pending, icon gửi đúng, response cũ, file mới/preset/template và lỗi upload hiện tại. Không có pageerror trong các cases.
 - H2 và browser mock không chứng minh FE → BE → SQL Server thật. Script SQL Server chỉ đã chuẩn bị/review nội dung, chưa thực thi; cần review/apply trên database đích. Các warning Ant Design và chunk >500 kB có sẵn vẫn còn. Không có npm script lint/test để chạy.
+
+## 10. Chạy local bằng VS Code — Channel và ảnh upload (2026-10-15)
+
+- Với workspace mở ở `den-app`, cấu hình Java trong `.vscode/launch.json` dùng `cwd = ${workspaceFolder}/server` và `envFile = ${workspaceFolder}/server/.env`. Giữ `projectName` khớp project mà Java extension nhận diện; project hiện tại trong Spring Boot Dashboard là `denhub-server-server`. Nếu mở riêng workspace `server`, hai đường dẫn tương ứng là `${workspaceFolder}` và `${workspaceFolder}/.env`.
+- `FileService.uploadImage` và `loadFileAsResource` dùng thư mục tương đối `uploads/{folder}`. Chạy từ `server/` sẽ đọc/ghi trong `server/uploads`, nơi ảnh server local hiện có được lưu. Chạy từ `den-app/` sẽ tìm trong `den-app/uploads` và không thấy ảnh cũ. Restart Java sau khi thay cwd; không cần di chuyển ảnh hoặc sửa URL trong database cho thay đổi này.
+- `.vscode` và `.env` bị Git ignore. Hướng dẫn này giúp tái tạo cấu hình trên máy khác; không commit credential. Cấu hình launch không tự áp dụng cho mọi cách chạy ngoài cấu hình Java đó.
+- `GET /api/v1/servers/{serverId}/channels` khai báo rõ `@PathVariable("serverId")`; `GET /api/v1/files/{folder}/{filename}` khai báo rõ `folder` và `filename`. Binding của hai API hoạt động cả khi IDE compiler không giữ tên tham số bằng `-parameters`; route, response và quyền truy cập hiện có được giữ nguyên.
+- Hai MockMvc regression tests tắt việc khám phá tên tham số: Channel kiểm tra ID tới service; File kiểm tra bytes PNG, MIME type và cache header. Sau sửa, toàn bộ backend PASS 228/228; `gradlew check` PASS. Đây là kiểm thử backend/MockMvc/H2 và cấu hình đường dẫn, chưa phải xác minh UI hoặc SQL Server thật sau restart.
+
+## 11. Cài đặt và chỉnh sửa Server (`CONFIRMED`, 2026-10-15)
+
+Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và FE. Contract dùng `PUT` theo prefix Controller hiện có, thống nhất mục 4.5/5.2; không đổi các API Server khác.
+
+### 11.1 REST, DTO và quyền
+
+- `PUT /api/v1/servers/{serverId}`, JSON `UpdateServerDTO`; `serverId` phải là số dương. Authentication/JWT hiện có; chỉ User active có ID trùng `Server.ownerId` được sửa. Không dùng role admin toàn hệ thống hay membership để thay thế kiểm tra Owner.
+- `name` bắt buộc, không null/rỗng/toàn khoảng trắng Unicode; tối đa 100 đơn vị UTF-16 trên request trước chuẩn hóa. `iconUrl` tối đa 255 đơn vị UTF-16; null, bỏ qua field, rỗng hoặc chỉ gồm khoảng trắng mà `String.strip()` loại bỏ sẽ gỡ ảnh. Hai trường được chuẩn hóa bằng `String.strip()` trước lưu. Đây là cập nhật toàn bộ thông tin có thể chỉnh sửa, FE gửi cả hai field.
+- Thành công `200`, thông báo `Cập nhật Server thành công`; `ServerResponseDTO` trong `RestResponse.data` với `id`, `name`, `iconUrl`, `ownerId`, `createdDate`. FE đọc `response.data.data`.
+- Lỗi dùng Problem Details hiện có: `400` JSON/ID/validation không hợp lệ, `401` JWT/session/tài khoản không hợp lệ hoặc inactive, `403` không phải Owner, `404` Server không tồn tại. Request hợp lệ vẫn không được nhận Owner/ngày tạo từ client; chỉ cập nhật tên và ảnh.
+- `ServerService.updateServer` tái sử dụng `getActiveCurrentUser`, kiểm tra DTO cả khi gọi trực tiếp Service, thực hiện trong transaction hiện có. `saveAndFlush` ghi dữ liệu và audit trước khi rời request đã xác thực. Giữ Entity, schema, membership, Channel và WebSocket; không thêm event broadcast hoặc migration. Mapping/giới hạn cũ được đối chiếu tại docs/03 mục 4.5.
+
+### 11.2 UI và đồng bộ dữ liệu
+
+- Owner mở nút bánh răng `Cài đặt Server` ở heading sidebar nhóm; trên mobile mở drawer Kênh trước. Dùng `ServerSettingsModal` trong `components/common`, CSS riêng có scope; không thêm route hay dependency.
+- Bố cục tham khảo cách tổ chức cài đặt Discord: điều hướng Tổng quan, form tên và ảnh, preview và thanh Lưu/Hủy khi có thay đổi. Dùng Ant Design, Plus Jakarta Sans và tokens nền tối/cyan/indigo hiện có. Mobile thu gọn một cột.
+- Upload tái sử dụng `POST /api/v1/files/upload`, folder `servers`, nhận URL trong wrapper hoặc response upload cũ. Chỉ JPG/JPEG/PNG/WebP/GIF, tối đa 5 MB theo service hiện có. Gỡ ảnh gửi null. Upload không tự đổi Server; chỉ PUT thành công mới thay đổi thông tin Server.
+- Chặn lưu khi upload/submit đang chờ, có guard chống gửi trùng; lỗi giữ draft. Hủy khôi phục dữ liệu đã lưu; đóng draft chưa lưu có xác nhận. Chuyển Server đóng settings; response upload/save cũ không được thay đổi phiên/modal hoặc Server mới. Response upload mới nhất thắng.
+- Sau PUT thành công, cập nhật detail của GroupChatPage và danh sách `setServers` trong Outlet context, đồng bộ header/sidebar/dock. Không xóa file upload đã bỏ chọn hoặc ảnh cũ vì file có thể được dùng chung; vòng đời file ngoài phạm vi task.
+
+### 11.3 Verification và giới hạn
+
+- Backend: `gradlew.bat test check` PASS 259/259, gồm 31 cases mới cho update: Service, binding không có compiler parameter metadata, JWT/role/active account, validation, lưu H2, audit email 53/254 và bảo toàn identity/membership.
+- FE: 17 settings browser tests PASS trên Edge headless với API mock; 23 group UI regression tests PASS trong lượt chạy kết hợp. Đã xem screenshot desktop 1440 và mobile 375; kiểm tra thêm viewport 320/768. `npm run build` PASS; không có script npm lint/test được cấu hình.
+- Playwright dùng runtime sẵn có theo mục 8.2; có thể lưu screenshot qua `SERVER_SETTINGS_ARTIFACT_DIR`, mặc định thư mục tạm `denhub-server-settings`. Không gửi fixture JWT tới backend thật.
+- Chưa kiểm thử FE → backend → SQL Server thật và chưa apply schema/audit script. Mock/H2 không chứng minh SQL Server hiện tại phù hợp mapping. Các warning Ant Design cũ và bundle lớn vẫn có sẵn.

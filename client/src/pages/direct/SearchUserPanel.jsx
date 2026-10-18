@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import {
   Drawer, Input, List, Avatar, Button, Tag, Typography,
-  Space, Spin, Empty, message as antMessage,
+  Space, Spin, Empty, Popconfirm, message as antMessage,
 } from 'antd';
-import { SearchOutlined, UserAddOutlined, MessageOutlined } from '@ant-design/icons';
+import { SearchOutlined, UserAddOutlined, MessageOutlined, StopOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import friendApi from '../../api/friendApi';
@@ -28,6 +28,7 @@ export default function SearchUserPanel({ open, onClose }) {
   const [friendLoading, setFriendLoading] = useState({});   // { [userId]: boolean }
   const [chatLoading, setChatLoading] = useState({});        // { [userId]: boolean }
   const [friendSent, setFriendSent] = useState({});          // { [userId]: boolean }
+  const [blockLoading, setBlockLoading] = useState({});      // { [userId]: boolean }
 
   const debounceTimer = useRef(null);
 
@@ -95,6 +96,20 @@ export default function SearchUserPanel({ open, onClose }) {
       antMessage.error('Không thể mở hội thoại.');
     } finally {
       setChatLoading((prev) => ({ ...prev, [user.id]: false }));
+    }
+  };
+
+  const handleBlockUser = async (user) => {
+    setBlockLoading((prev) => ({ ...prev, [user.id]: true }));
+    try {
+      await friendApi.blockUser(user.id);
+      antMessage.success(`Đã chặn người dùng ${user.name || user.username}.`);
+      setResults((prev) => prev.filter((u) => u.id !== user.id));
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.detail || 'Không thể chặn người dùng.';
+      antMessage.error(msg);
+    } finally {
+      setBlockLoading((prev) => ({ ...prev, [user.id]: false }));
     }
   };
 
@@ -204,6 +219,39 @@ export default function SearchUserPanel({ open, onClose }) {
                   >
                     Nhắn tin
                   </Button>
+                  {/* Nút Chặn */}
+                  <Popconfirm
+                    title="Chặn người dùng"
+                    description={`Bạn có chắc muốn chặn ${user.name || user.username}? Người này sẽ không tìm thấy bạn qua tìm kiếm.`}
+                    okText="Chặn"
+                    cancelText="Không"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => handleBlockUser(user)}
+                  >
+                    <Button
+                      id={`btn-block-${user.id}`}
+                      size="small"
+                      icon={<StopOutlined />}
+                      loading={!!blockLoading[user.id]}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        borderColor: 'rgba(239, 68, 68, 0.25)',
+                        color: '#F87171',
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#EF4444';
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.18)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                      }}
+                    >
+                      Chặn
+                    </Button>
+                  </Popconfirm>
                 </Space>,
               ]}
             >

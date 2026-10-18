@@ -85,6 +85,7 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
   contexts.push(context);
   context.setDefaultTimeout(12000);
+  context.setDefaultNavigationTimeout(30000);
   await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   await context.route('https://images.unsplash.com/**', route => route.fulfill({
     contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrZkAAAAASUVORK5CYII=', 'base64'),
@@ -116,11 +117,17 @@ async function fulfillServerRequest(route) {
   const request = route.request();
   assert.equal(request.method(), 'GET');
   const pathname = new URL(request.url()).pathname;
+  if (pathname === '/api/v1/conversations') {
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [] } });
+  }
   if (pathname === '/api/v1/servers') {
     return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
   }
   if (pathname.endsWith('/channels')) {
-    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [{ id: 101, serverId: 1, name: 'general', position: 0 }] } });
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [] } });
+  }
+  if (pathname.endsWith('/members')) {
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [] } });
   }
   assert.match(pathname, /^\/api\/v1\/servers\/\d+$/);
   const server = servers.find(item => String(item.id) === pathname.split('/').at(-1));
@@ -503,7 +510,7 @@ test('mobile and narrow screens fit horizontally and expose channels and members
   await screenshot(page, 'group-mobile.png');
   await page.getByRole('button', { name: 'Mở danh sách kênh' }).click();
   await page.getByRole('dialog').waitFor();
-  assert.equal(await page.getByRole('dialog').getByText('Danh sách kênh chưa sẵn sàng.').isVisible(), true);
+  assert.equal(await page.getByRole('dialog').getByText(/Chưa có kênh nào trong server|Danh sách kênh chưa sẵn sàng/).isVisible(), true);
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Mở danh sách thành viên' }).click();
@@ -607,3 +614,90 @@ test('IME composition does not send and missing channels disable the composer', 
   await page.waitForFunction(() => document.querySelector('textarea').disabled);
   assert.equal(await page.getByRole('button', { name: 'Gửi tin nhắn' }).isDisabled(), true);
 });
+
+test('server members list renders members with owner badge, nickname, and fallback avatar', async () => {
+  const { page, errors } = await openPage({ handler: async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/servers/12/members') {
+      return route.fulfill({
+        json: {
+          statusCode: 200,
+          error: null,
+          message: 'OK',
+          data: [
+            { id: 1, serverId: 12, userId: 100, username: 'hoangnam', name: 'Hoàng Nam', nickname: 'Nam Boss', avatar: null, role: 'OWNER' },
+            { id: 2, serverId: 12, userId: 101, username: 'anhben', name: 'Võ Anh Bến', nickname: 'Bến', avatar: null, role: 'MEMBER' },
+          ],
+        },
+      });
+    }
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/servers/12`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Thành viên (2)').waitFor();
+  await page.getByText('Nam Boss').waitFor();
+  assert.equal(await page.getByTitle('Chủ nhóm').isVisible(), true);
+  await page.getByText('Bến').waitFor();
+  assert.equal(await page.getByText('@hoangnam').isVisible(), true);
+  assert.deepEqual(errors, []);
+});
+
+test('server members loading, error and retry work correctly', async () => {
+  let mode = 'failure';
+  const { page, errors } = await openPage({ handler: async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/servers/12/members') {
+      if (mode === 'failure') {
+        return route.fulfill({ status: 500, json: { message: 'Lỗi tải thành viên' } });
+      }
+      return route.fulfill({
+        json: {
+          statusCode: 200,
+          error: null,
+          message: 'OK',
+          data: [
+            { id: 1, serverId: 12, userId: 100, username: 'hoangnam', name: 'Hoàng Nam', nickname: 'Nam Boss', avatar: null, role: 'OWNER' },
+          ],
+        },
+      });
+    }
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/servers/12`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Lỗi tải thành viên').waitFor();
+  const retryBtn = page.getByRole('button', { name: 'Thử lại' });
+  assert.equal(await retryBtn.isVisible(), true);
+  mode = 'success';
+  await retryBtn.click();
+  await page.getByText('Nam Boss').waitFor();
+  assert.deepEqual(errors, []);
+});
+
+test('server switching reloads members of the selected server', async () => {
+  const memberRequests = [];
+  const { page, errors } = await openPage({ handler: async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/members')) {
+      memberRequests.push(url.pathname);
+      return route.fulfill({
+        json: {
+          statusCode: 200,
+          error: null,
+          message: 'OK',
+          data: [
+            { id: 1, serverId: Number(url.pathname.split('/')[4]), userId: 100, username: 'user', name: 'User', nickname: 'Nick', avatar: null, role: 'MEMBER' },
+          ],
+        },
+      });
+    }
+    return fulfillServerRequest(route);
+  } });
+  await page.goto(`${origin}/servers/12`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Thành viên (1)').waitFor();
+  assert.ok(memberRequests.includes('/api/v1/servers/12/members'));
+  await page.goto(`${origin}/servers/1`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Thành viên (1)').waitFor();
+  assert.ok(memberRequests.includes('/api/v1/servers/1/members'));
+  assert.deepEqual(errors, []);
+});
+

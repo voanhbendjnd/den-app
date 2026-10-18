@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.denhub.service.ServerService;
 import com.denhub.service.dto.CreateServerDTO;
+import com.denhub.service.dto.UpdateServerDTO;
+import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +54,53 @@ class ServerResourceTest {
                 .andExpect(jsonPath("$.name").value("Detail server"))
                 .andExpect(jsonPath("$.ownerId").value(100));
         org.mockito.Mockito.verify(serverService).getServerDetail(12L);
+    }
+
+    @Test
+    void updateServer_BindsIdWithoutParameterMetadataAndPassesRequest() throws Exception {
+        mockMvc.getDispatcherServlet().getWebApplicationContext()
+                .getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.class)
+                .setParameterNameDiscoverer(org.mockito.Mockito.mock(org.springframework.core.ParameterNameDiscoverer.class));
+        ServerResponseDTO response = new ServerResponseDTO();
+        response.setId(12L);
+        response.setName("New server");
+        when(serverService.updateServer(org.mockito.ArgumentMatchers.eq(12L), any(UpdateServerDTO.class))).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/servers/12")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New server\",\"iconUrl\":null}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("New server"));
+        org.mockito.ArgumentCaptor<UpdateServerDTO> request = org.mockito.ArgumentCaptor.forClass(UpdateServerDTO.class);
+        org.mockito.Mockito.verify(serverService).updateServer(org.mockito.ArgumentMatchers.eq(12L), request.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("New server", request.getValue().getName());
+        org.junit.jupiter.api.Assertions.assertNull(request.getValue().getIconUrl());
+    }
+
+    @Test
+    void getServerMembers_Success() throws Exception {
+        ServerMemberResponseDTO memberDto = new ServerMemberResponseDTO();
+        memberDto.setId(101L);
+        memberDto.setServerId(12L);
+        memberDto.setUserId(1L);
+        memberDto.setUsername("nam123");
+        memberDto.setName("Hoang Nam");
+        memberDto.setNickname("Nam Boss");
+        memberDto.setAvatar("https://example.test/avatar.png");
+        memberDto.setRole("OWNER");
+
+        when(serverService.getServerMembers(12L)).thenReturn(java.util.List.of(memberDto));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/servers/12/members"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(101))
+                .andExpect(jsonPath("$[0].serverId").value(12))
+                .andExpect(jsonPath("$[0].userId").value(1))
+                .andExpect(jsonPath("$[0].username").value("nam123"))
+                .andExpect(jsonPath("$[0].name").value("Hoang Nam"))
+                .andExpect(jsonPath("$[0].nickname").value("Nam Boss"))
+                .andExpect(jsonPath("$[0].avatar").value("https://example.test/avatar.png"))
+                .andExpect(jsonPath("$[0].role").value("OWNER"));
+        org.mockito.Mockito.verify(serverService).getServerMembers(12L);
     }
 
     @Test
@@ -129,5 +178,45 @@ class ServerResourceTest {
             mockMvc.perform(post("/api/v1/servers/10/join")
                     .contentType(MediaType.APPLICATION_JSON))
         ).hasCauseInstanceOf(com.denhub.web.rest.errors.BadRequestAlertException.class);
+    }
+
+    @Test
+    void createServerInvite_Success() throws Exception {
+        com.denhub.service.dto.ServerInviteResponseDTO inviteDto = new com.denhub.service.dto.ServerInviteResponseDTO();
+        inviteDto.setId(1L);
+        inviteDto.setServerId(12L);
+        inviteDto.setCode("aB7kX9mQ");
+        inviteDto.setCreatedBy(5L);
+        inviteDto.setStatus("ACTIVE");
+        inviteDto.setCreatedAt(java.time.Instant.parse("2026-10-14T14:30:00Z"));
+
+        when(serverService.createServerInvite(org.mockito.ArgumentMatchers.eq(12L), any())).thenReturn(inviteDto);
+
+        mockMvc.perform(post("/api/v1/servers/12/invites")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.serverId").value(12))
+                .andExpect(jsonPath("$.code").value("aB7kX9mQ"))
+                .andExpect(jsonPath("$.createdBy").value(5))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        org.mockito.Mockito.verify(serverService).createServerInvite(org.mockito.ArgumentMatchers.eq(12L), any());
+    }
+
+    @Test
+    void joinServerByInviteCode_Success() throws Exception {
+        ServerResponseDTO dto = new ServerResponseDTO();
+        dto.setId(25L);
+        dto.setName("Joined Server");
+
+        when(serverService.joinServerByInviteCode("abc12345")).thenReturn(dto);
+
+        mockMvc.perform(post("/api/v1/servers/join-invite/abc12345"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(25))
+                .andExpect(jsonPath("$.name").value("Joined Server"));
+
+        org.mockito.Mockito.verify(serverService).joinServerByInviteCode("abc12345");
     }
 }

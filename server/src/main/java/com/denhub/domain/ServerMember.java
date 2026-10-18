@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.Length;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "server_member", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"server_id", "user_id"}, name = "ux_server_member")
@@ -21,6 +23,12 @@ public class ServerMember {
     @Length(max = 20, min = 1)
     @Column(name = "nickname", length = 20, nullable = false, columnDefinition = "NVARCHAR(20)")
     private String nickname;
+
+    @Transient
+    private String role = "MEMBER";
+
+    @Transient
+    private Instant joinedAt = Instant.now();
 
     public Long getId() {
         return id;
@@ -52,5 +60,21 @@ public class ServerMember {
 
     public void setNickname(String nickname) {
         this.nickname = nickname;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public Instant getJoinedAt() {
+        return joinedAt;
+    }
+
+    public void setJoinedAt(Instant joinedAt) {
+        this.joinedAt = joinedAt;
     }
 }

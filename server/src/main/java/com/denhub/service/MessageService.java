@@ -8,10 +8,12 @@ import com.denhub.repository.MessageRepository;
 import com.denhub.repository.ServerMemberRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.SecurityUtils;
+import com.denhub.service.dto.CursorPageResponse;
 import com.denhub.service.dto.MessageResponse;
 import com.denhub.service.dto.SendMessageRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -74,6 +77,62 @@ public class MessageService {
                 savedMessage.getAuthorId(),
                 savedMessage.getContent(),
                 savedMessage.getCreatedDate());
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPageResponse<MessageResponse> getMessages(Long channelId, Long before, Integer limit) {
+        String email = getAuthenticatedEmail();
+
+        if (channelId == null || channelId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID của Channel không hợp lệ");
+        }
+
+        int effectiveLimit = (limit != null) ? limit : 30;
+        if (effectiveLimit < 1 || effectiveLimit > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số lượng tin nhắn phải từ 1 đến 100");
+        }
+
+        if (before != null && before <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Con trỏ phân trang không hợp lệ");
+        }
+
+        User currentUser = userRepository.findOneByEmail(email)
+                .filter(user -> Boolean.TRUE.equals(user.getActivated()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Không tìm thấy Channel"));
+
+        if (!serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), currentUser.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Bạn không có quyền xem tin nhắn trong Channel này");
+        }
+
+        PageRequest pageRequest = PageRequest.of(0, effectiveLimit + 1);
+        List<Message> messages = (before == null)
+                ? messageRepository.findByChannelIdOrderByIdDesc(channel.getId(), pageRequest)
+                : messageRepository.findByChannelIdAndIdLessThanOrderByIdDesc(channel.getId(), before, pageRequest);
+
+        boolean hasMore = messages.size() > effectiveLimit;
+        List<Message> pagedMessages = hasMore ? messages.subList(0, effectiveLimit) : messages;
+
+        Long nextCursor = null;
+        if (hasMore && !pagedMessages.isEmpty()) {
+            nextCursor = pagedMessages.get(pagedMessages.size() - 1).getId();
+        }
+
+        List<MessageResponse> items = pagedMessages.stream()
+                .map(msg -> new MessageResponse(
+                        msg.getId(),
+                        msg.getChannelId(),
+                        msg.getAuthorId(),
+                        msg.getContent(),
+                        msg.getCreatedDate()))
+                .toList();
+
+        return new CursorPageResponse<>(items, nextCursor, hasMore, effectiveLimit);
     }
 
     private String getAuthenticatedEmail() {

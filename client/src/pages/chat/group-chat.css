@@ -23,6 +23,8 @@
 .group-sidebar__body { padding: 22px 16px; flex: 1; overflow-y: auto; }
 .group-back-link { display: inline-flex; align-items: center; gap: 9px; color: var(--color-text-muted); font-size: 12px; padding: 6px 0; }
 .group-back-link:hover { color: var(--color-cyan); }
+.group-sidebar-invite-btn { display: inline-flex; align-items: center; gap: 5px; background: rgba(0, 242, 254, .08); border: 1px solid rgba(0, 242, 254, .25); color: #00f2fe; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: all .18s ease; }
+.group-sidebar-invite-btn:hover { background: rgba(0, 242, 254, .18); border-color: #00f2fe; box-shadow: 0 0 10px rgba(0, 242, 254, .25); }
 .group-section-label { margin: 0; color: var(--color-text-muted); font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
 .group-section-header { margin: 24px 0 12px; display: flex; align-items: center; justify-content: space-between; }
 .group-add-channel-btn { background: transparent; border: none; color: var(--color-text-muted); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease; }
@@ -58,6 +60,8 @@
 .group-chat__title strong { white-space: nowrap; font-size: 14px; }
 .group-chat__title > span { color: var(--color-text-muted); font-size: 12px; padding-left: 16px; border-left: 1px solid var(--border-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .group-pending-label { font-size: 10px; padding: 5px 9px; color: #afb8cb; border: 1px solid var(--border-subtle); border-radius: 6px; white-space: nowrap; }
+.group-header-invite-btn.ant-btn { color: #00f2fe; border: 1px solid rgba(0, 242, 254, .22); background: rgba(0, 242, 254, .06); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease; }
+.group-header-invite-btn.ant-btn:hover { background: rgba(0, 242, 254, .16) !important; color: #38bdf8 !important; border-color: rgba(0, 242, 254, .5) !important; }
 .group-mobile-channels.ant-btn { display: none; }
 .group-chat__content { flex: 1; min-height: 0; overflow-y: auto; display: flex; background: radial-gradient(ellipse at 45% 33%, rgba(99, 102, 241, .07), transparent 65%); }
 .group-welcome { margin: auto; padding: 50px 32px 38px; width: 100%; max-width: 610px; text-align: center; }
@@ -75,11 +79,26 @@
 .group-welcome__notice p { color: var(--color-text-muted); font-size: 11px; line-height: 1.8; margin: 6px 0 0; }
 .group-member-column { width: 232px; flex-shrink: 0; border-left: 1px solid var(--border-subtle); background: var(--color-bg-sidebar); }
 .group-members { padding: 0 20px; }
-.group-members .group-section-label { height: 72px; margin: 0; display: flex; align-items: center; border-bottom: 1px solid var(--border-subtle); }
+.group-members-header { height: 72px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); }
+.group-members-header .group-section-label { height: auto; margin: 0; display: flex; align-items: center; border-bottom: none; }
+.group-members-invite-btn { background: transparent; border: none; color: var(--color-text-muted); cursor: pointer; font-size: 14px; padding: 6px 8px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease; }
+.group-members-invite-btn:hover { color: var(--color-cyan); background: rgba(0, 242, 254, .12); }
 .group-members__empty { text-align: center; margin-top: 40px; }
 .group-members__empty > .anticon { font-size: 28px; padding: 16px; color: #8291af; background: rgba(148, 163, 184, .05); border-radius: 16px; }
 .group-members__empty h3 { font-size: 12px; line-height: 1.8; font-weight: 600; color: #c0c9da; margin: 20px 0 8px; }
 .group-members__empty p { font-size: 11px; line-height: 1.9; color: var(--color-text-muted); }
+.group-members-count { font-size: 12px; font-weight: 400; color: var(--color-text-muted); margin-left: 4px; }
+.group-members-loading { display: flex; align-items: center; gap: 10px; padding: 24px 0; color: var(--color-text-muted); font-size: 12px; justify-content: center; }
+.group-members-error { display: flex; flex-direction: column; gap: 6px; padding: 16px 12px; margin-top: 16px; border-radius: 8px; background: rgba(239, 68, 68, .08); border: 1px solid rgba(239, 68, 68, .2); color: #fca5a5; font-size: 12px; }
+.group-members-list { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; }
+.group-member-item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background .15s ease; cursor: default; }
+.group-member-item:hover { background: rgba(255, 255, 255, .04); }
+.group-member-item__avatar { flex-shrink: 0; background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); color: #0b1120; font-weight: 600; font-size: 12px; }
+.group-member-item__info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.group-member-item__name-row { display: flex; align-items: center; gap: 6px; }
+.group-member-item__name { font-size: 13px; font-weight: 500; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.group-member-item__badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; background: rgba(245, 158, 11, .15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, .3); line-height: 1.2; flex-shrink: 0; }
+.group-member-item__username { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-top: 1px; }
 .message-composer { padding: 16px 24px 18px; flex-shrink: 0; }
 .message-composer__box { display: flex; align-items: flex-end; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, .17); background: var(--color-bg-surface); }
 .message-composer__box:focus-within { border-color: #818cf8; }
