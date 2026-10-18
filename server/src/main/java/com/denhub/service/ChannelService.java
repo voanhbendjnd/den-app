@@ -10,6 +10,7 @@ import com.denhub.repository.UserRepository;
 import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.ChannelResponseDTO;
 import com.denhub.service.dto.CreateChannelDTO;
+import com.denhub.service.dto.UpdateChannelDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,27 @@ public class ChannelService {
                 .stream()
                 .map(this::toChannelResponseDTO)
                 .toList();
+    }
+
+    public ChannelResponseDTO updateChannel(Long channelId, UpdateChannelDTO dto) {
+        User currentUser = getCurrentUser();
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new BadRequestAlertException("Channel not found with id: " + channelId, "channel", "channelnotfound"));
+
+        validateServerAccess(channel.getServerId(), currentUser.getId());
+
+        String newName = dto.getName().trim();
+        if (channelRepository.existsByServerIdAndNameAndIdNot(channel.getServerId(), newName, channelId)) {
+            throw new BadRequestAlertException("Channel with name '" + newName + "' already exists in this server", "channel", "namealreadyexists");
+        }
+
+        channel.setName(newName);
+        if (dto.getPosition() != null) {
+            channel.setPosition(dto.getPosition());
+        }
+
+        Channel updatedChannel = channelRepository.save(channel);
+        return toChannelResponseDTO(updatedChannel);
     }
 
     // --- Helper Methods ---
