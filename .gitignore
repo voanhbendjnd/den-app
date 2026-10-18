@@ -30,3 +30,5 @@ dist/
 # JVM crash logs
 hs_err_pid*.log
 replay_pid*.log
+/server/src/main/resources/application.properties
+/server/src/main/resources/application.properties.example
