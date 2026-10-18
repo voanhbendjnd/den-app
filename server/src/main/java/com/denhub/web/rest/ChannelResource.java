@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import com.denhub.service.ChannelService;
 import com.denhub.service.dto.ChannelResponseDTO;
 import com.denhub.service.dto.CreateChannelDTO;
+import com.denhub.service.dto.UpdateChannelDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,5 +37,15 @@ public class ChannelResource {
     public ResponseEntity<java.util.List<ChannelResponseDTO>> getChannelsByServerId(@PathVariable("serverId") Long serverId) {
         java.util.List<ChannelResponseDTO> channels = channelService.getChannelsByServerId(serverId);
         return ResponseEntity.ok(channels);
+    }
+
+    @PutMapping("/channels/{channelId}")
+    @Operation(summary = "Cập nhật thông tin Channel", description = "Cập nhật tên và vị trí của kênh chat. Yêu cầu đăng nhập và là thành viên/chủ sở hữu server.")
+    public ResponseEntity<ChannelResponseDTO> updateChannel(
+            @PathVariable("channelId") Long channelId,
+            @Valid @RequestBody UpdateChannelDTO dto
+    ) {
+        ChannelResponseDTO response = channelService.updateChannel(channelId, dto);
+        return ResponseEntity.ok(response);
     }
 }

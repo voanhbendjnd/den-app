@@ -17,4 +17,6 @@ public interface ChannelRepository extends JpaRepository<Channel, Long> {
     int countByServerId(Long serverId);
 
     Optional<Channel> findByIdAndServerId(Long id, Long serverId);
+
+    boolean existsByServerIdAndNameAndIdNot(Long serverId, String name, Long id);
 }
