@@ -398,6 +398,15 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-18] FIX-MESSAGE-ENTITY-LOMBOK-CONSTRUCTOR — Khắc phục cảnh báo Flexible Constructor Bodies trên Message Entity
+
+- Khắc phục lỗi/cảnh báo IDE (Eclipse JDT LS / Language Support for Java by Red Hat v1.57+): "The Java feature 'Flexible Constructor Bodies' is only available with source level 25 and above" tại `Message.java:L19`.
+- Nguyên nhân: AST phân tích synthetic constructor của Lombok `@AllArgsConstructor` trên class kế thừa `AbstractAuditingEntity` bị JDT LS nhận diện nhầm là cú pháp Flexible Constructor Bodies của Java 25 trong khi cấu hình dự án là Java 21.
+- Xử lý: Gỡ bỏ `@NoArgsConstructor` và `@AllArgsConstructor`, bổ sung tường minh `public Message() {}` và `public Message(...)` đầy đủ tham số tương thích hoàn toàn với `@Builder` và JPA (giống thiết kế của `Conversation.java`).
+- Tests: Thêm bộ test unit mới `server/src/test/java/com/denhub/domain/MessageTest.java` (4 tests: `testNoArgsConstructor`, `testAllArgsConstructor`, `testBuilder`, `testSenderIdFallback`).
+- Verification: `.\gradlew.bat compileJava` BUILD SUCCESSFUL; `.\gradlew.bat test --tests "com.denhub.domain.MessageTest"` PASS 4/4; các test liên quan `MessageServiceTest`, `ConversationServiceTest`, `MessageSecurityIT` đều PASS 100%.
+- Không thay đổi schema database, API contract, hoặc logic nghiệp vụ.
+
 ### [2026-10-15] RELEASE-SERVER-SETTINGS — Commit riêng từng file theo yêu cầu
 
 - Người dùng trực tiếp yêu cầu “commit và push giúp tôi. mỗi file sửa đổi là 1 commit”. Ủy quyền lần này áp dụng cho thay đổi Server Settings hiện có trên `feature/server-edit`, gồm 8 file modified và 4 file mới; không triển khai sửa các lỗi vừa phát hiện trong lượt review.
