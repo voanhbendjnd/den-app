@@ -503,6 +503,71 @@ Implemented:
 ### [2026-10-14] FEAT-SERVER-INVITE-CREATE-FE — UI Tạo & Sao Chép Mã Mời Server
 
 Implemented:
+=======
+### [2026-10-18] FEAT-DISCORD-AUTH-UI-REGISTER-GOOGLE-LOGIN — Triển khai Giao diện Discord, API Đăng ký và Đăng nhập Google
+
+- Triển khai toàn diện theo yêu cầu người dùng: "lamf ui , api dang ky , login with gg luon , ui phai y chang discord".
+- **Backend:**
+  - Endpoint Đăng ký: `@PostMapping({"/register", "/auth/register"})` trong `AccountResource.java`, nhận `RegisterReqDTO` (`email`, `password`, `name`, `username`), mã hóa BCrypt, gán quyền `ROLE_USER`, kích hoạt tài khoản (`activated = true`), lưu vào SQL Server và trả về `UserDTO` bọc trong `RestResponse<UserDTO>` với HTTP status 201 Created.
+  - Endpoint Google Login: `@PostMapping({"/auth/google", "/login/google"})`, nhận `GoogleLoginReqDTO` (chứa `credential` ID token JWT từ Google Identity Services hoặc thông tin profile). Giải mã Google JWT qua Nimbus JWT / claims, tự động tìm hoặc tạo mới người dùng trong DB, và cấp phát DenHub JWT Access Token + HttpOnly Refresh Token Cookie (`ResLoginDTO`).
+  - Cấu hình bảo mật: Thêm `/api/auth/google` và `/api/login/google` vào `SecurityConfiguration.java` (public endpoints, `permitAll()`).
+  - DTO: Tạo mới `RegisterReqDTO.java`, `GoogleLoginReqDTO.java`, sửa mapper `UserDTO.java` để truyền đúng trường `name`.
+- **Frontend:**
+  - Tái cấu trúc giao diện chuẩn 100% theo Discord:
+    - `AuthLayout.jsx`: Nền gradient vũ trụ cosmic dark (`#1a1c38` đến `#0f1024`), floating glowing particles, starbursts và Discord logo vector thương hiệu ở góc trên bên trái.
+    - `LoginPage.jsx`: Card dark `#313338` bo góc 8px; cột trái gồm tiêu đề "Chào mừng trở lại!", form input `#1e1f22`, nhãn in hoa `#b5bac1` kèm dấu sao đỏ, nút đăng nhập blurple `#5865F2`, nút Đăng nhập với Google kèm logo vector chính thức, link Quên mật khẩu và link Đăng ký; cột phải là khối "Đăng nhập bằng Mã QR" với QR Code mockup có logo Discord trung tâm và hướng dẫn quét ứng dụng di động. Tự động responsive ẩn QR trên màn hình nhỏ.
+    - `RegisterPage.jsx`: Form tạo tài khoản style Discord, gồm Email, Tên hiển thị, Tên đăng nhập, Mật khẩu, nút Đăng ký `#5865F2` và Đăng ký nhanh với Google.
+    - `authApi.js` & `AuthContext.jsx`: Bổ sung phương thức `googleLogin` và `loginWithGoogle` đồng bộ state phiên làm việc.
+    - `index.css`: Thêm bộ token và CSS class Discord authentic (`.discord-card`, `.discord-input`, `.discord-button-blurple`, `.discord-button-google`, `.discord-label`, `.discord-link`).
+- **Tests & Verification:**
+  - Backend: Tạo mới `AccountResourceIT.java` (6 tests: đăng ký thành công 201, trùng email 400, email không hợp lệ 400, password ngắn 400, Google login thành công 200, Google thiếu email 400) -> PASS 6/6. Chạy toàn bộ test suite `.\gradlew.bat test` -> BUILD SUCCESSFUL 100%.
+  - Frontend: Tạo mới `client/tests/discordAuth.test.mjs` (4 tests: format register payload, name fallback, google payload, normalize user) -> PASS 4/4; `npm run build` -> BUILD SUCCESSFUL (3199 modules transformed, 0 error).
+- Không để lộ secret / private keys trong code và Git.
+
+### [2026-10-18] FIX-MESSAGE-ENTITY-LOMBOK-CONSTRUCTOR — Khắc phục cảnh báo Flexible Constructor Bodies trên Message Entity
+
+- Khắc phục lỗi/cảnh báo IDE (Eclipse JDT LS / Language Support for Java by Red Hat v1.57+): "The Java feature 'Flexible Constructor Bodies' is only available with source level 25 and above" tại `Message.java:L19`.
+- Nguyên nhân: AST phân tích synthetic constructor của Lombok `@AllArgsConstructor` trên class kế thừa `AbstractAuditingEntity` bị JDT LS nhận diện nhầm là cú pháp Flexible Constructor Bodies của Java 25 trong khi cấu hình dự án là Java 21.
+- Xử lý: Gỡ bỏ `@NoArgsConstructor` và `@AllArgsConstructor`, bổ sung tường minh `public Message() {}` và `public Message(...)` đầy đủ tham số tương thích hoàn toàn với `@Builder` và JPA (giống thiết kế của `Conversation.java`).
+- Tests: Thêm bộ test unit mới `server/src/test/java/com/denhub/domain/MessageTest.java` (4 tests: `testNoArgsConstructor`, `testAllArgsConstructor`, `testBuilder`, `testSenderIdFallback`).
+- Verification: `.\gradlew.bat compileJava` BUILD SUCCESSFUL; `.\gradlew.bat test --tests "com.denhub.domain.MessageTest"` PASS 4/4; các test liên quan `MessageServiceTest`, `ConversationServiceTest`, `MessageSecurityIT` đều PASS 100%.
+- Không thay đổi schema database, API contract, hoặc logic nghiệp vụ.
+
+### [2026-10-15] RELEASE-SERVER-SETTINGS — Commit riêng từng file theo yêu cầu
+
+- Người dùng trực tiếp yêu cầu “commit và push giúp tôi. mỗi file sửa đổi là 1 commit”. Ủy quyền lần này áp dụng cho thay đổi Server Settings hiện có trên `feature/server-edit`, gồm 8 file modified và 4 file mới; không triển khai sửa các lỗi vừa phát hiện trong lượt review.
+- Đã tạo 12 commit code/test, từ `d01085f` đến `ab5c5ae`; kiểm tra từng commit chỉ chứa đúng một file. Tài liệu hợp đồng Server Settings đã có trong commit `3135911`; cập nhật log/handoff này được commit riêng cho một file docs.
+- Verification trước commit: từ `server/`, `.\gradlew.bat test check --rerun-tasks` PASS 259/259 trong lượt review; `.\gradlew.bat test check` ở lượt release BUILD SUCCESSFUL, các task UP-TO-DATE. Từ `client/`, `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs tests/serverJoin.test.mjs tests/serverInvite.test.mjs` PASS 60/60 trong lượt review (NODE_PATH runtime Playwright như mục 8.2); `npm run build` ở lượt release PASS, còn warning bundle lớn có sẵn.
+- Đã review diff, kiểm tra danh sách file, hash nội dung và `git diff --check` trước commit; không thêm credential, `.env`, file build hoặc ảnh upload. Các vấn đề đã báo trong review, conflict markers cũ và kiểm thử SQL Server thật vẫn cần xử lý riêng. Push chỉ tới nhánh feature theo yêu cầu trực tiếp lần này, không force push hoặc sửa main/master; trạng thái remote cần xác minh sau khi push.
+
+### [2026-10-15] FEAT-SERVER-SETTINGS — Owner chỉnh sửa Server, Backend và FE
+
+- Người dùng duyệt kế hoạch bằng “tiến hành”. Nhánh `feature/server-edit`, working tree sạch trước task; không tạo/chuyển nhánh, không commit hoặc push.
+- Chốt `PUT /api/v1/servers/{serverId}` thay đề xuất PATCH cũ trong docs. Thêm `UpdateServerDTO`, Controller và Service: Owner active, tên không blank Unicode/tối đa 100 UTF-16, icon tối đa 255/null để gỡ; response wrapper hiện có, lỗi Problem Details 400/401/403/404. Chuẩn hóa bằng String.strip; chỉ cập nhật hai field. saveAndFlush ghi audit trong request đã xác thực. Không đổi schema, quyền module khác hoặc WebSocket.
+- FE: `ServerSettingsModal` và CSS scope riêng, nút cài đặt ở heading sidebar nhóm (desktop/mobile), điều hướng Tổng quan, preview, đổi/gỡ ảnh và Lưu/Hủy. Dùng theme/Ant Design hiện có; chỉ Owner thấy entry. Upload/save có guard chống gửi trùng, bỏ response cũ và giữ form khi lỗi; đóng draft có xác nhận. Thành công đồng bộ detail và dock qua setServers trong Outlet context.
+- Tests mới: 31 BE cases trong ServerServiceTest/ServerResourceTest/ServerSecurityIT; 17 browser cases trong server-settings.browser.test.mjs. Tái sử dụng Playwright/Edge sẵn có; không cài dependency. Browser chặn API bằng mock, không dùng fixture JWT cho backend thật.
+- Backend lượt đầu `.\gradlew.bat test`: 258 tests, 3 FAIL do audit flush sau khi MockMvc đã xóa security context và fixture email 254 có local-part quá dài. Đã lưu/flush trước khi rời request và sửa fixture email hợp lệ; chạy lại PASS 258/258. Sau bổ sung biên Unicode NEL cho Service, lệnh cuối từ `server/`: `.\gradlew.bat test check` PASS 259/259, 0 failure/error/skip.
+- FE lượt đầu chạy kết hợp: 33/35 PASS, 2 navigation timeouts khi hai Vite workers cùng khởi động optimizer. PRE-EXISTING ISSUE trong test fixture: chưa mock GET /api/v1/conversations có sẵn của MainLayout, phát sinh unhandled rejection. Đã cập nhật fixture regression, đặt navigation timeout 30 giây và chạy tuần tự; không sửa production module Conversation. `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` PASS 35/35 tại lượt có 12 settings cases. Sau bổ sung cases, `node --test tests/server-settings.browser.test.mjs` PASS 17/17; 23 group regression cases đã PASS, tổng 40 browser cases khác nhau.
+- Từ `client/`, đặt `$env:NODE_PATH = 'C:/Users/ADMIN/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'` trước browser commands; `npm run build` PASS sau sửa UI cuối. Không có npm lint/test scripts. Đã xem screenshot desktop 1440/mobile 375; test thêm viewport 320/768 và không tràn ngang. Screenshot mặc định lưu ngoài repo trong thư mục tạm denhub-server-settings.
+- Docs: cập nhật 00 (tiến độ/log/handoff), 01 (quyền/phạm vi), 02 (contract API/DTO/UI), 03 (mapping 100/255 so với thiết kế icon 500). Đã kiểm tra docs/04; tái sử dụng design system hiện có, không cần sửa hướng dẫn thiết kế chung.
+- Giới hạn: chưa kiểm thử FE → BE → SQL Server thật; chưa apply script audit SQL Server có sẵn. PRE-EXISTING ISSUE: conflict markers docs/00, các warning Ant Design và bundle lớn được giữ ngoài phạm vi. Không tự dọn file ảnh upload đã bỏ chọn.
+- Git: thay đổi còn uncommitted để người dùng review/commit. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-15] FIX-CHANNEL-FILE-LOCAL-RUN — Binding tham số và đường dẫn ảnh server
+
+- Người dùng duyệt kế hoạch bằng “làm đi”; triển khai trên `feature/server-edit`, working tree sạch trước khi sửa.
+- `ChannelResource` khai báo `@PathVariable("serverId")`; `FileResource` khai báo `@PathVariable("folder")` và `@PathVariable("filename")`. GET vẫn dùng route, DTO và quyền hiện có; không phụ thuộc compiler có giữ tên tham số Java hay không.
+- `.vscode/launch.json` local đổi `cwd` của cả hai cấu hình sang `${workspaceFolder}/server`; giữ đường dẫn `envFile`. File này bị Git ignore, không tự thêm vào tracking. Không di chuyển/xóa ảnh hoặc sửa database.
+- Thêm hai tests vào `ChannelResourceTest` và `FileResourceTest`, dùng `ParameterNameDiscoverer` trả null để tái hiện IDE build thiếu tên tham số. Channel test kiểm tra ID truyền tới service và danh sách rỗng; File test kiểm tra folder/filename có dấu chấm, HTTP 200, bytes ảnh PNG, MIME type và Cache-Control.
+- Trước sửa controller: từ `server/`, `.\gradlew.bat test --tests com.denhub.web.rest.ChannelResourceTest --tests com.denhub.web.rest.FileResourceTest` FAIL đúng hai regression tests mới (7 tests, 2 failures; thiếu tên tham số). Đây là lỗi của task, không phải lỗi ngoài phạm vi.
+- Sau sửa: `.\gradlew.bat test` PASS 228/228, 0 failure/error/skip; `.\gradlew.bat check` PASS với tasks up-to-date từ lần test vừa chạy. Kiểm tra JSON launch, cwd/envFile và 5 ảnh cũ bằng PowerShell PASS.
+- Documentation: cập nhật docs/00 (tiến độ/log/handoff), docs/02 (chạy local và binding). Đã xem xét docs/01, docs/03, docs/04; không cần đổi vì không thay nghiệp vụ, schema hoặc UI.
+- Giới hạn: chưa chạy lại UI/GET trên phiên server thật, không khởi động ứng dụng với SQL Server và không thay schema; cần restart Java bằng cấu hình đã sửa. PRE-EXISTING ISSUE: dấu merge conflict trong docs/00 được giữ nguyên ngoài phạm vi task.
+- Git: FileResource đã nằm trong commit `c63b22f`, được tạo ngoài phiên xử lý của agent và trùng nội dung vừa kiểm thử. Sau triển khai, người dùng yêu cầu commit backend trên nhánh hiện tại; phạm vi commit tiếp theo là ChannelResource, hai regression test files và docs/00, docs/02. Launch chỉ local và bị ignore. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-14] FEAT-SERVER-INVITE-CREATE-FE — UI Tạo & Sao Chép Mã Mời Server
+
+Implemented:
 
 - Frontend API Service (`client/src/api/serverApi.js`):
   - Bổ sung hàm `createInvite(serverId, data)` gọi endpoint `POST /api/v1/servers/{serverId}/invites` sử dụng `axiosClient` hiện có (với JWT interceptor, chuẩn wrapper `RestResponse`).
