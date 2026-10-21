@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, Navigate, useOutletContext, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -246,7 +246,13 @@ function MembersPanel({
 
 export default function GroupChatPage() {
   const { serverId } = useParams();
-  const { setServers } = useOutletContext();
+  const { setServers, onServerDeleted } = useOutletContext();
+  const navigate = useNavigate();
+  const currentServerId = useRef(serverId);
+  useEffect(() => {
+    currentServerId.current = serverId;
+    return () => { currentServerId.current = null; };
+  }, [serverId]);
   const { currentUser } = useAuth();
   const screens = Grid.useBreakpoint();
   const [channelsOpen, setChannelsOpen] = useState(false);
@@ -608,6 +614,13 @@ export default function GroupChatPage() {
         server={server}
       />
       <ServerSettingsModal key={serverId} open={isSettingsOpen && isOwner} server={server}
+        onDeleted={id => {
+          onServerDeleted(id);
+          if (String(currentServerId.current) === String(id)) {
+            setIsSettingsOpen(false);
+            navigate('/', { replace: true });
+          }
+        }}
         onClose={() => setIsSettingsOpen(false)} onSaved={updated => {
           setDetail(previous => ({ ...previous, server: updated }));
           setServers(previous => previous.map(item => String(item.id) === String(updated.id) ? updated : item));

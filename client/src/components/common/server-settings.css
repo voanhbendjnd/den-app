@@ -28,6 +28,9 @@
 .server-settings__savebar { position: sticky; bottom: 0; margin-top: 30px; padding: 20px 0 0; border-top: 1px solid var(--border-subtle); background: var(--color-bg-surface); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .server-settings__savebar > span { color: var(--color-text-muted); font-size: 12px; }
 .server-settings__savebar > div { display: flex; gap: 8px; flex-shrink: 0; }
+.server-settings__danger { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-subtle); }
+.server-settings__danger h3 { margin: 0 0 8px; color: #ff7875; font-size: 16px; }
+.server-settings__danger p { color: var(--color-text-muted); font-size: 13px; line-height: 1.7; }
 .group-sidebar-settings-btn { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: transparent; color: var(--color-text-muted); cursor: pointer; }
 .group-sidebar-settings-btn:hover, .group-sidebar-settings-btn:focus-visible { color: var(--color-cyan); background: rgba(99, 102, 241, .14); }
 @media (max-width: 700px) {

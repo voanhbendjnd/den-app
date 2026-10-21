@@ -103,6 +103,9 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
   const requests = [];
   await context.route(apiPattern, async route => {
     const request = route.request();
+    if (new URL(request.url()).pathname.startsWith('/api/posts/')) {
+      return route.fulfill({ json: { data: { result: [], hasMore: false } } });
+    }
     requests.push({ method: request.method(), path: new URL(request.url()).pathname });
     if (handler) return handler(route, requests);
     await fulfillServerRequest(route);
@@ -176,7 +179,8 @@ test('home distinguishes loading, failed list with retry, and a successful empty
   await page.getByRole('heading', { name: 'Chưa tải được danh sách Server' }).waitFor();
   assert.equal(await page.getByText('Bạn chưa có Server nào', { exact: true }).count(), 0);
   mode = 'success';
-  await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'Chưa tải được danh sách Server' })
+    .getByRole('button', { name: 'Thử lại', exact: true }).click();
   await page.getByRole('heading', { name: 'Không Gian Của Bạn (2)' }).waitFor();
   await page.getByRole('heading', { name: 'Nhóm học tập', exact: true }).waitFor();
   mode = 'empty';

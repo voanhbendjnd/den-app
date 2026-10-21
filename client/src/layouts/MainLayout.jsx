@@ -108,6 +108,18 @@ export default function MainLayout() {
         navigate('/login');
     };
 
+    const handleServerDeleted = (id) => {
+        // Invalidate list snapshots started before DELETE completed.
+        serversRequest.current += 1;
+        setServers(previous => previous.filter(item => String(item.id) !== String(id)));
+        if (serversLoading) {
+            fetchServers();
+            return;
+        }
+        setServersLoading(false);
+        setServersError(null);
+    };
+
     const userMenuItems = [
         {
             key: 'profile',
@@ -641,6 +653,7 @@ export default function MainLayout() {
                         serversLoading,
                         serversError,
                         setServers,
+                        onServerDeleted: handleServerDeleted,
                         openCreateModal: () => setIsCreateModalOpen(true),
                         openJoinModal: () => setIsJoinModalOpen(true),
                         openCreateChannelModal: (server) => {
