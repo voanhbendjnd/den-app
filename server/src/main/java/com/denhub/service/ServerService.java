@@ -13,6 +13,7 @@ import com.denhub.domain.Invite;
 import com.denhub.domain.enums.InviteStatus;
 import com.denhub.repository.ChannelRepository;
 import com.denhub.repository.InviteRepository;
+import com.denhub.repository.MessageRepository;
 import com.denhub.repository.ServerMemberRepository;
 import com.denhub.repository.ServerRepository;
 import com.denhub.repository.UserRepository;
@@ -54,6 +55,30 @@ public class ServerService {
     UserRepository userRepository;
     InviteRepository inviteRepository;
     ChannelRepository channelRepository;
+    MessageRepository messageRepository;
+
+    public void deleteServer(Long serverId) {
+        User currentUser = getActiveCurrentUser();
+        if (serverId == null || serverId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Server ID không hợp lệ");
+        }
+        Server server = serverRepository.findByIdForUpdate(serverId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
+        if (!currentUser.getId().equals(server.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ chủ sở hữu mới có quyền xóa Server");
+        }
+        // Refuse inconsistent cross-domain references rather than deleting private conversations.
+        if (messageRepository.hasConversationReferencesInServer(serverId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Không thể xóa an toàn vì dữ liệu tin nhắn đang liên kết với hội thoại riêng. Vui lòng liên hệ quản trị viên.");
+        }
+        messageRepository.deleteChannelMessagesByServerId(serverId);
+        channelRepository.deleteAllByServerId(serverId);
+        inviteRepository.deleteAllByServerId(serverId);
+        serverMemberRepository.deleteAllByServerId(serverId);
+        serverRepository.delete(server);
+        serverRepository.flush();
+    }
 
     @Transactional(readOnly = true)
     public ServerResponseDTO getServerDetail(Long serverId) {
@@ -81,7 +106,7 @@ public class ServerService {
         if (serverId == null || serverId <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Server ID không hợp lệ");
         }
-        Server server = serverRepository.findById(serverId)
+        Server server = serverRepository.findByIdForUpdate(serverId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
         if (!currentUser.getId().equals(server.getOwnerId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ chủ sở hữu mới có quyền chỉnh sửa Server");
@@ -246,7 +271,7 @@ public class ServerService {
         User currentUser = userRepository.findOneByEmail(currentUserEmail)
                 .orElseThrow(() -> new BadRequestAlertException("User not found in database", "server", "usernotfound"));
 
-        Server server = serverRepository.findById(serverId)
+        Server server = serverRepository.findByIdForUpdate(serverId)
                 .orElseThrow(() -> new BadRequestAlertException("Server not found", "server", "servernotfound"));
 
         if (serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId())) {
@@ -284,7 +309,7 @@ public class ServerService {
                     HttpStatus.BAD_REQUEST, "Mã mời đã hết hạn");
         }
 
-        Server server = serverRepository.findById(invite.getServerId())
+        Server server = serverRepository.findByIdForUpdate(invite.getServerId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Không tìm thấy Server liên kết với mã mời"));
 
@@ -317,7 +342,7 @@ public class ServerService {
         }
 
         User currentUser = getActiveCurrentUser();
-        Server server = serverRepository.findById(serverId)
+        Server server = serverRepository.findByIdForUpdate(serverId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
 

@@ -42,6 +42,10 @@ public class ResFormatResponse implements ResponseBodyAdvice<Object> {
         HttpServletResponse servletResponse = ((ServletServerHttpResponse) response).getServletResponse();
         int status = servletResponse.getStatus();
 
+        if (status == 204) {
+            return null;
+        }
+
         if (body instanceof String || body instanceof Resource || body instanceof ResourceRegion) {
             return body;
         }

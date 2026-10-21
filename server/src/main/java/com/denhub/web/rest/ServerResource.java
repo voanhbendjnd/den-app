@@ -31,6 +31,13 @@ public class ServerResource {
 
     ServerService serverService;
 
+    @DeleteMapping("/{serverId}")
+    @Operation(summary = "Xóa vĩnh viễn Server", description = "Chỉ Server Owner đang hoạt động được xóa Server cùng kênh, tin nhắn kênh, mã mời và membership.")
+    public ResponseEntity<Void> deleteServer(@PathVariable("serverId") Long serverId) {
+        serverService.deleteServer(serverId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{serverId}")
     @Operation(summary = "Đọc chi tiết Server", description = "Lấy thông tin Server. Yêu cầu đăng nhập và là chủ sở hữu hoặc thành viên của Server.")
     public ResponseEntity<ServerResponseDTO> getServerDetail(@PathVariable("serverId") Long serverId) {
