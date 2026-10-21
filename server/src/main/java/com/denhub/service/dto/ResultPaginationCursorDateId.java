@@ -1,4 +1,13 @@
 package com.denhub.service.dto;
 
-public class ResultPaginationCursorDateId {
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+
+public class ResultPaginationCursorDateId extends ResultPaginationDTO{
+    boolean hasMore;
+    String cursorDate;
+    Long cursorId;
 }

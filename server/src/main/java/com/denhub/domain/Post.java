@@ -25,5 +25,7 @@ public class Post extends AbstractAuditingEntity<Long> implements Serializable {
     String privacy;
     @Column(name = "like_counts")
     Integer likeCounts;
+    @Column(name = "media_url", columnDefinition = "NVARCHAR(1000)")
+    String mediaUrl;
     
 }
