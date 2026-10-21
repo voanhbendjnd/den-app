@@ -90,10 +90,11 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 | **SERVER** | Thành viên tham gia Server bằng cách nào? | `CONFIRMED` | Qua Invite code duy nhất do Owner/Admin tạo. |
 | **SERVER** | Creator có vai trò gì khi tạo Server? | `CONFIRMED` | Creator nhận vai trò `OWNER`. Server tự tạo kênh `#general`. |
 | **SERVER** | Owner có thể rời Server không? | `CONFIRMED` | Không. Owner chỉ có thể chuyển quyền hoặc xóa Server (BR-SRV-01). |
-| **SERVER** | Ai có quyền xóa Server? | `CONFIRMED` | Duy nhất Server `OWNER`. |
+| **SERVER** | Ai có quyền xóa Server? | `CONFIRMED` (2026-10-21) | Duy nhất chủ sở hữu theo `Server.ownerId`, đã xác thực và tài khoản active. Membership, role tạm thời hoặc quyền admin toàn hệ thống không thay thế Owner. |
+| **SERVER** | Xóa Server ảnh hưởng dữ liệu nào? | `CONFIRMED` (2026-10-21) | Xóa vĩnh viễn Server, toàn bộ Channel (kể cả `general`), tin nhắn trong Channel, membership và invite của Server trong một transaction. Giữ User, Server khác, hội thoại riêng và file vật lý. Nếu có tin nhắn liên kết chéo sang hội thoại riêng, từ chối xóa để bảo toàn dữ liệu. UI phải cảnh báo không thể hoàn tác, mọi thành viên mất quyền truy cập, và đếm ngược 3 giây trước khi cho xác nhận. |
 | **SERVER** | Ai được chỉnh sửa thông tin Server? | `CONFIRMED` (2026-10-15) | Duy nhất Server `OWNER`, đã xác thực và tài khoản active, được đổi tên, đổi hoặc gỡ ảnh. Vai trò Server `ADMIN`/`MEMBER` hoặc quyền admin toàn hệ thống không tự cấp quyền sửa. Giữ nguyên chủ sở hữu, ngày tạo, thành viên và kênh. UI yêu cầu lưu rõ ràng; hủy không cập nhật Server. |
 | **CHANNEL** | Loại kênh trong MVP? | `CONFIRMED` | Kênh văn bản (Text Channel). Tên kênh dạng slug chữ thường `[a-z0-9-]`. |
-| **CHANNEL** | Kênh `#general` có thể bị xóa không? | `CONFIRMED` | Không. Luôn duy trì ít nhất kênh `#general` trong Server (BR-SRV-02). |
+| **CHANNEL** | Kênh `#general` có thể bị xóa không? | `CONFIRMED` | Không được xóa riêng khi Server còn tồn tại. Khi Owner xóa toàn bộ Server, `general` được dọn cùng Server (2026-10-21). |
 | **MEMBER** | Ma trận quyền hạn Server? | `CONFIRMED` | Phân cấp `OWNER > ADMIN > MEMBER` với Hierarchy Kick Shield (BR-MEM-02). |
 | **MEMBER** | Admin có được kick Admin / Owner không? | `CONFIRMED` | Không. Admin chỉ được kick `MEMBER`. Chỉ Owner mới được kick Admin. |
 | **MESSAGE** | Message lưu trữ ở đâu? | `CONFIRMED` | Lưu trữ trong Microsoft SQL Server (bảng `messages`), xóa mềm (`deleted_at`). |
