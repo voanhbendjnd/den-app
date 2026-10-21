@@ -153,6 +153,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Friendship** | `POST` | `/api/friendships/block-user` | Chặn người dùng (kể cả khi chưa là bạn hoặc đã là bạn) | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/block-user/remove` | Gỡ chặn người dùng (Unblock user) | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
+| **Post** | `POST` | `/api/posts/all-friends` | Lấy danh sách bài viết từ bạn bè & bản thân trên Newsfeed (Cursor pagination theo date và id) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |

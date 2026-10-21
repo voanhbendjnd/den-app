@@ -348,6 +348,13 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | **Tính năng Gỡ Block & Danh sách chặn (Backend & Frontend)** | TESTED | Backend: `FriendshipService.removeBlock` (xóa bản ghi khi unblock, chặn người bị block tự gỡ), `getAllBlockedUsers` (cursor pagination). `FriendshipController`: `/api/friendships/block-user/remove` và `/blocked-users`. 23 tests `FriendshipServiceTest` PASS 100%, backend suite PASS. Frontend: `useBlockedUsers.js`, tab "Đã chặn" trên `FriendRequestPage.jsx`, nút Bỏ chặn kèm Popconfirm. `npm run build` PASS. |
 | **Tắt realtime popup notification khi đồng ý kết bạn (BE & FE)** | TESTED | Gỡ bỏ `notificationFriendshipRequest.requestAccepted` trong BE (`acceptFriendRequest` và `sendRequestAddFriend`) và gỡ bỏ popup toast `notification.success` trong `useGlobalFriendNotification.jsx` để tránh spam màn hình khi nhiều người đồng ý kết bạn cùng lúc. Cập nhật test `FriendshipServiceTest` PASS 23/23, toàn bộ backend test suite PASS. |
 
+### Tính năng Lấy bài viết bạn bè & Bảng tin Feed (2026-10-21)
+
+| Công việc | Trạng thái | Bằng chứng / bước còn lại |
+| :--- | :--- | :--- |
+| **Sửa business rules & logic lấy bài viết (Backend)** | TESTED | Sửa `PostRepository.java`: truy vấn feed theo `p.privacy IN ('PUBLIC', 'FRIENDS_ONLY')` và bài viết của chính user, lọc cursor date và id; sửa alias trong `FriendshipRepository.java`; sửa `PostService.java`: xử lý list an toàn khi không có bạn bè, fetch thông tin tác giả (name, username, avatar) gán vào `PostDTO`, tính toán và set `hasMore`. 5 unit tests mới trong `PostServiceTest` PASS 100%, toàn bộ backend suite PASS (`BUILD SUCCESSFUL in 50s`). |
+| **Giao diện Bảng tin bạn bè (Frontend)** | TESTED (BUILD) | `postApi.js`: API client `getAllPostsFromFriends`. `useFriendPosts.js`: hook quản lý bài viết, cursor pagination (`loadMore`), refresh, optimistic like toggle. `PostCard.jsx`: Cyber Glassmorphism post card hiển thị avatar, tên, username, tag quyền riêng tư, thời gian tương đối, nội dung, ảnh đính kèm, tương tác Thích/Bình luận. `FriendFeedSection.jsx`: component Bảng tin tích hợp trên `HomePage.jsx` với skeleton loading, empty state, load more. `npm run build` PASS 100%. |
+
 ### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
 <<<<<<< HEAD
