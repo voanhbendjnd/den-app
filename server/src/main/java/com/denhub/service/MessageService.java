@@ -6,6 +6,7 @@ import com.denhub.domain.User;
 import com.denhub.repository.ChannelRepository;
 import com.denhub.repository.MessageRepository;
 import com.denhub.repository.ServerMemberRepository;
+import com.denhub.repository.ServerRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.CursorPageResponse;
@@ -33,17 +34,20 @@ public class MessageService {
     private final ServerMemberRepository serverMemberRepository;
     private final UserRepository userRepository;
     private final Validator validator;
+    private final ServerRepository serverRepository;
 
     public MessageService(MessageRepository messageRepository,
                           ChannelRepository channelRepository,
                           ServerMemberRepository serverMemberRepository,
                           UserRepository userRepository,
-                          Validator validator) {
+                          Validator validator,
+                          ServerRepository serverRepository) {
         this.messageRepository = messageRepository;
         this.channelRepository = channelRepository;
         this.serverMemberRepository = serverMemberRepository;
         this.userRepository = userRepository;
         this.validator = validator;
+        this.serverRepository = serverRepository;
     }
 
     @Transactional
@@ -59,6 +63,10 @@ public class MessageService {
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Không tìm thấy Channel"));
+
+        // Serialize channel writes with deletion, including requests that read the channel earlier.
+        serverRepository.findByIdForUpdate(channel.getServerId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
 
         if (!serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), sender.getId())) {
             throw new ResponseStatusException(

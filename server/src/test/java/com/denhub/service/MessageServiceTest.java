@@ -55,6 +55,7 @@ class MessageServiceTest {
     @Mock private ChannelRepository channelRepository;
     @Mock private ServerMemberRepository serverMemberRepository;
     @Mock private UserRepository userRepository;
+    @Mock private com.denhub.repository.ServerRepository serverRepository;
 
     private MessageService messageService;
 
@@ -72,7 +73,7 @@ class MessageServiceTest {
     void setUp() {
         SecurityContextHolder.clearContext();
         messageService = new MessageService(messageRepository, channelRepository,
-                serverMemberRepository, userRepository, validatorFactory.getValidator());
+                serverMemberRepository, userRepository, validatorFactory.getValidator(), serverRepository);
     }
 
     @AfterEach
@@ -81,10 +82,21 @@ class MessageServiceTest {
     }
 
     @Test
+    void refusesToSendWhenServerWasDeletedAfterChannelWasRead() {
+        authenticate(EMAIL);
+        stubSender();
+        stubChannel(false);
+        when(serverRepository.findByIdForUpdate(SERVER_ID)).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.NOT_FOUND, assertThrows(ResponseStatusException.class,
+                () -> messageService.sendMessage(CHANNEL_ID, new SendMessageRequest("Hello"))).getStatusCode());
+        verifyNoInteractions(messageRepository, serverMemberRepository);
+    }
+
+    @Test
     void sendsMessageUsingAuthenticatedUserAndPreservesContent() {
         authenticate("  DUY@EXAMPLE.COM  ");
         stubSender();
-        stubChannel();
+        stubChannel(true);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
         stubSavedMessage();
         String content = "  Hello mọi người!\nDòng thứ hai 🙂  ";
@@ -108,7 +120,7 @@ class MessageServiceTest {
     void acceptsContentAtUtf16Limit(String content) {
         authenticate(EMAIL);
         stubSender();
-        stubChannel();
+        stubChannel(true);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
         stubSavedMessage();
 
@@ -237,7 +249,7 @@ class MessageServiceTest {
     void rejectsUserOutsideChannelServer() {
         authenticate(EMAIL);
         stubSender();
-        stubChannel();
+        stubChannel(true);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(false);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
@@ -252,7 +264,7 @@ class MessageServiceTest {
     void propagatesStorageFailureWithoutReturningSuccess() {
         authenticate(EMAIL);
         stubSender();
-        stubChannel();
+        stubChannel(true);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
         RuntimeException failure = new IllegalStateException("Simulated storage failure");
         when(messageRepository.save(any(Message.class))).thenThrow(failure);
@@ -267,7 +279,7 @@ class MessageServiceTest {
     void getMessages_Success_DefaultLimitWithoutBefore() {
         authenticate(EMAIL);
         stubSender();
-        stubChannel();
+        stubChannel(false);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
 
         Message msg1 = createMockMessage(102L, "Tin nhắn mới nhất");
@@ -292,7 +304,7 @@ class MessageServiceTest {
     void getMessages_Success_WithBeforeAndLimit_HasMore() {
         authenticate(EMAIL);
         stubSender();
-        stubChannel();
+        stubChannel(false);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
 
         Message msg103 = createMockMessage(103L, "Msg 103");
@@ -316,7 +328,7 @@ class MessageServiceTest {
     void getMessages_Success_EmptyChannel() {
         authenticate(EMAIL);
         stubSender();
-        stubChannel();
+        stubChannel(false);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
         when(messageRepository.findByChannelIdOrderByIdDesc(eq(CHANNEL_ID), any(PageRequest.class)))
                 .thenReturn(List.of());
@@ -409,7 +421,7 @@ class MessageServiceTest {
     void getMessages_Forbidden_WhenNotServerMember() {
         authenticate(EMAIL);
         stubSender();
-        stubChannel();
+        stubChannel(false);
         when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(false);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
@@ -448,7 +460,8 @@ class MessageServiceTest {
         return sender;
     }
 
-    private void stubChannel() {
+    private void stubChannel(boolean writing) {
+        if (writing) when(serverRepository.findByIdForUpdate(SERVER_ID)).thenReturn(Optional.of(new com.denhub.domain.Server()));
         Channel channel = new Channel();
         channel.setId(CHANNEL_ID);
         channel.setServerId(SERVER_ID);
