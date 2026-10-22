@@ -27,6 +27,20 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
         """)
     int deleteChannelMessagesByServerId(@Param("serverId") Long serverId);
 
+    @Query("""
+        SELECT COUNT(m) > 0 FROM Message m
+        WHERE m.channelId = :channelId
+          AND (m.conversationId IS NOT NULL
+               OR EXISTS (SELECT d.id FROM Conversation d WHERE d.lastMessageId = m.id))
+        """)
+    boolean hasConversationReferencesInChannel(@Param("channelId") Long channelId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        DELETE FROM Message m WHERE m.conversationId IS NULL
+          AND m.channelId = :channelId
+        """)
+    int deleteByChannelId(@Param("channelId") Long channelId);
 
     Page<Message> findByConversationIdOrderByCreatedAtAsc(Long conversationId, Pageable pageable);
 
