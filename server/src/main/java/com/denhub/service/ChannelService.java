@@ -33,7 +33,7 @@ public class ChannelService {
 
     public ChannelResponseDTO createChannel(CreateChannelDTO dto) {
         User currentUser = getCurrentUser();
-        validateServerAccess(dto.getServerId(), currentUser.getId());
+        validateServerAccess(dto.getServerId(), currentUser.getId(), true);
 
         String channelName = dto.getName().trim();
         if (channelRepository.existsByServerIdAndName(dto.getServerId(), channelName)) {
@@ -54,7 +54,7 @@ public class ChannelService {
     @Transactional(readOnly = true)
     public List<ChannelResponseDTO> getChannelsByServerId(Long serverId) {
         User currentUser = getCurrentUser();
-        validateServerAccess(serverId, currentUser.getId());
+        validateServerAccess(serverId, currentUser.getId(), false);
 
         return channelRepository.findAllByServerIdOrderByPositionAsc(serverId)
                 .stream()
@@ -67,7 +67,7 @@ public class ChannelService {
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(() -> new BadRequestAlertException("Channel not found with id: " + channelId, "channel", "channelnotfound"));
 
-        validateServerAccess(channel.getServerId(), currentUser.getId());
+        validateServerAccess(channel.getServerId(), currentUser.getId(), true);
 
         String newName = dto.getName().trim();
         if (channelRepository.existsByServerIdAndNameAndIdNot(channel.getServerId(), newName, channelId)) {
@@ -93,8 +93,8 @@ public class ChannelService {
                 .orElseThrow(() -> new BadRequestAlertException("User not found in database", "channel", "usernotfound"));
     }
 
-    private Server validateServerAccess(Long serverId, Long userId) {
-        Server server = serverRepository.findById(serverId)
+    private Server validateServerAccess(Long serverId, Long userId, boolean writing) {
+        Server server = (writing ? serverRepository.findByIdForUpdate(serverId) : serverRepository.findById(serverId))
                 .orElseThrow(() -> new BadRequestAlertException("Server not found with id: " + serverId, "channel", "servernotfound"));
 
         boolean isOwner = server.getOwnerId() != null && server.getOwnerId().equals(userId);

@@ -41,6 +41,19 @@ class ServerResourceTest {
     }
 
     @Test
+    void deleteServerBindsIdWithoutParameterMetadataAndReturnsNoBody() throws Exception {
+        mockMvc = MockMvcBuilders.standaloneSetup(serverResource)
+                .setControllerAdvice(new com.denhub.util.ResFormatResponse()).build();
+        mockMvc.getDispatcherServlet().getWebApplicationContext()
+                .getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.class)
+                .setParameterNameDiscoverer(org.mockito.Mockito.mock(org.springframework.core.ParameterNameDiscoverer.class));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/servers/12"))
+                .andExpect(status().isNoContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+        org.mockito.Mockito.verify(serverService).deleteServer(12L);
+    }
+
+    @Test
     void getServerDetail_UsesRequestedId() throws Exception {
         ServerResponseDTO dto = new ServerResponseDTO();
         dto.setId(12L);

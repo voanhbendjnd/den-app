@@ -4,8 +4,9 @@ import { CameraOutlined, CheckOutlined, SettingOutlined, UploadOutlined } from '
 import serverApi from '../../api/serverApi';
 import fileApi from '../../api/fileApi';
 import './server-settings.css';
+import DeleteServerModal from './DeleteServerModal';
 
-export default function ServerSettingsModal({ open, server, onClose, onSaved }) {
+export default function ServerSettingsModal({ open, server, onClose, onSaved, onDeleted }) {
   const { modal, message } = App.useApp();
   const [form] = Form.useForm();
   const [name, setName] = useState('');
@@ -14,6 +15,9 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved }) 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletePending = useRef(false);
   const fileInput = useRef(null);
   const session = useRef(0);
   const uploadRequest = useRef(0);
@@ -30,6 +34,9 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved }) 
     setUploading(false);
     setSaving(false);
     setError(null);
+    setDeleteOpen(false);
+    setDeleting(false);
+    deletePending.current = false;
     if (open && server) {
       const initial = { name: server.name, iconUrl: server.iconUrl || null };
       setBaseline(initial);
@@ -59,7 +66,7 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved }) 
   };
 
   const requestClose = () => {
-    if (savePending.current || confirmation.current) return;
+    if (savePending.current || deletePending.current || confirmation.current) return;
     if (!dirty) return onClose();
     const currentSession = session.current;
     confirmation.current = modal.confirm({
@@ -74,7 +81,7 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved }) 
   const upload = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || savePending.current) return;
+    if (!file || savePending.current || deletePending.current || deleteOpen) return;
     const extension = file.name.split('.').at(-1)?.toLowerCase();
     if (!file.type.startsWith('image/') || !['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
       setError('Chọn ảnh JPG, PNG, WebP hoặc GIF.'); return;
@@ -106,7 +113,7 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved }) 
   };
 
   const save = async ({ name: draftName }) => {
-    if (!dirty || savePending.current || uploadPending.current || !server?.id) return;
+    if (!dirty || savePending.current || uploadPending.current || deletePending.current || deleteOpen || !server?.id) return;
     const currentSession = session.current;
     savePending.current = true;
     setSaving(true);
@@ -141,9 +148,9 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved }) 
   };
 
   return (
-    <Modal open={open} title="Cài đặt Server" onCancel={requestClose} footer={null}
+    <><Modal open={open} title="Cài đặt Server" onCancel={requestClose} footer={null}
       width={920} centered className="server-settings-modal" destroyOnHidden
-      closable={!saving} maskClosable={!saving} keyboard={!saving}>
+      closable={!saving && !deleting} maskClosable={!saving && !deleting} keyboard={!saving && !deleting}>
       <div className="server-settings">
         <aside className="server-settings__sidebar" aria-label="Các mục cài đặt Server">
           <Avatar shape="square" src={baseline.iconUrl} size={44}>{baseline.name?.[0]?.toUpperCase()}</Avatar>
@@ -197,8 +204,20 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved }) 
               </div>
             </div>}
           </Form>
+          <div className="server-settings__danger">
+            <h3>Xóa Server</h3>
+            <p>Xóa vĩnh viễn Server và dữ liệu trò chuyện của mọi thành viên. Không thể hoàn tác.</p>
+            <Button danger disabled={saving || uploading || deleting || deleteOpen} onClick={() => {
+              if (savePending.current || uploadPending.current || deletePending.current) return;
+              setDeleteOpen(true);
+            }}>Xóa Server</Button>
+          </div>
         </section>
       </div>
     </Modal>
+      {open && deleteOpen && <DeleteServerModal key={server.id} server={server}
+        onClose={() => setDeleteOpen(false)} onDeleted={onDeleted}
+        onBusyChange={busy => { deletePending.current = busy; setDeleting(busy); }} />}
+    </>
   );
 }

@@ -82,7 +82,7 @@ class ServerServiceTest {
 
     @Test
     void updateServer_OwnerChangesOnlyEditableFields() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
         Instant createdDate = Instant.parse("2026-10-13T01:00:00Z");
         server.setCreatedDate(createdDate);
@@ -102,7 +102,7 @@ class ServerServiceTest {
     @org.junit.jupiter.params.provider.NullAndEmptySource
     @ValueSource(strings = {"   "})
     void updateServer_ClearsIcon(String icon) {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
         server.setIconUrl("https://example.test/old.png");
         when(serverRepository.saveAndFlush(server)).thenReturn(server);
@@ -111,7 +111,7 @@ class ServerServiceTest {
 
     @Test
     void updateServer_NonOwnerCannotMutateEntity() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> serverService.updateServer(10L, updateDto("Changed", null)));
         assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
@@ -123,7 +123,7 @@ class ServerServiceTest {
     @org.junit.jupiter.params.provider.NullAndEmptySource
     @ValueSource(strings = {"   ", "\u00a0\u2003\u202f", "\u0085"})
     void updateServer_RejectsBlankNameBeforeMutation(String name) {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> serverService.updateServer(10L, updateDto(name, null)));
@@ -134,7 +134,7 @@ class ServerServiceTest {
 
     @Test
     void updateServer_RejectsOversizedFieldsBeforeMutation() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
         for (UpdateServerDTO dto : java.util.List.of(updateDto("x".repeat(101), null), updateDto("Valid", "x".repeat(256)))) {
             ResponseStatusException error = assertThrows(ResponseStatusException.class,
@@ -216,12 +216,16 @@ class ServerServiceTest {
     }
 
     private Server prepareDetailRequest() {
+        return prepareDetailRequest(false);
+    }
+
+    private Server prepareDetailRequest(boolean writing) {
         prepareDetailUser();
         Server server = new Server();
         server.setId(10L);
         server.setName("Detail server");
         server.setOwnerId(99L);
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(writing ? serverRepository.findByIdForUpdate(10L) : serverRepository.findById(10L)).thenReturn(Optional.of(server));
         return server;
     }
 
@@ -394,7 +398,7 @@ class ServerServiceTest {
         Server server = new Server();
         server.setId(10L);
 
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
 
         serverService.joinServer(10L);
@@ -419,7 +423,7 @@ class ServerServiceTest {
         mockUser.setEmail(email);
 
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
-        when(serverRepository.findById(10L)).thenReturn(Optional.empty());
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.empty());
 
         assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
     }
@@ -440,7 +444,7 @@ class ServerServiceTest {
         Server server = new Server();
         server.setId(10L);
 
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
 
         assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
@@ -578,7 +582,7 @@ class ServerServiceTest {
 
     @Test
     void createServerInvite_Success_WhenOwner() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
 
         when(inviteRepository.existsByCode(anyString())).thenReturn(false);
@@ -604,7 +608,7 @@ class ServerServiceTest {
 
     @Test
     void createServerInvite_Success_WithCustomExpiresAt() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
 
         Instant future = Instant.now().plusSeconds(3600);
@@ -626,7 +630,7 @@ class ServerServiceTest {
 
     @Test
     void createServerInvite_RejectsNonOwner() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(2L); // Different user is owner
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
@@ -638,7 +642,7 @@ class ServerServiceTest {
     @Test
     void createServerInvite_RejectsMissingServer() {
         prepareDetailUser();
-        when(serverRepository.findById(10L)).thenReturn(Optional.empty());
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.empty());
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> serverService.createServerInvite(10L, null));
@@ -663,7 +667,7 @@ class ServerServiceTest {
 
     @Test
     void createServerInvite_RejectsPastExpiresAt() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
 
         Instant past = Instant.now().minusSeconds(3600);
@@ -678,7 +682,7 @@ class ServerServiceTest {
 
     @Test
     void createServerInvite_RetriesOnCodeCollision() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
 
         // First attempt collides, second attempt succeeds
@@ -694,7 +698,7 @@ class ServerServiceTest {
 
     @Test
     void createServerInvite_FailsWhenAllCandidatesCollide() {
-        Server server = prepareDetailRequest();
+        Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
 
         // All 5 attempts collide
@@ -782,7 +786,7 @@ class ServerServiceTest {
         server.setOwnerId(2L);
 
         when(inviteRepository.findByCode("valid123")).thenReturn(Optional.of(invite));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
         when(serverMemberRepository.save(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -860,7 +864,7 @@ class ServerServiceTest {
         server.setId(10L);
 
         when(inviteRepository.findByCode("already1")).thenReturn(Optional.of(invite));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,

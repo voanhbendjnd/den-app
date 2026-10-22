@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import FriendFeedSection from '../../components/post/FriendFeedSection';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -239,6 +240,13 @@ export default function HomePage() {
             ))}
           </Row>
         )}
+      </div>
+
+      {/* =========================================================
+          Friends Feed Section (Bảng tin bạn bè)
+         ========================================================= */}
+      <div style={{ maxWidth: 760, margin: '40px auto 0' }}>
+        <FriendFeedSection />
       </div>
     </div>
   );

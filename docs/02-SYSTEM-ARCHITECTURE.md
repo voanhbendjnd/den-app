@@ -153,6 +153,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Friendship** | `POST` | `/api/friendships/block-user` | Chặn người dùng (kể cả khi chưa là bạn hoặc đã là bạn) | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/block-user/remove` | Gỡ chặn người dùng (Unblock user) | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
+| **Post** | `POST` | `/api/posts/all-friends` | Lấy danh sách bài viết từ bạn bè & bản thân trên Newsfeed (Cursor pagination theo date và id) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
@@ -163,7 +164,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Server** | `POST` | `/api/v1/servers` | Tạo một Server mới | `CONFIRMED` |
 | **Server** | `GET` | `/api/v1/servers/{serverId}` | Đọc thông tin phần vỏ Server; Owner/Member, contract mục 9 | `IMPLEMENTED` |
 | **Server** | `PUT` | `/api/v1/servers/{serverId}` | Owner cập nhật tên/ảnh Server, contract mục 11 | `IMPLEMENTED` |
-| **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
+| **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Owner xóa vĩnh viễn Server, contract mục 12 | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/invites` | Tạo mã mời Server mới (duy nhất Owner) | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
@@ -208,7 +209,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `POST /api/servers`: Tạo server mới (transactional với `#general` channel và Owner)
 - `GET /api/v1/servers/{serverId}`: Chi tiết phần vỏ Server theo phạm vi duyệt 2026-10-13 (mục 9); trả DTO Server hiện có. Thiết kế trước đó `/api/servers/{serverId}` kèm danh sách kênh được thu hẹp cho lượt này; dữ liệu Channel thuộc module Channel, không thêm alias `/api/servers/{serverId}`.
 - `PUT /api/v1/servers/{serverId}`: Cập nhật tên/ảnh server (Owner), contract mục 11 được duyệt 2026-10-15; thay thế đề xuất cũ `PATCH /api/servers/{serverId}`, không thêm alias.
-- `DELETE /api/servers/{serverId}`: Xóa server (Owner)
+- `DELETE /api/v1/servers/{serverId}`: Owner xóa vĩnh viễn Server theo mục 12 (2026-10-21); thay thế đường dẫn thiết kế `/api/servers/{serverId}`, không thêm alias.
 - `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
 - `POST /api/v1/servers/{serverId}/invites`: Tạo invite code (duy nhất Server Owner, mã 8 ký tự Base62 an toàn, trả `ServerInviteResponseDTO` trong wrapper `RestResponse`)
 - `POST /api/v1/servers/join-invite/{code}`: Tham gia server qua invite code (Người dùng đã đăng nhập, trả `ServerResponseDTO` trong wrapper `RestResponse`)
@@ -629,3 +630,35 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 - FE: 17 settings browser tests PASS trên Edge headless với API mock; 23 group UI regression tests PASS trong lượt chạy kết hợp. Đã xem screenshot desktop 1440 và mobile 375; kiểm tra thêm viewport 320/768. `npm run build` PASS; không có script npm lint/test được cấu hình.
 - Playwright dùng runtime sẵn có theo mục 8.2; có thể lưu screenshot qua `SERVER_SETTINGS_ARTIFACT_DIR`, mặc định thư mục tạm `denhub-server-settings`. Không gửi fixture JWT tới backend thật.
 - Chưa kiểm thử FE → backend → SQL Server thật và chưa apply schema/audit script. Mock/H2 không chứng minh SQL Server hiện tại phù hợp mapping. Các warning Ant Design cũ và bundle lớn vẫn có sẵn.
+
+## 12. Xóa Server (`IMPLEMENTED`, 2026-10-21)
+
+### 12.1 REST và điều kiện đủ
+
+- Người dùng duyệt kế hoạch kiểm tra trước đó bằng yêu cầu triển khai Delete Server, cảnh báo và countdown 3 giây; sau đó yêu cầu tiếp tục đúng tính năng. Giữ nguyên code khởi tạo tài khoản ngoài phạm vi.
+- `DELETE /api/v1/servers/{serverId}`; không có request body hoặc DTO mới. JWT/session dùng Security hiện có; Service dùng `getActiveCurrentUser`, xác nhận User tồn tại/active. ID phải là số dương và Server tồn tại. Chỉ `currentUser.id == Server.ownerId` được xóa; không dựa vào membership role hoặc `ROLE_ADMIN`.
+- Thành công `204 No Content`, body rỗng; `ResFormatResponse` bỏ wrapper cho HTTP 204, áp dụng đúng convention mục 4.1 cho cả các endpoint 204 hiện có.
+- Lỗi `application/problem+json`: `400` ID sai/không chuyển được sang Long; `401` token/session/tài khoản không hợp lệ; `403` không phải Owner; `404` Server không còn tồn tại (kể cả xóa lặp); `409` phát hiện tin Channel có `conversationId` hoặc được `Conversation.lastMessageId` tham chiếu. Lỗi storage ngoài dự kiến đi qua handler 500 đã có; không lộ chi tiết hạ tầng.
+- Không yêu cầu Server rỗng hoặc đuổi hết thành viên. Kiểm tra quyền và tham chiếu chéo hoàn tất trước khi xóa bất kỳ dữ liệu nào.
+
+### 12.2 Transaction và ghi dữ liệu đồng thời
+
+- `ServerService.deleteServer` chạy trong transaction Service hiện có: lấy `ServerRepository.findByIdForUpdate` (`PESSIMISTIC_WRITE`), kiểm quyền/tham chiếu, bulk-delete tin Channel của Server (chỉ `conversationId IS NULL`), Channel, Invite, ServerMember, rồi xóa/flush Server. Một bước thất bại rollback cả giao dịch.
+- Entity dùng ID scalar, không thêm JPA relationship/cascade hoặc migration. Giữ User, dữ liệu Server khác, Conversation và tin riêng; không sửa ConversationService hoặc xóa file ảnh/media vật lý.
+- Do database hiện không có FK, các luồng ghi liên quan lấy cùng khóa Server trước khi mutate: update/join/join-invite/create-invite trong ServerService; create/update Channel trong ChannelService; send Message trong MessageService. Các GET giữ nguyên cách đọc. Request đã đọc Channel/Invite trước khi chờ khóa vẫn phải kiểm tra Server tồn tại sau khi lấy khóa; nếu Server đã xóa thì không ghi dữ liệu con.
+- Khóa tuần tự hóa ghi trong cùng Server để tránh dữ liệu mồ côi; có thể giảm khả năng ghi song song. Bảo đảm này áp dụng các luồng ứng dụng đã phối hợp khóa, không thay thế FK cho SQL ghi trực tiếp từ bên ngoài.
+
+### 12.3 Giao diện và countdown
+
+- Owner mở Cài đặt Server, chọn Xóa Server. `DeleteServerModal` hiển thị tên Server đã lưu, cảnh báo xóa vĩnh viễn Channel (kể cả general), tin nhắn Channel, membership và mã mời; mọi thành viên mất quyền truy cập.
+- Mỗi lần mở mới tạo deadline `performance.now() + 3000`; nút hiện `Xác nhận xóa (3s)` rồi giảm dần. Button disabled và handler tự kiểm deadline để Enter/click sớm không gửi DELETE. Đây là xác nhận UX phía client; quyền và điều kiện dữ liệu luôn được kiểm lại ở backend.
+- Trong lúc DELETE chờ: ref chặn request trùng, nút xác nhận/hủy/đóng bị khóa. Không đồng thời lưu hoặc upload ảnh. Lỗi giữ hộp thoại và thông báo an toàn, không tự loại Server khỏi danh sách; lỗi mạng nói rõ chưa thể xác nhận kết quả xóa.
+- Thành công gọi callback loại Server khỏi state MainLayout, vô hiệu response GET danh sách cũ, tải lại danh sách nếu đang có request chờ, đóng Settings và về Home bằng `replace`. Response xóa của Server cũ vẫn loại đúng ID khỏi dock nhưng không điều hướng khỏi Server mới hoặc hiển thị toast ở phiên cũ.
+- Không thêm destination/payload WebSocket khi topic quản trị Server còn TBD. Các phiên thành viên khác chưa nhận thông báo xóa tức thời.
+
+### 12.4 Kiểm chứng và giới hạn
+
+- Backend: `ServerDeleteServiceTest`, `ServerDeleteIT` và regression binding/204 trong ServerResourceTest; cập nhật mocks các luồng ghi dùng khóa. Kiểm auth/Owner/ID, graph cleanup, bảo toàn DM/Server khác, tham chiếu chéo 409, rollback sau khi đã chạy DELETE con, và hai thứ tự giao tranh khóa giữa xóa/tạo Channel. Hai concurrency cases và rollback chạy ngoài transaction test để kiểm commit/rollback Service thật trên H2.
+- Toàn bộ backend `gradlew.bat test check` PASS 322/322. Browser suite Server Settings/Group PASS 51/51; logic Node PASS 35/35; production build PASS. Screenshot cảnh báo desktop 1440/mobile 375 được kiểm tra; fixture browser dùng Playwright clock để kiểm countdown và animations riêng.
+- Sau tinh chỉnh clock/animation của fixture, chạy lại riêng `node --test tests/server-settings.browser.test.mjs` PASS 28/28; các 23 Group cases giữ kết quả PASS của lượt kết hợp. Không thêm production dependency cho browser tests.
+- SQL Server chỉ được kiểm tra metadata bằng SELECT, không xóa dữ liệu thật, không chạy DDL hoặc khởi động app bằng cấu hình SQL Server. H2 và API mock không chứng minh FE → BE → SQL Server thật; cần kiểm thử trên môi trường thử nghiệm của nhóm.

@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -33,4 +34,13 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
         order by fs.lastModifiedDate desc, fs.id desc
     """)
     Slice<FriendRequestProjection> getAllFriendWithStatus(@Param("userId") Long currentUserId,@Param("status") String status, @Param("cursor")Instant cursor, Pageable pageable);
+
+    @Query(value = """
+        select
+            case when fs.userOneId = :currentUserId then fs.userTwoId else fs.userOneId end
+            from Friendship fs
+                where
+               (fs.userOneId = :currentUserId or fs.userTwoId = :currentUserId) and fs.status = 'ACCEPT'
+    """)
+    List<Long> getAllFriendIdsByUserId(@Param("currentUserId") Long currentUserId);
 }

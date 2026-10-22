@@ -76,7 +76,7 @@ class ChannelServiceTest {
     void createChannel_Success_WhenOwner() {
         authenticateUser();
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(channelRepository.existsByServerIdAndName(10L, "general")).thenReturn(false);
         when(channelRepository.countByServerId(10L)).thenReturn(2);
 
@@ -111,7 +111,7 @@ class ChannelServiceTest {
         mockServer.setOwnerId(99L);
 
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
         when(channelRepository.existsByServerIdAndName(10L, "dev-chat")).thenReturn(false);
         when(channelRepository.countByServerId(10L)).thenReturn(0);
@@ -151,7 +151,7 @@ class ChannelServiceTest {
     void createChannel_Fail_WhenServerNotFound() {
         authenticateUser();
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
-        when(serverRepository.findById(999L)).thenReturn(Optional.empty());
+        when(serverRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         CreateChannelDTO dto = new CreateChannelDTO();
         dto.setServerId(999L);
@@ -168,7 +168,7 @@ class ChannelServiceTest {
         mockServer.setOwnerId(99L);
 
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
 
         CreateChannelDTO dto = new CreateChannelDTO();
@@ -184,7 +184,7 @@ class ChannelServiceTest {
     void createChannel_Fail_WhenNameDuplicate() {
         authenticateUser();
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(channelRepository.existsByServerIdAndName(10L, "general")).thenReturn(true);
 
         CreateChannelDTO dto = new CreateChannelDTO();
@@ -293,7 +293,7 @@ class ChannelServiceTest {
 
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
         when(channelRepository.findById(101L)).thenReturn(Optional.of(channel));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(channelRepository.existsByServerIdAndNameAndIdNot(10L, "new-name", 101L)).thenReturn(false);
         when(channelRepository.save(any(Channel.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -323,7 +323,7 @@ class ChannelServiceTest {
 
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
         when(channelRepository.findById(101L)).thenReturn(Optional.of(channel));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
         when(channelRepository.existsByServerIdAndNameAndIdNot(10L, "general-chat", 101L)).thenReturn(false);
         when(channelRepository.save(any(Channel.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -350,7 +350,7 @@ class ChannelServiceTest {
 
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
         when(channelRepository.findById(101L)).thenReturn(Optional.of(channel));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(channelRepository.existsByServerIdAndNameAndIdNot(10L, "general", 101L)).thenReturn(false);
         when(channelRepository.save(any(Channel.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -401,7 +401,7 @@ class ChannelServiceTest {
 
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
         when(channelRepository.findById(101L)).thenReturn(Optional.of(channel));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
 
         UpdateChannelDTO dto = new UpdateChannelDTO();
@@ -423,7 +423,7 @@ class ChannelServiceTest {
 
         when(userRepository.findOneByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
         when(channelRepository.findById(101L)).thenReturn(Optional.of(channel));
-        when(serverRepository.findById(10L)).thenReturn(Optional.of(mockServer));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockServer));
         when(channelRepository.existsByServerIdAndNameAndIdNot(10L, "general", 101L)).thenReturn(true);
 
         UpdateChannelDTO dto = new UpdateChannelDTO();

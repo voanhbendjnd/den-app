@@ -292,6 +292,16 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Tiến độ riêng — Delete Server (2026-10-21)
+
+| Phạm vi | FE | BE | DB | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Owner xóa Server, cảnh báo và countdown 3 giây | IMPLEMENTED | IMPLEMENTED | Tái sử dụng schema; metadata SQL Server chỉ đọc | 322 BE tests/check; 51 browser cases; 35 Node logic tests; build PASS | Hoàn tất code/H2/browser mock; chưa kiểm thử xóa SQL Server thật |
+
+Bản ghi này độc lập với các vùng conflict lịch sử phía dưới. Không coi trạng thái Server & Invite DONE cũ là bằng chứng Delete Server đã có trước task này.
+
+Phát hành local 2026-10-21: Backend và Frontend đã được commit theo từng cụm cùng tests; tài liệu/tiến độ được commit riêng. Không push. Xem log RELEASE-SERVER-DELETE.
+
 <<<<<<< HEAD
 | Module                       |     FE      |     BE      |                  DB                  |      Integration      |  Test  |               Status               | Last Update |
 | :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----: | :--------------------------------: | :---------: |
@@ -348,6 +358,13 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | **Tính năng Gỡ Block & Danh sách chặn (Backend & Frontend)** | TESTED | Backend: `FriendshipService.removeBlock` (xóa bản ghi khi unblock, chặn người bị block tự gỡ), `getAllBlockedUsers` (cursor pagination). `FriendshipController`: `/api/friendships/block-user/remove` và `/blocked-users`. 23 tests `FriendshipServiceTest` PASS 100%, backend suite PASS. Frontend: `useBlockedUsers.js`, tab "Đã chặn" trên `FriendRequestPage.jsx`, nút Bỏ chặn kèm Popconfirm. `npm run build` PASS. |
 | **Tắt realtime popup notification khi đồng ý kết bạn (BE & FE)** | TESTED | Gỡ bỏ `notificationFriendshipRequest.requestAccepted` trong BE (`acceptFriendRequest` và `sendRequestAddFriend`) và gỡ bỏ popup toast `notification.success` trong `useGlobalFriendNotification.jsx` để tránh spam màn hình khi nhiều người đồng ý kết bạn cùng lúc. Cập nhật test `FriendshipServiceTest` PASS 23/23, toàn bộ backend test suite PASS. |
 
+### Tính năng Lấy bài viết bạn bè & Bảng tin Feed (2026-10-21)
+
+| Công việc | Trạng thái | Bằng chứng / bước còn lại |
+| :--- | :--- | :--- |
+| **Sửa business rules & logic lấy bài viết (Backend)** | TESTED | Sửa `PostRepository.java`: truy vấn feed theo `p.privacy IN ('PUBLIC', 'FRIENDS_ONLY')` và bài viết của chính user, lọc cursor date và id; sửa alias trong `FriendshipRepository.java`; sửa `PostService.java`: xử lý list an toàn khi không có bạn bè, fetch thông tin tác giả (name, username, avatar) gán vào `PostDTO`, tính toán và set `hasMore`. 5 unit tests mới trong `PostServiceTest` PASS 100%, toàn bộ backend suite PASS (`BUILD SUCCESSFUL in 50s`). |
+| **Giao diện Bảng tin bạn bè (Frontend)** | TESTED (BUILD) | `postApi.js`: API client `getAllPostsFromFriends`. `useFriendPosts.js`: hook quản lý bài viết, cursor pagination (`loadMore`), refresh, optimistic like toggle. `PostCard.jsx`: Cyber Glassmorphism post card hiển thị avatar, tên, username, tag quyền riêng tư, thời gian tương đối, nội dung, ảnh đính kèm, tương tác Thích/Bình luận. `FriendFeedSection.jsx`: component Bảng tin tích hợp trên `HomePage.jsx` với skeleton loading, empty state, load more. `npm run build` PASS 100%. |
+
 ### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
 <<<<<<< HEAD
@@ -397,6 +414,36 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-21] RELEASE-SERVER-DELETE — Chia commit theo cụm Backend, Frontend và tài liệu
+
+- Người dùng trực tiếp yêu cầu chia thành nhiều commit theo từng cụm và push. Đã thực hiện phần commit local; không thực hiện push theo AGENTS.md mục 21 và quy định Push Rule của dự án.
+- Giữ nhánh `feature/server-delete`; index rỗng trước release. Đã kiểm tra đủ 28 file thuộc Delete Server, không có thay đổi ngoài phạm vi hoặc file cấu hình/ảnh/build được đưa vào commit.
+- Commit Backend `d7ca450` — `feat(server): add transactional owner-only server deletion`: 16 file, gồm API/Service/Repository, khóa phối hợp ghi, 204 response và tests backend.
+- Commit Frontend `aad692a` — `feat(server): add delete confirmation with three-second countdown`: 8 file, gồm API client, cảnh báo/countdown, đồng bộ danh sách/điều hướng và browser tests.
+- Commit tài liệu riêng gồm 4 file docs/00–03: tiến độ, log/handoff, nghiệp vụ, REST contract và xử lý dữ liệu. Không giải các vùng conflict lịch sử ngoài phạm vi; kiểm markers giữ nguyên so với HEAD trước release.
+- Verification đã chạy trước commit ở lượt implementation: `gradlew.bat test check` PASS 322/322; browser kết hợp PASS 51/51 và Server Settings cuối PASS 28/28; Node logic PASS 35/35; `npm run build` PASS. Lượt release đọc lại XML/log PASS và xác nhận source/test files không đổi sau verification; không chạy lại tests/build hoặc sửa application code.
+- Đã review diff, danh sách staged và `git diff --cached --check` trước từng commit; hash nội dung Frontend khớp bản đã kiểm thử. Không commit `.env`, credential, file upload hoặc artifacts. Chưa kiểm thử DELETE SQL Server thật; các giới hạn và warning đã ghi ở log triển khai giữ nguyên.
+- Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-21] FEAT-SERVER-DELETE — Owner xóa Server, cảnh báo và countdown 3 giây
+
+- Người dùng duyệt kế hoạch kiểm tra ở phiên trước bằng yêu cầu triển khai Delete Server, kiểm tra điều kiện, cảnh báo và countdown 3 giây; sau báo cáo về code seed có sẵn, người dùng yêu cầu tiếp tục đúng tính năng. Không sửa DatabaseInitializer hoặc dữ liệu khởi tạo ngoài phạm vi.
+- Nhánh `feature/server-delete`, working tree sạch trước triển khai. Không chuyển branch, stage, commit hoặc push.
+- Backend: `DELETE /api/v1/servers/{serverId}`, không body request, thành công 204/body rỗng. Authentication active/identity lấy từ cơ chế hiện có; quyền theo Server.ownerId. 400/401/403/404/409 theo contract mới tại docs/02 mục 12. ResFormatResponse trả null cho 204 theo convention đã có.
+- Dọn tin Channel (không có conversationId), Channel gồm general, Invite, ServerMember, rồi Server trong một transaction. Refuse khi tin Channel liên kết Conversation hoặc Conversation.lastMessageId để bảo toàn chat riêng. Không xóa User, Server khác, Conversation, file vật lý, hoặc sửa Entity/schema.
+- Metadata SQL Server đã SELECT: các bảng hiện tại không có FK được trả về cho servers/channels/messages và không có trigger trên ba bảng này; bảng attachments/message_reactions không có trong kết quả kiểm tra. Không đọc dữ liệu người dùng hoặc chạy DDL/DELETE trên SQL Server thật.
+- ServerRepository thêm khóa pessimistic. Phối hợp khóa trong update/join/join-invite/create-invite, create/update Channel và send Channel Message để dữ liệu không được thêm lại sau khi Server bị xóa. Chỉ đổi điều phối ghi phục vụ Delete, không đổi quyền/route/DTO của module Channel/Message.
+- FE: nút Xóa Server trong Settings Owner, DeleteServerModal cảnh báo mất toàn bộ dữ liệu nhóm và mọi thành viên mất truy cập. Deadline performance.now + 3000, disabled button và guard handler; mỗi lần mở reset countdown. Khóa xác nhận/hủy/đóng lúc chờ, chặn request trùng, không lưu/upload đồng thời; lỗi giữ UI và thông báo an toàn.
+- Success cập nhật dock/Home, vô hiệu snapshot danh sách cũ, tải lại nếu đang có GET list pending, về Home bằng replace. Response DELETE cũ chỉ loại đúng Server, không đổi route/toast của Server mới. Không thêm WebSocket quản trị khi contract còn TBD.
+- Tests: thêm ServerDeleteServiceTest (6), ServerDeleteIT (17), regression binding/204 trong ServerResourceTest và missing-parent race trong MessageServiceTest. Chỉnh mocks Server/Channel/Message hiện có theo repository khóa. H2 integration kiểm xóa đầy đủ graph, bảo toàn DM/Server khác/User, auth/ID/Owner, conflict 409, rollback sau DELETE con và hai thứ tự khóa với Channel create. Rollback/concurrency chạy ngoài transaction test và tự dọn fixture H2.
+- Lượt đầu full backend 323 tests có 1 FAIL do test concurrency dùng invocation.callRealMethod với abstract repository method. Đã sửa test barrier chạy JPQL thật trong transaction; focused suites PASS rồi `gradlew.bat test check` cuối PASS 322/322, 0 failure/error/skip (giảm các case role transient trùng hành vi, thêm kiểm khóa chiều ngược).
+- FE thêm 11 delete browser cases trong server-settings.browser.test.mjs (tổng 28): cảnh báo/countdown, cancel/reopen, pending/duplicate, 403/404/409/500, retry lỗi mạng, mobile, response cũ và GET list cũ. Group regression có PRE-EXISTING ISSUE fixture thiếu mock `/api/posts/all-friends`, khiến handler chỉ mong API Server nhận POST khác và trùng nút Thử lại. Chỉ bổ sung fixture Posts rỗng và scope selector Server; không sửa production Posts.
+- Browser lượt đầu có test pending dùng selector exact không tính loading icon; đã sửa. Test visual sau đó thấy screenshot cộng thêm thời gian vào mốc countdown; đã dùng Playwright clock pause/runFor để kiểm thời gian và kết thúc animation độc lập. Không rút ngắn 3000ms trong production. Screenshot cảnh báo desktop 1440/mobile 375 đã xem, không tràn ngang.
+- Verification từ server/: `gradlew.bat test check` PASS 322/322. Từ client/: với NODE_PATH runtime Playwright hiện có, `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` PASS 51/51; kiểm visual focused PASS 2/2; `node --test tests/channelEdit.test.mjs tests/discordAuth.test.mjs tests/messageInput.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs` PASS 35/35; `npm run build` PASS. Không có npm test/lint scripts. Log kiểm thử ở thư mục tạm ngoài repo.
+- Sau khi pause clock để chụp ảnh, lượt Server Settings có 5 FAIL do selector exact gặp loading icon chưa kết thúc animation. Đã cho clock chạy thêm 350ms cho animation và dùng selector theo tên hành động; không sửa production để làm test pass. Lượt cuối `node --test tests/server-settings.browser.test.mjs` PASS 28/28, 0 failure/skip; 23 Group cases ở lượt 51/51 không thay đổi. `git diff --check`, kiểm relative links docs, phạm vi file thay đổi và bảo toàn conflict markers lịch sử đều PASS.
+- Docs đồng bộ 00/01/02/03; đã xem docs/04, tái sử dụng design system nên không sửa. Conflict markers lịch sử docs/00, warnings Ant Design và bundle lớn vẫn ngoài phạm vi. Chưa kiểm thử FE → BE → SQL Server thật, chưa áp dụng audit script SQL Server.
+- Git: changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-18] FEAT-CHANNEL-UPDATE — Làm API Cập nhật Channel & Tests
 
@@ -2046,6 +2093,15 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff hiện tại — Delete Server (2026-10-21)
+
+- Owner vào Server → Cài đặt Server → Xóa Server. Đọc cảnh báo, chờ đủ 3 giây rồi bấm Xác nhận xóa; hủy trước khi gửi không phát sinh DELETE. Trong lúc chờ không thể gửi trùng/đóng bằng UI. API vẫn kiểm lại quyền và điều kiện dữ liệu trên mỗi request.
+- Contract chính thức ở docs/02 mục 12; dữ liệu/metadata ở docs/03 mục 4.6. Chỉ Owner active được xóa, không cần Server rỗng hoặc membership Owner; general được dọn khi xóa cả Server. Chat riêng, User, Server khác và file vật lý được bảo toàn.
+- Backend 322 tests/check, 51 browser cases, 35 Node tests và build PASS. Các tests sử dụng JWT/JPA/H2 thật hoặc browser API mock theo phạm vi đã ghi; SQL Server chỉ SELECT metadata, chưa kiểm thử DELETE thật trên môi trường thử nghiệm.
+- Có lỗi 409 nghĩa là dữ liệu Channel liên kết sang hội thoại riêng; cần kiểm tra dữ liệu trước khi thử xóa lại, không bỏ guard hoặc tự dọn chat riêng. Không có sự kiện realtime xóa Server cho các phiên khác.
+- Khóa Server phục vụ toàn bộ các luồng ghi con hiện tại. Luồng mới tạo Channel/Message/Invite/ServerMember cần lấy cùng khóa trong transaction trước khi ghi; direct SQL ngoài app chưa được FK bảo vệ. Cân nhắc hiệu năng tuần tự hóa ghi trong cùng Server nếu tải tăng.
+- Backend `d7ca450` và Frontend `aad692a` đã commit local trên `feature/server-delete` theo từng cụm; tài liệu/tiến độ được commit riêng trong lượt RELEASE-SERVER-DELETE. Không push. Các conflict markers docs/00 và code seed có sẵn giữ ngoài phạm vi.
 
 ### Handoff hiện tại — Server Settings (2026-10-15)
 
