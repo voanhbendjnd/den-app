@@ -4,6 +4,7 @@ import com.denhub.domain.Channel;
 import com.denhub.domain.Server;
 import com.denhub.domain.User;
 import com.denhub.repository.ChannelRepository;
+import com.denhub.repository.MessageRepository;
 import com.denhub.repository.ServerMemberRepository;
 import com.denhub.repository.ServerRepository;
 import com.denhub.repository.UserRepository;
@@ -30,6 +31,7 @@ public class ChannelService {
     ServerRepository serverRepository;
     ServerMemberRepository serverMemberRepository;
     UserRepository userRepository;
+    MessageRepository messageRepository;
 
     public ChannelResponseDTO createChannel(CreateChannelDTO dto) {
         User currentUser = getCurrentUser();
@@ -81,6 +83,34 @@ public class ChannelService {
 
         Channel updatedChannel = channelRepository.save(channel);
         return toChannelResponseDTO(updatedChannel);
+    }
+
+    public void deleteChannel(Long channelId) {
+        if (channelId == null || channelId <= 0) {
+            throw new BadRequestAlertException("Channel ID không hợp lệ", "channel", "invalidid");
+        }
+
+        User currentUser = getCurrentUser();
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new BadRequestAlertException("Channel not found with id: " + channelId, "channel", "channelnotfound"));
+
+        validateServerAccess(channel.getServerId(), currentUser.getId(), true);
+
+        if ("general".equalsIgnoreCase(channel.getName().trim())) {
+            throw new BadRequestAlertException("Kênh #general là kênh mặc định và không thể bị xóa", "channel", "cannotdeletegeneral");
+        }
+
+        if (channelRepository.countByServerId(channel.getServerId()) <= 1) {
+            throw new BadRequestAlertException("Không thể xóa kênh cuối cùng trong server", "channel", "cannotdeletelastchannel");
+        }
+
+        if (messageRepository.hasConversationReferencesInChannel(channelId)) {
+            throw new BadRequestAlertException("Không thể xóa an toàn vì dữ liệu tin nhắn đang liên kết với hội thoại riêng", "channel", "conflict");
+        }
+
+        messageRepository.deleteByChannelId(channelId);
+        channelRepository.delete(channel);
+        channelRepository.flush();
     }
 
     // --- Helper Methods ---

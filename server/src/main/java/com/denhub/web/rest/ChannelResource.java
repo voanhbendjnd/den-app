@@ -48,4 +48,11 @@ public class ChannelResource {
         ChannelResponseDTO response = channelService.updateChannel(channelId, dto);
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/channels/{channelId}")
+    @Operation(summary = "Xóa một Channel", description = "Xóa kênh chat khỏi server. Không thể xóa kênh #general hoặc kênh cuối cùng. Yêu cầu đăng nhập và có quyền trong server.")
+    public ResponseEntity<Void> deleteChannel(@PathVariable("channelId") Long channelId) {
+        channelService.deleteChannel(channelId);
+        return ResponseEntity.noContent().build();
+    }
 }
