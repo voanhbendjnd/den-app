@@ -2,9 +2,11 @@ package com.denhub.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -16,6 +18,7 @@ import com.denhub.service.ChannelService;
 import com.denhub.service.dto.ChannelResponseDTO;
 import com.denhub.service.dto.CreateChannelDTO;
 import com.denhub.service.dto.UpdateChannelDTO;
+import com.denhub.web.rest.errors.BadRequestAlertException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +47,9 @@ class ChannelResourceTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(channelResource).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(channelResource)
+                .setControllerAdvice(new com.denhub.web.rest.errors.ExceptionTranslator())
+                .build();
     }
 
     @Test
@@ -180,6 +185,44 @@ class ChannelResourceTest {
         mockMvc.perform(put("/api/v1/channels/100")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteChannel_Success() throws Exception {
+        mockMvc.perform(delete("/api/v1/channels/100"))
+                .andExpect(status().isNoContent());
+
+        verify(channelService).deleteChannel(100L);
+    }
+
+    @Test
+    void deleteChannel_Success_WithoutParameterNameMetadata() throws Exception {
+        mockMvc.getDispatcherServlet().getWebApplicationContext()
+                .getBean(RequestMappingHandlerAdapter.class)
+                .setParameterNameDiscoverer(mock(ParameterNameDiscoverer.class));
+
+        mockMvc.perform(delete("/api/v1/channels/100"))
+                .andExpect(status().isNoContent());
+
+        verify(channelService).deleteChannel(100L);
+    }
+
+    @Test
+    void deleteChannel_Fail_WhenNotFound() throws Exception {
+        doThrow(new BadRequestAlertException("Channel not found with id: 999", "channel", "channelnotfound"))
+                .when(channelService).deleteChannel(999L);
+
+        mockMvc.perform(delete("/api/v1/channels/999"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteChannel_Fail_WhenCannotDeleteGeneral() throws Exception {
+        doThrow(new BadRequestAlertException("Kênh #general là kênh mặc định và không thể bị xóa", "channel", "cannotdeletegeneral"))
+                .when(channelService).deleteChannel(101L);
+
+        mockMvc.perform(delete("/api/v1/channels/101"))
                 .andExpect(status().isBadRequest());
     }
 }
