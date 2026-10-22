@@ -445,6 +445,50 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - Docs đồng bộ 00/01/02/03; đã xem docs/04, tái sử dụng design system nên không sửa. Conflict markers lịch sử docs/00, warnings Ant Design và bundle lớn vẫn ngoài phạm vi. Chưa kiểm thử FE → BE → SQL Server thật, chưa áp dụng audit script SQL Server.
 - Git: changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
 
+### [2026-10-22] FEAT-CHANNEL-DELETE — Làm API Xóa Channel & Tests (Kỳ Anh)
+
+Implemented:
+- Cập nhật `MessageRepository.java`:
+  - Thêm phương thức `hasConversationReferencesInChannel(Long channelId)` kiểm tra tin nhắn trong kênh có đang liên kết hội thoại riêng hay không (bảo toàn tính toàn vẹn dữ liệu).
+  - Thêm phương thức `deleteByChannelId(Long channelId)` xóa dọn dẹp toàn bộ tin nhắn thuộc kênh bị xóa (chỉ khi `conversationId IS NULL`).
+- Cập nhật `ChannelService.java`:
+  - Bổ sung phương thức `deleteChannel(Long channelId)`:
+    - Kiểm tra `channelId` hợp lệ (không null, > 0).
+    - Xác thực người dùng đăng nhập (`getCurrentUser()`).
+    - Tìm kiếm kênh theo ID, trả về `channelnotfound` (404/400) nếu không tồn tại.
+    - Kiểm tra quyền truy cập Server qua `validateServerAccess(channel.getServerId(), currentUser.getId(), true)` (yêu cầu là Server Owner hoặc Thành viên trong server).
+    - Ngăn chặn xóa kênh `#general` mặc định (`cannotdeletegeneral`).
+    - Ngăn chặn xóa kênh cuối cùng trong server (`cannotdeletelastchannel`).
+    - Từ chối xóa khi có tham chiếu chéo sang hội thoại riêng (`conflict`).
+    - Xóa tin nhắn trong kênh (`deleteByChannelId`) và xóa kênh (`delete`), flush transaction.
+- Cập nhật `ChannelResource.java`:
+  - Thêm endpoint `DELETE /api/v1/channels/{channelId}` với Swagger annotations `@Operation`, `@Tag(name = "Channel")`, `@SecurityRequirement(name = "bearerAuth")`, trả về HTTP `204 No Content`.
+- Tests Added:
+  - `ChannelServiceTest.java`: Thêm 10 unit tests bao phủ:
+    - `deleteChannel_Success_WhenOwner`
+    - `deleteChannel_Success_WhenMember`
+    - `deleteChannel_Fail_WhenInvalidId`
+    - `deleteChannel_Fail_WhenNotLoggedIn`
+    - `deleteChannel_Fail_WhenUserNotFound`
+    - `deleteChannel_Fail_WhenChannelNotFound`
+    - `deleteChannel_Fail_WhenNotMemberOrOwner`
+    - `deleteChannel_Fail_WhenChannelIsGeneral`
+    - `deleteChannel_Fail_WhenLastChannelInServer`
+    - `deleteChannel_Fail_WhenHasConversationReferences`
+  - `ChannelResourceTest.java`: Thêm 4 MockMvc tests bao phủ:
+    - `deleteChannel_Success` (HTTP 204)
+    - `deleteChannel_Success_WithoutParameterNameMetadata` (kiểm tra không phụ thuộc compiler metadata)
+    - `deleteChannel_Fail_WhenNotFound` (HTTP 400 Problem Details)
+    - `deleteChannel_Fail_WhenCannotDeleteGeneral` (HTTP 400 Problem Details)
+- Verification:
+  - `.\gradlew.bat test --tests "com.denhub.service.ChannelServiceTest" --tests "com.denhub.web.rest.ChannelResourceTest"`: BUILD SUCCESSFUL (40 tests PASS).
+  - `.\gradlew.bat test`: BUILD SUCCESSFUL (Toàn bộ test suite backend PASS 100%).
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md` (Thêm endpoint `DELETE /api/v1/channels/{channelId}`).
+  - `docs/00-DEVELOPMENT-PROCESS.md` (Cập nhật completed work log).
+
+---
+
 ### [2026-10-18] FEAT-CHANNEL-UPDATE — Làm API Cập nhật Channel & Tests
 
 Implemented:
