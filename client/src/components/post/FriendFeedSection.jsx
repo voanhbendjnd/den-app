@@ -1,13 +1,16 @@
 import React from 'react';
-import { Typography, Button, Spin, Empty } from 'antd';
+import { Typography, Button, Spin, Empty, Tag, Tooltip } from 'antd';
 import {
   ReloadOutlined,
   CompassFilled,
   MessageOutlined,
   DownOutlined,
+  CheckCircleFilled,
+  DisconnectOutlined,
 } from '@ant-design/icons';
 import { useFriendPosts } from '../../hooks/useFriendPosts';
 import PostCard from './PostCard';
+import CreatePostCard from './CreatePostCard';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -18,9 +21,11 @@ export default function FriendFeedSection() {
     loadingMore,
     hasMore,
     error,
+    wsConnected,
     refresh,
     loadMore,
     toggleLike,
+    createPost,
   } = useFriendPosts(10);
 
   return (
@@ -61,6 +66,23 @@ export default function FriendFeedSection() {
             >
               Bảng Tin Bạn Bè
             </Title>
+
+            {/* Realtime Live Status Tag */}
+            <Tooltip title={wsConnected ? 'Đã kết nối thời gian thực (nhận bài mới tự động)' : 'Đang kết nối lại thời gian thực...'}>
+              <Tag
+                icon={wsConnected ? <CheckCircleFilled /> : <DisconnectOutlined />}
+                color={wsConnected ? 'cyan' : 'default'}
+                style={{
+                  borderRadius: 12,
+                  fontSize: 11,
+                  padding: '1px 8px',
+                  marginLeft: 4,
+                  cursor: 'help',
+                }}
+              >
+                {wsConnected ? 'Trực tiếp' : 'Ngoại tuyến'}
+              </Tag>
+            </Tooltip>
           </div>
           <Text style={{ color: '#64748B', fontSize: 13, marginTop: 4, display: 'inline-block' }}>
             Khoảnh khắc và chia sẻ mới nhất từ bạn bè của bạn
@@ -83,6 +105,9 @@ export default function FriendFeedSection() {
           Làm mới
         </Button>
       </div>
+
+      {/* Create New Post Section */}
+      <CreatePostCard onSubmit={createPost} />
 
       {/* Main Content Area */}
       {loading ? (

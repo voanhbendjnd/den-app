@@ -6,7 +6,7 @@ import com.denhub.repository.FriendshipRepository;
 import com.denhub.repository.PostRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.SecurityUtils;
-import com.denhub.service.dto.PostDTO;
+import com.denhub.service.dto.DisplayPostDTO;
 import com.denhub.service.dto.ResultPaginationCursorDateId;
 import com.denhub.service.errors.AccessDeniedException;
 import com.denhub.service.errors.BadRequestResourceException;
@@ -127,9 +127,9 @@ class PostServiceTest {
         assertThat(result.getCursorId()).isEqualTo(101L);
 
         @SuppressWarnings("unchecked")
-        List<PostDTO> data = (List<PostDTO>) result.getResult();
+        List<DisplayPostDTO> data = (List<DisplayPostDTO>) result.getResult();
         assertThat(data).hasSize(1);
-        PostDTO dto = data.getFirst();
+        DisplayPostDTO dto = data.getFirst();
         assertThat(dto.getId()).isEqualTo(101L);
         assertThat(dto.getUserId()).isEqualTo(2L);
         assertThat(dto.getAuthorName()).isEqualTo("Alice");
@@ -172,7 +172,7 @@ class PostServiceTest {
         assertThat(result.isHasMore()).isTrue();
 
         @SuppressWarnings("unchecked")
-        List<PostDTO> data = (List<PostDTO>) result.getResult();
+        List<DisplayPostDTO> data = (List<DisplayPostDTO>) result.getResult();
         assertThat(data).hasSize(1);
         assertThat(data.getFirst().getId()).isEqualTo(102L);
         assertThat(result.getCursorDate()).isEqualTo(now.toString());
