@@ -1,4 +1,5 @@
 package com.denhub.domain.enums;
 
-public class PostStatus {
+public enum PostStatus {
+    PUBLIC, FRIENDS_ONLY, PRIVATE
 }

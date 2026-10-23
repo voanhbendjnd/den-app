@@ -6,7 +6,7 @@ import com.denhub.repository.FriendshipRepository;
 import com.denhub.repository.PostRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.SecurityUtils;
-import com.denhub.service.dto.PostDTO;
+import com.denhub.service.dto.DisplayPostDTO;
 import com.denhub.service.dto.ResultPaginationCursorDateId;
 import com.denhub.service.errors.AccessDeniedException;
 import com.denhub.service.errors.BadRequestResourceException;
@@ -31,7 +31,9 @@ public class PostService {
     PostRepository postRepository;
     FriendshipRepository friendshipRepository;
     UserRepository userRepository;
+    public void postFeed(){
 
+    }
     public ResultPaginationCursorDateId getAllPost(int size, String cursorDate, Long cursorId){
         Long currentUserId = SecurityUtils.getCurrentUserIdAtHolder();
         if(currentUserId == null){
@@ -63,13 +65,13 @@ public class PostService {
                 ? Collections.emptyMap()
                 : userRepository.findAllById(authorIds).stream().collect(Collectors.toMap(User::getId, u -> u));
 
-        List<PostDTO> data = posts.stream().map(x -> {
+        List<DisplayPostDTO> data = posts.stream().map(x -> {
             User author = userMap.get(x.getUserId());
             String authorName = author != null ? (author.getName() != null ? author.getName() : author.getUsername()) : "Người dùng";
             String authorUsername = author != null ? author.getUsername() : null;
             String authorAvatar = author != null ? author.getAvatar() : null;
 
-            return PostDTO.builder()
+            return DisplayPostDTO.builder()
                     .id(x.getId())
                     .userId(x.getUserId())
                     .authorName(authorName)
@@ -90,7 +92,7 @@ public class PostService {
         String nextCursorDate = null;
         Long nextCursorId = null;
         if(!data.isEmpty()) {
-            PostDTO last = data.getLast();
+            DisplayPostDTO last = data.getLast();
             nextCursorDate = last.getCreatedDate() != null ? last.getCreatedDate().toString() : null;
             nextCursorId = last.getId();
         }

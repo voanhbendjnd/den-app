@@ -1,14 +1,12 @@
 package com.denhub.web.rest;
 
 import com.denhub.service.PostService;
-import com.denhub.service.dto.PostDTO;
 import com.denhub.service.dto.ResultPaginationCursorDateId;
 import com.denhub.web.rest.vm.SizeDateIdVM;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

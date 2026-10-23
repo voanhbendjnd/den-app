@@ -265,6 +265,8 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 | `/user/queue/friend-requests/received` | `SUBSCRIBE` | Nhận thông báo có lời mời kết bạn mới | `CONFIRMED` |
 | `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Sự kiện ngầm cập nhật danh sách bạn bè khi lời mời được chấp nhận (không hiển thị popup notification để chống spam) | `CONFIRMED` |
 | `/user/queue/direct-messages` | `SUBSCRIBE` | Nhận tin nhắn riêng tư 1-1 gửi trực tiếp cho người dùng | `TBD` |
+| `/app/post` | `SEND` | Client đăng bài viết mới (`FeedPostReq`: content, privacy, mediaUrl, mediaUrls) | `CONFIRMED` |
+| `/user/queue/new-post` | `SUBSCRIBE` | Bạn bè nhận thông báo bài viết mới real-time (`DisplayPostDTO`) khi privacy != PRIVATE | `CONFIRMED` |
 | `/user/queue/errors` | `SUBSCRIBE` | Nhận thông báo lỗi thời gian thực cá nhân | `TBD` |
 
 > [!NOTE]

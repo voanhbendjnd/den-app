@@ -11,7 +11,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PostDTO {
+public class DisplayPostDTO {
 
     Long id;
     Long userId;
