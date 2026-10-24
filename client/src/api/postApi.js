@@ -15,6 +15,15 @@ const postApi = {
    */
   getAllPostsFromFriends: (size = 10, cursorDate = null, cursorId = null) =>
     axiosClient.post('/posts/all-friends', { size, cursorDate, cursorId }),
+
+  /**
+   * Thích hoặc bỏ thích một bài viết.
+   * POST /api/posts/{postId}/like
+   * @param {number|string} postId - ID của bài viết
+   * @returns {Promise<{ code, message, data: { postId, liked, likeCounts } }>}
+   */
+  toggleLike: (postId) => axiosClient.post(`/posts/${postId}/like`),
 };
 
 export default postApi;
+

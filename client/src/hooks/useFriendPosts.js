@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
+import { message } from 'antd';
 import postApi from '../api/postApi';
 import { getAccessToken } from '../utils/token';
 import { useAuth } from './useAuth';
@@ -179,11 +180,15 @@ export function useFriendPosts(pageSize = DEFAULT_PAGE_SIZE) {
     fetchPosts(false);
   }, [fetchPosts]);
 
-  // Optimistic like toggle
-  const toggleLike = useCallback((postId) => {
+  // Optimistic like toggle kết nối REST API /posts/{postId}/like với rollback khi lỗi
+  const toggleLike = useCallback(async (postId) => {
+    let previousPost = null;
+
+    // 1. Optimistic update trên giao diện ngay tức thì
     setPosts((prev) =>
       prev.map((post) => {
         if (post.id !== postId) return post;
+        previousPost = { ...post };
         const isLiked = post.isLiked ?? false;
         const currentLikes = post.likeCounts ?? 0;
         return {
@@ -193,6 +198,33 @@ export function useFriendPosts(pageSize = DEFAULT_PAGE_SIZE) {
         };
       })
     );
+
+    // 2. Gửi request lên backend API
+    try {
+      const res = await postApi.toggleLike(postId);
+      const data = res.data?.data ?? res.data;
+      if (data) {
+        setPosts((prev) =>
+          prev.map((post) => {
+            if (post.id !== postId) return post;
+            return {
+              ...post,
+              isLiked: typeof data.liked === 'boolean' ? data.liked : post.isLiked,
+              likeCounts: typeof data.totalLikes === 'number' ? data.totalLikes : post.likeCounts,
+            };
+          })
+        );
+      }
+    } catch (err) {
+      console.error('[useFriendPosts] Failed to toggle like:', err);
+      // 3. Rollback nếu server trả lỗi
+      if (previousPost) {
+        setPosts((prev) =>
+          prev.map((post) => (post.id === postId ? previousPost : post))
+        );
+      }
+      message.error(err.response?.data?.message || 'Không thể thao tác thích bài viết. Vui lòng thử lại.');
+    }
   }, []);
 
   return {

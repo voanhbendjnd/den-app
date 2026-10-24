@@ -22,6 +22,7 @@ public class DisplayPostDTO {
     // public, FRIENDS_ONLY, PRIVATE
     String privacy;
     Integer likeCounts;
+    Boolean isLiked;
     String mediaUrl;
     Instant createdDate;
 }

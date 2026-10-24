@@ -16,6 +16,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,6 +32,7 @@ public class PostService {
     PostRepository postRepository;
     FriendshipRepository friendshipRepository;
     UserRepository userRepository;
+    StringRedisTemplate stringRedisTemplate;
     public void postFeed(){
 
     }
@@ -71,6 +73,15 @@ public class PostService {
             String authorUsername = author != null ? author.getUsername() : null;
             String authorAvatar = author != null ? author.getAvatar() : null;
 
+            boolean isLiked = false;
+            if (stringRedisTemplate != null) {
+                try {
+                    String redisKey = String.format("post:%d:likes", x.getId());
+                    isLiked = Boolean.TRUE.equals(stringRedisTemplate.opsForSet().isMember(redisKey, String.valueOf(currentUserId)));
+                } catch (Exception ignored) {
+                }
+            }
+
             return DisplayPostDTO.builder()
                     .id(x.getId())
                     .userId(x.getUserId())
@@ -80,6 +91,7 @@ public class PostService {
                     .privacy(x.getPrivacy())
                     .content(x.getContent())
                     .likeCounts(x.getLikeCounts() != null ? x.getLikeCounts() : 0)
+                    .isLiked(isLiked)
                     .mediaUrl(x.getMediaUrl())
                     .createdDate(x.getCreatedDate())
                     .build();

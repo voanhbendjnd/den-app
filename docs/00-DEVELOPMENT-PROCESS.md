@@ -2178,9 +2178,56 @@ Commit:
 
 ---
 
+### [2026-10-24] BE-FE-POST-LIKE — Hoàn thiện tính năng Thích bài viết (Post Like) và tích hợp UI Newsfeed
+
+Implemented:
+
+- Backend:
+  - Tái cấu trúc `LikeService.java`:
+    - Bổ sung xác thực tài khoản đăng nhập (`SecurityUtils.getCurrentUserIdAtHolder()`) và kiểm tra tài khoản kích hoạt (`Boolean.TRUE.equals(user.getActivated())`).
+    - Kiểm tra bài viết tồn tại (`postRepository.findById(postId)`), trả về `400 Bad Request` (`postNotFound`) nếu không tìm thấy.
+    - Kiểm tra phân quyền tương tác theo `privacy`: `PRIVATE` chỉ tác giả được like, `FRIENDS_ONLY` chỉ bạn bè và tác giả được like, ném `AccessDeniedException` nếu vi phạm.
+    - Lưu trạng thái like vào Redis Set `post:{postId}:likes` với userId.
+    - Đồng bộ trường `post.like_counts` trong database SQL Server (`postRepository.save(post)`) để query Newsfeed trả về số like chính xác.
+  - Bổ sung trường `Boolean isLiked` vào `DisplayPostDTO.java`.
+  - Cập nhật `PostService.java`: Kiểm tra Redis Set `post:{postId}:likes` để set trường `isLiked` cho từng bài viết khi tải feed (`getAllPost`).
+  - Viết 9 unit tests cho `LikeServiceTest.java` và test `PostLikeControllerTest.java` (độ phủ 100% các kịch bản: like, unlike, quyền author, từ chối private/friends-only, bài viết không tồn tại, chưa đăng nhập, tài khoản inactive).
+  - Cập nhật `PostServiceTest.java` mock `StringRedisTemplate`.
+- Frontend:
+  - Bổ sung hàm `toggleLike: (postId) => axiosClient.post('/posts/' + postId + '/like')` trong `client/src/api/postApi.js`.
+  - Nâng cấp hook `useFriendPosts.js`: Thao tác like lạc quan (Optimistic Update), đồng bộ với dữ liệu từ server khi thành công (`liked`, `totalLikes`), tự động rollback và hiển thị thông báo lỗi `message.error` khi thất bại.
+  - Cập nhật `PostCard.jsx`: Thêm micro-animation bouncy spring effect cho nút Like và bộ lọc phát sáng Cyber Red (`drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))`), padding và style viền Cyber Glassmorphism.
+  - Tạo mới `client/tests/postLike.test.mjs` kiểm thử độc lập cho logic optimistic like, server sync và rollback.
+- Tests & Verification:
+  - Backend: `.\gradlew.bat test` PASS 100% (toàn bộ 330+ unit & integration tests của server).
+  - Frontend: `npm run build` PASS (0 errors, Vite production bundle).
+  - Frontend Logic: `node --test` PASS 45/45 tests.
+
+Docs Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md` (REST table + Section 13).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Completed Work Log & Handoff).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
-### Handoff hiện tại — Delete Server (2026-10-21)
+### Handoff hiện tại — Post Like & Feed UI (2026-10-24)
+
+- Tính năng Like bài viết đã hoàn thiện toàn diện từ Backend tới Frontend:
+  - API `POST /api/posts/{postId}/like` kiểm tra quyền theo privacy (`PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`), trạng thái active của user, lưu trữ Redis Set và đồng bộ trường `post.like_counts` trong SQL Server.
+  - API feed trả về `DisplayPostDTO` có trường `isLiked` được tra cứu tự động từ Redis theo user đang đăng nhập.
+  - Frontend `useFriendPosts` hỗ trợ Optimistic Update và rollback khi gặp lỗi, `PostCard` có micro-animation bouncy scale và Cyber Red glow.
+- Verification:
+  - Toàn bộ backend test `gradlew.bat test` PASS (330+ tests).
+  - Client production build `npm run build` PASS.
+  - Client node tests PASS 45/45.
+- Chưa commit; AI Agent tuân thủ nghiêm ngặt quy tắc không push và không tự ý commit khi chưa có ủy quyền rõ ràng từ người dùng.
+
+### Handoff trước — Delete Server (2026-10-21)
+
 
 - Owner vào Server → Cài đặt Server → Xóa Server. Đọc cảnh báo, chờ đủ 3 giây rồi bấm Xác nhận xóa; hủy trước khi gửi không phát sinh DELETE. Trong lúc chờ không thể gửi trùng/đóng bằng UI. API vẫn kiểm lại quyền và điều kiện dữ liệu trên mỗi request.
 - Contract chính thức ở docs/02 mục 12; dữ liệu/metadata ở docs/03 mục 4.6. Chỉ Owner active được xóa, không cần Server rỗng hoặc membership Owner; general được dọn khi xóa cả Server. Chat riêng, User, Server khác và file vật lý được bảo toàn.
