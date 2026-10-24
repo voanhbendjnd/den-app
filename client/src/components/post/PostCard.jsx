@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Avatar, Typography, Tag, Button, Tooltip, Image } from 'antd';
 import {
   HeartOutlined,
@@ -90,6 +90,8 @@ function renderPrivacyTag(privacy) {
 }
 
 export default function PostCard({ post, onLike }) {
+  const [isBouncing, setIsBouncing] = useState(false);
+
   if (!post) return null;
 
   const {
@@ -107,6 +109,12 @@ export default function PostCard({ post, onLike }) {
 
   const displayName = authorName || authorUsername || 'Người dùng';
   const relativeTime = formatRelativeTime(createdDate);
+
+  const handleLikeClick = () => {
+    setIsBouncing(true);
+    setTimeout(() => setIsBouncing(false), 300);
+    onLike?.(id);
+  };
 
   return (
     <div
@@ -229,24 +237,40 @@ export default function PostCard({ post, onLike }) {
           <Button
             type="text"
             icon={
-              isLiked ? (
-                <HeartFilled style={{ color: '#EF4444', fontSize: 17 }} />
-              ) : (
-                <HeartOutlined style={{ color: '#94A3B8', fontSize: 17 }} />
-              )
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  transform: isBouncing ? 'scale(1.35)' : 'scale(1)',
+                  transition: 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                }}
+              >
+                {isLiked ? (
+                  <HeartFilled
+                    style={{
+                      color: '#EF4444',
+                      fontSize: 17,
+                      filter: 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))',
+                    }}
+                  />
+                ) : (
+                  <HeartOutlined style={{ color: '#94A3B8', fontSize: 17 }} />
+                )}
+              </span>
             }
-            onClick={() => onLike?.(id)}
+            onClick={handleLikeClick}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              color: isLiked ? '#EF4444' : '#94A3B8',
+              color: isLiked ? '#F87171' : '#94A3B8',
               fontWeight: 600,
               fontSize: 13,
-              padding: '4px 10px',
+              padding: '4px 12px',
               borderRadius: 8,
-              background: isLiked ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
-              transition: 'all 0.2s ease',
+              background: isLiked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+              border: isLiked ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             <span>{likeCounts} Thích</span>
