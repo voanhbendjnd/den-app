@@ -21,7 +21,7 @@ import ServerInviteModal from '../../components/common/ServerInviteModal';
 import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
-import { canDeleteChannel } from '../../utils/channelUtils';
+import { canDeleteChannel, isChannelDeletable } from '../../utils/channelUtils';
 import './group-chat.css';
 
 function ChannelSidebar({
@@ -114,7 +114,7 @@ function ChannelSidebar({
             {channels.map((ch) => {
               const isActive = activeChannel?.id === ch.id;
               const isGeneral = ch.name?.toLowerCase() === 'general';
-              const isDeletable = canDeleteChannel(ch, channels.length);
+              const isDeletable = isChannelDeletable(ch, channels.length);
               return (
                 <div
                   key={ch.id}
@@ -522,7 +522,7 @@ export default function GroupChatPage() {
               icon={<DeleteOutlined />}
               title={channels.length <= 1 ? 'Máy chủ phải có ít nhất 1 kênh' : `Xóa kênh #${activeChannel.name}`}
               aria-label={`Xóa kênh #${activeChannel.name}`}
-              disabled={!canDeleteChannel(activeChannel, channels.length)}
+              disabled={!isChannelDeletable(activeChannel, channels.length)}
               onClick={() => setDeletingChannel(activeChannel)}
             />
           )}

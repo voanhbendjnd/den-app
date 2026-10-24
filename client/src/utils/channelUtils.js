@@ -94,6 +94,13 @@ export function canDeleteChannel(channel, totalChannelsCount) {
 }
 
 /**
+ * Kiểm tra nhanh kênh có thể xóa được hay không dưới dạng Boolean
+ */
+export function isChannelDeletable(channel, totalChannelsCount) {
+  return canDeleteChannel(channel, totalChannelsCount).canDelete;
+}
+
+/**
  * Ánh xạ mã lỗi khi xóa Channel từ API server sang thông báo người dùng thân thiện
  */
 export function getChannelDeleteErrorMessage(err, channelName = '') {
