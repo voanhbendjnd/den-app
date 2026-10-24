@@ -448,6 +448,45 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - Docs đồng bộ 00/01/02/03; đã xem docs/04, tái sử dụng design system nên không sửa. Conflict markers lịch sử docs/00, warnings Ant Design và bundle lớn vẫn ngoài phạm vi. Chưa kiểm thử FE → BE → SQL Server thật, chưa áp dụng audit script SQL Server.
 - Git: changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
 
+### [2026-10-24] FEAT-CHANNEL-DELETE-UI — Làm UI Xóa Channel, Kết Nối API (Kỳ Anh)
+
+Implemented:
+- Cập nhật `client/src/api/channelApi.js`:
+  - Thêm phương thức `delete: (channelId) => axiosClient.delete('/v1/channels/' + channelId)`.
+- Cập nhật `client/src/utils/channelUtils.js`:
+  - Thêm hàm `canDeleteChannel(channel, totalChannelsCount)` kiểm tra tính hợp lệ và trả về `{ canDelete: boolean, reason: string|null }` (bảo vệ kênh `#general` và kênh duy nhất trong server).
+  - Thêm hàm `isChannelDeletable(channel, totalChannelsCount)` hỗ trợ kiểm tra nhanh dạng Boolean.
+  - Thêm hàm `getChannelDeleteErrorMessage(err, channelName)` ánh xạ mã lỗi từ API server (`cannotdeletegeneral`, `cannotdeletelastchannel`, `forbidden`, `channelnotfound`, `conflict`, `invalidid`) sang thông báo tiếng Việt thân thiện với người dùng.
+- Tạo mới `client/src/components/common/DeleteChannelModal.jsx`:
+  - Modal xác nhận xóa kênh chuẩn phong cách Cyber Dark viền đỏ phát sáng (`#ef4444`).
+  - Kiểm tra điều kiện tiên quyết trước khi submit, cảnh báo hành động không thể hoàn tác.
+  - Xử lý trạng thái loading, cơ chế anti-spam qua ref, hiển thị lỗi qua Alert và thông báo thành công qua message.
+- Cập nhật `client/src/components/common/EditChannelModal.jsx`:
+  - Bổ sung tùy chọn nút "Xóa kênh" ở góc trái modal cài đặt kênh (có tooltip giải thích lý do khi bị disable nếu là kênh `#general` hoặc server chỉ có 1 kênh).
+- Cập nhật `client/src/pages/chat/group-chat.css`:
+  - Thêm styles `.group-channel-delete-btn` (hiện khi hover row, hiệu ứng scale đỏ nổi bật, ẩn khi disabled).
+  - Thêm styles `.group-header-delete-btn` trên header chat cạnh nút cài đặt kênh.
+- Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
+  - Tích hợp `DeleteChannelModal` và các nút xóa trên từng dòng channel tại sidebar và header của khung chat.
+  - Quản lý state `deletingChannel`.
+  - Hàm `handleChannelDeleted(deletedChannelId)`: loại bỏ channel khỏi state `channels`, tự động chuyển fallback `activeChannel` sang kênh còn lại đầu tiên khi kênh đang mở bị xóa.
+- Tests Added:
+  - `client/tests/channelDelete.test.mjs`: Thêm 6 bài unit tests toàn diện:
+    - `canDeleteChannel returns detailed verification object` (invalid, #general, single channel, deletable)
+    - `isChannelDeletable returns boolean flag correctly`
+    - `getChannelDeleteErrorMessage maps general channel protection error correctly`
+    - `getChannelDeleteErrorMessage maps last channel protection error correctly`
+    - `getChannelDeleteErrorMessage maps permission and not found errors`
+    - `getChannelDeleteErrorMessage maps generic backend and fallback errors`
+- Verification:
+  - `node --test tests/channelDelete.test.mjs`: PASS 6/6 tests.
+  - `node --test tests/*.test.mjs`: PASS 42/42 tests toàn bộ client suite.
+- Docs Updated:
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Đổi trạng thái endpoint `DELETE /api/v1/channels/{channelId}` thành `CONFIRMED`.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật work log chi tiết cho UI Xóa Channel.
+
+---
+
 ### [2026-10-22] FEAT-CHANNEL-DELETE — Làm API Xóa Channel & Tests (Kỳ Anh)
 
 Implemented:

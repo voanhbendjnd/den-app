@@ -74,3 +74,63 @@ export function getChannelEditErrorMessage(err, channelName = '') {
   }
   return 'Không thể cập nhật kênh. Vui lòng thử lại sau!';
 }
+
+/**
+ * Kiểm tra xem kênh có đủ điều kiện để xóa hay không:
+ * - Kênh #general là mặc định, không thể xóa
+ * - Server phải có ít nhất 1 kênh (không thể xóa kênh cuối cùng)
+ */
+export function canDeleteChannel(channel, totalChannelsCount) {
+  if (!channel || !channel.id) {
+    return { canDelete: false, reason: 'Thông tin kênh không hợp lệ!' };
+  }
+  if (channel.name && channel.name.trim().toLowerCase() === 'general') {
+    return { canDelete: false, reason: 'Kênh #general là kênh mặc định và không thể bị xóa!' };
+  }
+  if (totalChannelsCount !== undefined && totalChannelsCount !== null && totalChannelsCount <= 1) {
+    return { canDelete: false, reason: 'Không thể xóa kênh duy nhất trong Server!' };
+  }
+  return { canDelete: true, reason: null };
+}
+
+/**
+ * Kiểm tra nhanh kênh có thể xóa được hay không dưới dạng Boolean
+ */
+export function isChannelDeletable(channel, totalChannelsCount) {
+  return canDeleteChannel(channel, totalChannelsCount).canDelete;
+}
+
+/**
+ * Ánh xạ mã lỗi khi xóa Channel từ API server sang thông báo người dùng thân thiện
+ */
+export function getChannelDeleteErrorMessage(err, channelName = '') {
+  const errorData = err?.response?.data;
+  const errorKey = errorData?.errorKey;
+  const message = errorData?.message || '';
+
+  if (errorKey === 'cannotdeletegeneral' || message.includes('general')) {
+    return 'Kênh #general là kênh mặc định và không thể bị xóa!';
+  }
+  if (errorKey === 'cannotdeletelastchannel' || message.includes('cuối cùng') || message.includes('last')) {
+    return 'Không thể xóa kênh cuối cùng trong Server!';
+  }
+  if (errorKey === 'forbidden' || err?.response?.status === 403) {
+    return 'Bạn không có quyền xóa kênh trong server này!';
+  }
+  if (errorKey === 'channelnotfound' || err?.response?.status === 404) {
+    return 'Kênh không tồn tại hoặc đã bị xóa trước đó!';
+  }
+  if (errorKey === 'conflict' || err?.response?.status === 409) {
+    return 'Không thể xóa kênh an toàn vì dữ liệu tin nhắn đang liên kết với hội thoại riêng!';
+  }
+  if (errorKey === 'invalidid') {
+    return 'Mã kênh không hợp lệ!';
+  }
+  if (errorData?.message) {
+    return errorData.message;
+  }
+  return channelName
+    ? `Không thể xóa kênh "#${channelName}". Vui lòng thử lại sau!`
+    : 'Không thể xóa kênh. Vui lòng thử lại sau!';
+}
+

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Button, Typography, message, Space, Alert } from 'antd';
+import { Modal, Form, Input, InputNumber, Button, Typography, message, Space, Alert, Tooltip } from 'antd';
 import { 
   NumberOutlined, 
   EditOutlined,
   CheckOutlined,
-  CloseOutlined
+  CloseOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import channelApi from '../../api/channelApi';
 import { formatChannelName, getChannelEditErrorMessage } from '../../utils/channelUtils';
@@ -13,10 +14,22 @@ const { Title, Text } = Typography;
 
 export { formatChannelName, getChannelEditErrorMessage };
 
-export default function EditChannelModal({ open, onClose, onSuccess, channel, server }) {
+export default function EditChannelModal({ 
+  open, 
+  onClose, 
+  onSuccess, 
+  channel, 
+  server, 
+  onDelete, 
+  totalChannelsCount 
+}) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  const isGeneral = channel?.name?.toLowerCase() === 'general';
+  const isOnlyChannel = typeof totalChannelsCount === 'number' && totalChannelsCount <= 1;
+  const cannotDelete = isGeneral || isOnlyChannel;
 
   useEffect(() => {
     if (open && channel) {
@@ -60,6 +73,18 @@ export default function EditChannelModal({ open, onClose, onSuccess, channel, se
       setLoading(false);
     }
   };
+
+  const handleDeleteClick = () => {
+    if (cannotDelete) return;
+    onClose();
+    onDelete?.(channel);
+  };
+
+  const deleteTooltip = isGeneral
+    ? 'Kênh #general là kênh mặc định, không thể xóa'
+    : isOnlyChannel
+    ? 'Máy chủ phải có ít nhất 1 kênh'
+    : 'Xóa vĩnh viễn kênh này';
 
   return (
     <Modal
@@ -193,8 +218,43 @@ export default function EditChannelModal({ open, onClose, onSuccess, channel, se
           />
         </Form.Item>
 
-        <div style={{ marginTop: 24 }}>
-          <Space orientation="horizontal" style={{ width: '100%', justifyContent: 'flex-end' }}>
+        <div
+          style={{
+            marginTop: 24,
+            display: 'flex',
+            justifyContent: onDelete ? 'space-between' : 'flex-end',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          {onDelete && (
+            <Tooltip title={deleteTooltip}>
+              <span>
+                <Button
+                  danger
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  disabled={loading || cannotDelete}
+                  onClick={handleDeleteClick}
+                  style={{
+                    color: cannotDelete ? '#64748b' : '#f87171',
+                    borderRadius: 8,
+                    padding: '4px 12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: cannotDelete ? 'rgba(255, 255, 255, 0.03)' : 'rgba(239, 68, 68, 0.1)',
+                    border: `1px solid ${cannotDelete ? 'rgba(255, 255, 255, 0.08)' : 'rgba(239, 68, 68, 0.3)'}`,
+                    cursor: cannotDelete ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Xóa kênh
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+
+          <Space orientation="horizontal" style={{ justifyContent: 'flex-end' }}>
             <Button
               onClick={onClose}
               disabled={loading}

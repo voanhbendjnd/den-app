@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useOutletContext, useParams } from 'react-
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
 import {
   ArrowLeftOutlined,
+  DeleteOutlined,
   MenuOutlined,
   MessageOutlined,
   PlusOutlined,
@@ -15,10 +16,12 @@ import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
 import CreateChannelModal from '../../components/common/CreateChannelModal';
 import EditChannelModal from '../../components/common/EditChannelModal';
+import DeleteChannelModal from '../../components/common/DeleteChannelModal';
 import ServerInviteModal from '../../components/common/ServerInviteModal';
 import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
+import { canDeleteChannel, isChannelDeletable } from '../../utils/channelUtils';
 import './group-chat.css';
 
 function ChannelSidebar({
@@ -34,6 +37,7 @@ function ChannelSidebar({
   onSelectChannel,
   onOpenCreateChannel,
   onOpenEditChannel,
+  onOpenDeleteChannel,
   onRetryChannels,
 }) {
   return (
@@ -109,6 +113,8 @@ function ChannelSidebar({
           <nav className="group-channels-nav" aria-label="Danh sách kênh">
             {channels.map((ch) => {
               const isActive = activeChannel?.id === ch.id;
+              const isGeneral = ch.name?.toLowerCase() === 'general';
+              const isDeletable = isChannelDeletable(ch, channels.length);
               return (
                 <div
                   key={ch.id}
@@ -136,6 +142,21 @@ function ChannelSidebar({
                   >
                     <SettingOutlined />
                   </button>
+                  {!isGeneral && (
+                    <button
+                      type="button"
+                      className="group-channel-delete-btn"
+                      title={channels.length <= 1 ? 'Máy chủ phải có ít nhất 1 kênh' : `Xóa kênh #${ch.name}`}
+                      aria-label={`Xóa kênh #${ch.name}`}
+                      disabled={!isDeletable}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDeleteChannel?.(ch);
+                      }}
+                    >
+                      <DeleteOutlined />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -261,7 +282,12 @@ export default function GroupChatPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState(null);
-  useEffect(() => { setIsSettingsOpen(false); setEditingChannel(null); }, [serverId]);
+  const [deletingChannel, setDeletingChannel] = useState(null);
+  useEffect(() => { 
+    setIsSettingsOpen(false); 
+    setEditingChannel(null); 
+    setDeletingChannel(null);
+  }, [serverId]);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
 
@@ -374,6 +400,24 @@ export default function GroupChatPage() {
     }
   };
 
+  const handleChannelDeleted = (deletedChannelId) => {
+    if (!deletedChannelId) return;
+    setChannels((prevList) => {
+      const nextList = prevList.filter((c) => c.id !== deletedChannelId);
+      setActiveChannel((prevActive) => {
+        if (prevActive?.id === deletedChannelId) {
+          return nextList.length > 0 ? nextList[0] : null;
+        }
+        return prevActive;
+      });
+      return nextList;
+    });
+    if (serverId) {
+      fetchChannels(serverId);
+    }
+    setDeletingChannel(null);
+  };
+
   useEffect(() => {
     let active = true;
     setDetail({ serverId, server: null, loading: true, error: null });
@@ -443,6 +487,7 @@ export default function GroupChatPage() {
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => setIsCreateChannelOpen(true)}
           onOpenEditChannel={(ch) => setEditingChannel(ch)}
+          onOpenDeleteChannel={(ch) => setDeletingChannel(ch)}
           onRetryChannels={() => fetchChannels(serverId)}
         />
       </aside>
@@ -467,6 +512,18 @@ export default function GroupChatPage() {
               title={`Cài đặt kênh #${activeChannel.name}`}
               aria-label={`Cài đặt kênh #${activeChannel.name}`}
               onClick={() => setEditingChannel(activeChannel)}
+            />
+          )}
+          {activeChannel && activeChannel.name?.toLowerCase() !== 'general' && (
+            <Button
+              type="text"
+              danger
+              className="group-header-delete-btn"
+              icon={<DeleteOutlined />}
+              title={channels.length <= 1 ? 'Máy chủ phải có ít nhất 1 kênh' : `Xóa kênh #${activeChannel.name}`}
+              aria-label={`Xóa kênh #${activeChannel.name}`}
+              disabled={!isChannelDeletable(activeChannel, channels.length)}
+              onClick={() => setDeletingChannel(activeChannel)}
             />
           )}
           {isOwner && (
@@ -570,6 +627,10 @@ export default function GroupChatPage() {
             setChannelsOpen(false);
             setEditingChannel(ch);
           }}
+          onOpenDeleteChannel={(ch) => {
+            setChannelsOpen(false);
+            setDeletingChannel(ch);
+          }}
           onRetryChannels={() => fetchChannels(serverId)}
         />
       </Drawer>
@@ -604,8 +665,22 @@ export default function GroupChatPage() {
         open={Boolean(editingChannel)}
         channel={editingChannel}
         server={server}
+        totalChannelsCount={channels.length}
         onClose={() => setEditingChannel(null)}
         onSuccess={handleChannelUpdated}
+        onDelete={(ch) => {
+          setEditingChannel(null);
+          setDeletingChannel(ch);
+        }}
+      />
+
+      <DeleteChannelModal
+        open={Boolean(deletingChannel)}
+        channel={deletingChannel}
+        server={server}
+        totalChannelsCount={channels.length}
+        onClose={() => setDeletingChannel(null)}
+        onSuccess={handleChannelDeleted}
       />
 
       <ServerInviteModal
