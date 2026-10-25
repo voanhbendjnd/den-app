@@ -383,6 +383,7 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.12 — UI nhập và gửi tin nhắn         | DONE                                                       | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53. |
 | Task 1.12 / khung Group và ô nhập độc lập   | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
 | Task 1.08 — API lấy lịch sử tin nhắn + test | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
+| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
 =======
 | Công việc | Trạng thái | Bằng chứng / bước còn lại |
 | :--- | :--- | :--- |
@@ -396,6 +397,7 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.12 — UI nhập và gửi tin nhắn | DONE | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53. |
 | Task 1.12 / khung Group và ô nhập độc lập | DONE | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE. |
 | Task 1.08 — API lấy lịch sử tin nhắn + test | DONE | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%. |
+| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test | DONE | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%. |
 | FEAT-FRIEND-REQUEST-UI — UI danh sách lời mời kết bạn + Realtime | DONE | 5 file FE: `friendApi.js` bổ sung `getFriendRequests`; `useFriendRequests.js` STOMP + cursor pagination; `FriendRequestPage.jsx` UI đầy đủ; route `/friends`; menu Bạn Bè. `npm run build` PASS 3192 modules. Không thay backend. |
 | FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE) | DONE | `friendApi.js` (accept/remove endpoints); `useFriendRequests.js` (`acceptRequest`, `removeRequest`, `actionLoading`); `FriendRequestPage.jsx` (Nút Đồng ý Indigo Gradient, Từ chối Dark Glass, spin loading độc lập, toast thông báo). `npm run build` PASS 3192 modules. |
 | FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) + Sửa query Friendship (BE) | DONE | Sửa typo `:status <> 'PENDING'` trong `FriendshipRepository`; `friendApi.js` (`getAllFriends`); `useFriends.js` (cursor pagination, filter search); `FriendRequestPage.jsx` (Tabs Tất cả / Chờ xử lý, FriendCard, nút Nhắn tin Direct Message); `npm run build` PASS 3193 modules. |
@@ -447,6 +449,58 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - Sau khi pause clock để chụp ảnh, lượt Server Settings có 5 FAIL do selector exact gặp loading icon chưa kết thúc animation. Đã cho clock chạy thêm 350ms cho animation và dùng selector theo tên hành động; không sửa production để làm test pass. Lượt cuối `node --test tests/server-settings.browser.test.mjs` PASS 28/28, 0 failure/skip; 23 Group cases ở lượt 51/51 không thay đổi. `git diff --check`, kiểm relative links docs, phạm vi file thay đổi và bảo toàn conflict markers lịch sử đều PASS.
 - Docs đồng bộ 00/01/02/03; đã xem docs/04, tái sử dụng design system nên không sửa. Conflict markers lịch sử docs/00, warnings Ant Design và bundle lớn vẫn ngoài phạm vi. Chưa kiểm thử FE → BE → SQL Server thật, chưa áp dụng audit script SQL Server.
 - Git: changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-25] FEAT-MESSAGE-EDIT-API — Làm API sửa tin nhắn (PATCH & PUT /api/messages/{messageId}) + Tests
+
+- Nhánh: `feature/edit-message-api`.
+- Kế hoạch: Đã được người dùng duyệt trước khi triển khai ("ok duyet maf truoc khi lam goi y ten nhanh").
+- Implemented:
+  - Tạo mới `server/src/main/java/com/denhub/service/dto/UpdateMessageRequest.java`:
+    - Record DTO với `@NotBlank`, `@Pattern(regexp = "(?sU).*\\S.*")`, `@Size(max = 4000)` UTF-16 chars.
+  - Cập nhật `server/src/main/java/com/denhub/service/dto/MessageResponse.java`:
+    - Bổ sung trường `updatedAt` kiểu `Instant` với format `@JsonFormat(shape = JsonFormat.Shape.STRING)` và `@JsonInclude(JsonInclude.Include.NON_NULL)` để đảm bảo giữ nguyên contract 5 fields khi chưa sửa và trả thêm `updatedAt` khi đã sửa.
+    - Giữ trọn vẹn backward compatibility với constructor 5 tham số và hỗ trợ record-style accessors.
+  - Cập nhật `server/src/main/java/com/denhub/service/MessageService.java`:
+    - Triển khai `updateMessage(Long messageId, UpdateMessageRequest request)`:
+      - Kiểm tra `messageId > 0` và validate request body qua Bean Validator (400 Bad Request).
+      - Lấy danh tính người dùng hiện tại từ Spring Security Context, tra cứu tài khoản activated (401 Unauthorized).
+      - Tra cứu tin nhắn trong `MessageRepository`, nếu không tồn tại trả 404 Not Found.
+      - Tuân thủ nghiêm ngặt Business Rule `BR-MSG-02`: **Chỉ tác giả gốc (`authorId` / `senderId`) mới được sửa tin nhắn của mình**. Kiểm tra nếu `authorId != currentUser.getId()`, lập tức chặn bằng `403 Forbidden` (`"Bạn không có quyền sửa tin nhắn này"`). Quyền này áp dụng tuyệt đối ngay cả với Server Owner.
+      - Cập nhật trường `content`, lưu qua `messageRepository.save(message)` và trả về `MessageResponse` với `lastModifiedDate`.
+  - Cập nhật `server/src/main/java/com/denhub/web/rest/MessageResource.java`:
+    - Bổ sung endpoint `@PatchMapping("/messages/{messageId}")` và `@PutMapping("/messages/{messageId}")`.
+    - Trả về `ResponseEntity.ok(response)` tự động được bọc bởi `ResFormatResponse` với `statusCode: 200`, `message: "Chỉnh sửa tin nhắn thành công"`, `error: null`.
+- Tests Added / Updated:
+  - `MessageServiceTest`: 9 unit tests cho `updateMessage`:
+    - Sửa thành công và cập nhật nội dung bởi chính tác giả.
+    - Chặn `messageId` null hoặc âm / bằng 0 (400).
+    - Chặn content rỗng, toàn khoảng trắng Unicode, hoặc dài hơn 4000 ký tự (400).
+    - Chặn khi chưa đăng nhập hoặc tài khoản không tồn tại / inactive (401).
+    - Chặn khi tin nhắn không tồn tại (404).
+    - Chặn khi người sửa không phải tác giả (403).
+    - Chặn khi Server Owner cố gắng sửa tin nhắn của member khác (403).
+  - `MessageResourceIT`: 5 MockMvc tests cho `updateMessage`:
+    - Sửa thành công qua PATCH trả về 200 OK kèm wrapper envelope `data.content` và `data.updatedAt`.
+    - Sửa thành công qua PUT trả về 200 OK.
+    - Chặn content blank trả về 400 Bad Request.
+    - Ném 404 khi Service báo tin nhắn không tồn tại.
+    - Ném 403 khi Service báo không có quyền sửa.
+  - `MessageSecurityIT`: 7 SpringBootTest integration tests:
+    - Sửa thành công qua PATCH với token thật của tác giả, xác minh entity trong H2 database được cập nhật `content` và `lastModifiedDate`.
+    - Sửa thành công qua PUT với token thật của tác giả.
+    - Chặn 403 Forbidden khi member khác cố sửa tin nhắn của tác giả (database không bị thay đổi).
+    - Chặn 403 Forbidden khi Server Owner cố sửa tin nhắn của member khác (database không bị thay đổi).
+    - Chặn 401 Unauthorized khi không truyền token Bearer.
+    - Chặn 400 Bad Request khi truyền content blank.
+    - Chặn 404 Not Found khi ID tin nhắn không tồn tại.
+- Verification:
+  - `.\gradlew.bat test --tests "com.denhub.service.MessageServiceTest" --tests "com.denhub.web.rest.MessageResourceIT" --tests "com.denhub.web.rest.MessageSecurityIT"`: BUILD SUCCESSFUL (tất cả 99/99 tests PASS).
+  - `.\gradlew.bat test`: BUILD SUCCESSFUL (toàn bộ test suite dự án PASS 100%).
+  - `node --test tests/channelMessages.test.mjs ...`: PASS 53/53 client unit tests.
+  - `npm run build`: BUILD SUCCESSFUL (3209 modules transformed, 0 error).
+- Not pushed — AI agents are not allowed to push DenHub.
+
+---
 
 ### [2026-10-25] FEAT-CHANNEL-MESSAGES-UI — Làm UI hiển thị lịch sử tin nhắn kênh & Mở khóa ô chat (FE)
 
