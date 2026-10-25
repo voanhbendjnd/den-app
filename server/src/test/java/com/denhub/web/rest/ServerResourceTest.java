@@ -252,4 +252,14 @@ class ServerResourceTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
         org.mockito.Mockito.verify(serverService).leaveServer(12L);
     }
+
+    @Test
+    void removeMember_ReturnsNoContent() throws Exception {
+        mockMvc = MockMvcBuilders.standaloneSetup(serverResource)
+                .setControllerAdvice(new com.denhub.util.ResFormatResponse()).build();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/servers/12/members/45"))
+                .andExpect(status().isNoContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+        org.mockito.Mockito.verify(serverService).removeMember(12L, 45L);
+    }
 }

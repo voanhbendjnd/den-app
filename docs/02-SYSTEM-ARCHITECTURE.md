@@ -173,7 +173,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Server** | `POST` | `/api/v1/servers/{serverId}/invites` | Tạo mã mời Server mới (duy nhất Owner) | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server (Member, Admin; Owner cấm theo BR-SRV-01) | `IMPLEMENTED` |
 | **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `IMPLEMENTED` |
-| **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
+| **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Owner loại (kick) một Member ra khỏi Server (Task 2.19) | `IMPLEMENTED` |
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
 | **Message** | `GET` | `/api/channels/{channelId}/messages?before={id}&limit=30` | Lấy lịch sử Message (Cursor pagination) | `CONFIRMED` |
 | **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message server cũ | `TBD` |
@@ -220,7 +220,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `POST /api/v1/servers/join-invite/{code}`: Tham gia server qua invite code (Người dùng đã đăng nhập, trả `ServerResponseDTO` trong wrapper `RestResponse`)
 - `DELETE /api/invites/{code}`: Thu hồi invite code
 - `GET /api/v1/servers/{serverId}/members`: Danh sách thành viên (Owner/Member, `ServerMemberResponseDTO`)
-- `DELETE /api/servers/{serverId}/members/{userId}`: Kick thành viên
+- `DELETE /api/v1/servers/{serverId}/members/{userId}`: Owner loại (kick) thành viên khỏi Server (trả `204 No Content`)
 - `PATCH /api/servers/{serverId}/members/{userId}/role`: Phân quyền `ADMIN`/`MEMBER` (Owner)
 
 ### 5.3 Channels & Messages
@@ -800,5 +800,24 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 - **useFriendPosts Hook**:
   - `editPost(postId, payload)`: Gọi `postApi.updatePost`, cập nhật state bài viết tương ứng và toast thành công.
   - `deletePost(postId)`: Cập nhật lạc quan (loại bỏ bài viết khỏi danh sách ngay lập tức), gọi `postApi.deletePost`, tự động rollback nếu server trả lỗi.
+
+---
+
+## 15. CONTRACT API LOẠI THÀNH VIÊN KHỎI SERVER (TASK 2.19)
+
+### 15.1 Endpoint & Authentication
+- **Endpoint**: `DELETE /api/v1/servers/{serverId}/members/{userId}`
+- **Authentication**: Bắt buộc (JWT Bearer Token qua header `Authorization: Bearer <token>`).
+- **Quyền hạn**: Duy nhất Server Owner (`currentUser.id == server.ownerId`).
+- **Response**: `204 No Content` (body rỗng).
+
+### 15.2 Quy tắc nghiệp vụ & Mã lỗi
+1. **Tham số hợp lệ**: `serverId` và `userId` phải là số nguyên dương (`> 0`). Nếu null hoặc `<= 0` $\rightarrow$ `400 Bad Request`.
+2. **Server tồn tại**: Kiểm tra Server với pessimistic write lock `findByIdForUpdate(serverId)`. Nếu không tìm thấy $\rightarrow$ `404 Not Found` ("Không tìm thấy Server").
+3. **Kiểm tra quyền**: Người thực hiện phải là Owner của Server. Nếu không $\rightarrow$ `403 Forbidden` ("Chỉ chủ sở hữu Server mới có quyền loại thành viên").
+4. **Quy tắc bảo vệ Owner**: Không được phép loại chủ sở hữu khỏi Server qua endpoint này (kể cả Owner tự kick mình) $\rightarrow$ `400 Bad Request` ("Không thể loại chủ sở hữu khỏi Server"). Thành viên muốn tự rời Server phải dùng endpoint Leave Server (`POST /api/v1/servers/{serverId}/leave` hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`).
+5. **Thành viên tồn tại**: `targetUserId` phải là thành viên hiện tại của Server trong bảng `server_member`. Nếu không $\rightarrow$ `404 Not Found` ("Thành viên không tồn tại trong Server").
+6. **Xóa thành viên**: Thực hiện `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)`.
+
 
 

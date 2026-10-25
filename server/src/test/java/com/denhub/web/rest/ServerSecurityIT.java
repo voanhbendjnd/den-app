@@ -820,4 +820,132 @@ class ServerSecurityIT {
         entityManager.clear();
         assertFalse(members.existsByServerIdAndUserId(server.getId(), memberUser.getId()));
     }
+
+    @Test
+    void ownerRemovesMemberSuccessfully() throws Exception {
+        User rawMember = new User();
+        rawMember.setEmail("target-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawMember.setPassword("fixture-" + UUID.randomUUID());
+        rawMember.setName("Target Member");
+        rawMember.setActivated(true);
+        rawMember.setSessionId(UUID.randomUUID().toString());
+        User memberUser = users.saveAndFlush(rawMember);
+
+        ServerMember sm = new ServerMember();
+        sm.setServerId(server.getId());
+        sm.setUserId(memberUser.getId());
+        sm.setNickname("Target Nick");
+        members.saveAndFlush(sm);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), memberUser.getId()));
+
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + memberUser.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertFalse(members.existsByServerIdAndUserId(server.getId(), memberUser.getId()));
+    }
+
+    @Test
+    void nonOwnerCannotRemoveMember_Returns403() throws Exception {
+        User rawMember1 = new User();
+        rawMember1.setEmail("mem1-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawMember1.setPassword("fixture-" + UUID.randomUUID());
+        rawMember1.setName("Member 1");
+        rawMember1.setActivated(true);
+        rawMember1.setSessionId(UUID.randomUUID().toString());
+        User member1 = users.saveAndFlush(rawMember1);
+
+        User rawMember2 = new User();
+        rawMember2.setEmail("mem2-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawMember2.setPassword("fixture-" + UUID.randomUUID());
+        rawMember2.setName("Member 2");
+        rawMember2.setActivated(true);
+        rawMember2.setSessionId(UUID.randomUUID().toString());
+        User member2 = users.saveAndFlush(rawMember2);
+
+        ServerMember sm1 = new ServerMember();
+        sm1.setServerId(server.getId());
+        sm1.setUserId(member1.getId());
+        sm1.setNickname("Nick 1");
+        members.saveAndFlush(sm1);
+
+        ServerMember sm2 = new ServerMember();
+        sm2.setServerId(server.getId());
+        sm2.setUserId(member2.getId());
+        sm2.setNickname("Nick 2");
+        members.saveAndFlush(sm2);
+
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + member2.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(member1))), 403);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), member2.getId()));
+    }
+
+    @Test
+    void outsiderCannotRemoveMember_Returns403() throws Exception {
+        User rawTarget = new User();
+        rawTarget.setEmail("target-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawTarget.setPassword("fixture-" + UUID.randomUUID());
+        rawTarget.setName("Target Member");
+        rawTarget.setActivated(true);
+        rawTarget.setSessionId(UUID.randomUUID().toString());
+        User target = users.saveAndFlush(rawTarget);
+
+        ServerMember sm = new ServerMember();
+        sm.setServerId(server.getId());
+        sm.setUserId(target.getId());
+        sm.setNickname("Target Nick");
+        members.saveAndFlush(sm);
+
+        User rawOutsider = new User();
+        rawOutsider.setEmail("outsider-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawOutsider.setPassword("fixture-" + UUID.randomUUID());
+        rawOutsider.setName("Outsider User");
+        rawOutsider.setActivated(true);
+        rawOutsider.setSessionId(UUID.randomUUID().toString());
+        User outsider = users.saveAndFlush(rawOutsider);
+
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + target.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(outsider))), 403);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), target.getId()));
+    }
+
+    @Test
+    void ownerCannotRemoveSelf_Returns400() throws Exception {
+        addMembership(server.getId());
+
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + reader.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), reader.getId()));
+    }
+
+    @Test
+    void targetNotMember_RemoveMemberReturns404() throws Exception {
+        User rawNonMember = new User();
+        rawNonMember.setEmail("nonmember-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawNonMember.setPassword("fixture-" + UUID.randomUUID());
+        rawNonMember.setName("Non Member");
+        rawNonMember.setActivated(true);
+        rawNonMember.setSessionId(UUID.randomUUID().toString());
+        User nonMember = users.saveAndFlush(rawNonMember);
+
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + nonMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void missingServer_RemoveMemberReturns404() throws Exception {
+        problem(mvc.perform(delete("/api/v1/servers/999999/members/10")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void missingJwt_RemoveMemberReturns401() throws Exception {
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/10")), 401);
+    }
 }

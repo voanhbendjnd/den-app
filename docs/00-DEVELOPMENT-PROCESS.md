@@ -413,6 +413,47 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-2.19-SERVER-REMOVE-MEMBER-API — Làm API Loại Thành Viên & Tests
+
+- **Mục tiêu:** Xây dựng API `DELETE /api/v1/servers/{serverId}/members/{userId}` cho phép Server Owner loại (kick) một thành viên khác ra khỏi Server.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/ServerService.java`:
+    - Thêm method `removeMember(Long serverId, Long userId)`.
+    - Kiểm tra `serverId` và `userId` hợp lệ (> 0).
+    - Khóa pessimistic write Server qua `findByIdForUpdate(serverId)` để đồng bộ concurrency.
+    - Kiểm tra quyền: Duy nhất Server Owner (`currentUser.getId().equals(server.getOwnerId())`) mới được phép loại thành viên, trả về `403 FORBIDDEN` nếu không phải Owner.
+    - Chặn Owner tự loại mình qua endpoint này (trả về `400 BAD_REQUEST`).
+    - Kiểm tra thành viên mục tiêu có trong `server_member` hay không qua `existsByServerIdAndUserId`, trả về `404 NOT_FOUND` nếu không tồn tại.
+    - Thực hiện xóa qua `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)`.
+  - `server/src/main/java/com/denhub/web/rest/ServerResource.java`:
+    - Khai báo endpoint `DELETE /api/v1/servers/{serverId}/members/{userId}`.
+    - Trả về `204 No Content` với body rỗng.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/web/rest/ServerResourceTest.java`:
+    - `removeMember_ReturnsNoContent`: Kiểm tra controller gọi đúng service và trả về 204.
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - `removeMember_SuccessWhenOwnerRemovesMember`: Owner loại thành viên thành công.
+    - `removeMember_FailWhenNotLoggedIn`: Trả về 401 khi chưa xác thực.
+    - `removeMember_FailWhenServerIdInvalid`: Trả về 400 khi `serverId` null/<=0.
+    - `removeMember_FailWhenUserIdInvalid`: Trả về 400 khi `userId` null/<=0.
+    - `removeMember_FailWhenServerNotFound`: Trả về 404 khi Server không tồn tại.
+    - `removeMember_FailWhenCallerNotOwner`: Trả về 403 khi caller không phải Owner.
+    - `removeMember_FailWhenTargetIsOwner`: Trả về 400 khi cố loại Owner.
+    - `removeMember_FailWhenTargetNotMember`: Trả về 404 khi thành viên không thuộc Server.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - `ownerRemovesMemberSuccessfully`: Owner gửi DELETE với JWT token thật, kiểm tra xóa membership trong DB và trả về 204.
+    - `nonOwnerCannotRemoveMember_Returns403`: Member thường gửi DELETE bị từ chối 403.
+    - `outsiderCannotRemoveMember_Returns403`: Outsider gửi DELETE bị từ chối 403.
+    - `ownerCannotRemoveSelf_Returns400`: Owner cố loại chính mình bị từ chối 400.
+    - `targetNotMember_RemoveMemberReturns404`: Loại target không thuộc Server nhận 404.
+    - `missingServer_RemoveMemberReturns404`: Server không tồn tại nhận 404.
+    - `missingJwt_RemoveMemberReturns401`: Không có JWT nhận 401.
+- **Documentation Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Cập nhật endpoint `DELETE /api/v1/servers/{serverId}/members/{userId}` sang `IMPLEMENTED` và thêm mục 15.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật Completed Work Log và Current Project Progress.
+- **Git:**
+  - Branch: `feature/server-remove-member-api`.
+
 ### [2026-10-25] FEAT-USER-PROFILE-API — Làm API Xem Hồ Sơ Cá Nhân & Tests (Kỳ Anh)
 
 - **Mục tiêu:** Xây dựng API `GET /api/v1/users/profile` (kèm alias `GET /api/v1/users/me`) cho phép người dùng đang đăng nhập xem đầy đủ thông tin hồ sơ cá nhân của chính mình.
