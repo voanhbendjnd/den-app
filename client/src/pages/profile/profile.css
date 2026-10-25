@@ -1,0 +1,293 @@
+/* =============================================
+   DenHub Profile Page - Cyber Dark Aesthetics
+   ============================================= */
+
+.profile-page-wrapper {
+  min-height: 100%;
+  padding: 32px 24px 60px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.profile-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  animation: profileFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes profileFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Card Chính */
+.profile-main-card {
+  background: var(--color-bg-surface, #151D2E);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 242, 254, 0.05);
+  position: relative;
+  transition: border-color 0.3s ease;
+}
+
+.profile-main-card:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+/* Hero Cover Banner */
+.profile-cover-banner {
+  height: 160px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.5) 0%, rgba(0, 242, 254, 0.35) 100%),
+              radial-gradient(circle at 80% 20%, rgba(0, 242, 254, 0.3) 0%, transparent 60%);
+  position: relative;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.profile-cover-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.profile-cover-badge {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: rgba(15, 20, 34, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  color: #00F2FE;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Avatar Section */
+.profile-body-content {
+  padding: 0 32px 36px;
+  position: relative;
+}
+
+.profile-avatar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: -50px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  display: inline-block;
+  padding: 4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366F1 0%, #00F2FE 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 242, 254, 0.3);
+}
+
+.profile-avatar {
+  border: 3px solid var(--color-bg-surface, #151D2E) !important;
+  background: #1C263B !important;
+  color: #F1F5F9 !important;
+  font-weight: 700;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-avatar-status {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 3px solid var(--color-bg-surface, #151D2E);
+  box-shadow: 0 0 10px #10B981;
+}
+
+.profile-actions-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Info Header */
+.profile-title-section {
+  margin-bottom: 28px;
+}
+
+.profile-display-name {
+  font-size: 26px;
+  font-weight: 800;
+  color: #F1F5F9;
+  margin: 0 0 4px 0;
+  line-height: 1.2;
+}
+
+.profile-username-tag {
+  color: #94A3B8;
+  font-size: 15px;
+  font-family: var(--font-mono, monospace);
+  margin-bottom: 12px;
+  display: inline-block;
+}
+
+.profile-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.profile-role-tag {
+  border-radius: 12px;
+  padding: 3px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.profile-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.profile-status-badge.inactive {
+  background: rgba(239, 68, 68, 0.12);
+  color: #EF4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Grid Thông tin Chi tiết */
+.profile-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 640px) {
+  .profile-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-info-card {
+  background: rgba(15, 20, 34, 0.6);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.07));
+  border-radius: 14px;
+  padding: 16px 18px;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.profile-info-card:hover {
+  background: rgba(28, 38, 59, 0.45);
+  border-color: rgba(0, 242, 254, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.profile-info-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #00F2FE;
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.profile-info-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-info-label {
+  font-size: 12px;
+  color: #64748B;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.profile-info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #F1F5F9;
+  word-break: break-all;
+}
+
+/* Card Lỗi / Error State */
+.profile-error-card {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.profile-error-title {
+  color: #EF4444;
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.profile-error-desc {
+  color: #94A3B8;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Quick Actions Footer Card */
+.profile-footer-box {
+  background: rgba(12, 16, 26, 0.6);
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.07));
+  padding: 18px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}

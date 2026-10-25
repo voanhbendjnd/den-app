@@ -159,6 +159,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Post** | `DELETE` | `/api/posts/{postId}` | Xóa bài viết vĩnh viễn và dọn dẹp Redis Set (yêu cầu là tác giả) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
+| **User Profile** | `GET` | `/api/v1/users/profile` (alias `/api/v1/users/me`) | Lấy thông tin chi tiết hồ sơ cá nhân của người dùng đang đăng nhập | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/login` | Đăng nhập và lấy Access Token JWT | `TBD` |
 | **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tương user hiện tại qua token | `TBD` |

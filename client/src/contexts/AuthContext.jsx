@@ -113,6 +113,18 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
   }, []);
 
+  const updateCurrentUser = useCallback((userData) => {
+    if (!userData) return;
+    setCurrentUser((prev) => {
+      const merged = { ...prev, ...userData };
+      if (merged.authorities) {
+        merged.role = merged.authorities.includes('ROLE_ADMIN') ? 'ADMIN' : (merged.role || 'USER');
+      }
+      localStorage.setItem('denhub_user', JSON.stringify(merged));
+      return merged;
+    });
+  }, []);
+
   const value = {
     currentUser,
     isAuthenticated: !!currentUser,
@@ -121,6 +133,7 @@ export function AuthProvider({ children }) {
     login,
     loginWithGoogle,
     logout,
+    updateCurrentUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

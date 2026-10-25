@@ -302,7 +302,6 @@ Bản ghi này độc lập với các vùng conflict lịch sử phía dưới.
 
 Phát hành local 2026-10-21: Backend và Frontend đã được commit theo từng cụm cùng tests; tài liệu/tiến độ được commit riêng. Không push. Xem log RELEASE-SERVER-DELETE.
 
-<<<<<<< HEAD
 | Module                       |     FE      |     BE      |                  DB                  |      Integration      |  Test  |               Status               | Last Update |
 | :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----: | :--------------------------------: | :---------: |
 | **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      | TESTED |            IN_PROGRESS             | 2026-10-11  |
@@ -315,7 +314,6 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Real-time (1-1)**          |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Search User & Friendship** |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
-=======
 | Module | FE | BE | DB | Integration | Test | Status | Last Update |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
@@ -328,7 +326,6 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Search User & Friendship** | IMPLEMENTED | DONE | CONFIRMED | IMPLEMENTED | PASS (build) | IN_PROGRESS | 2026-10-14 |
->>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
@@ -419,6 +416,82 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-25] FEAT-USER-PROFILE-API — Làm API Xem Hồ Sơ Cá Nhân & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `GET /api/v1/users/profile` (kèm alias `GET /api/v1/users/me`) cho phép người dùng đang đăng nhập xem đầy đủ thông tin hồ sơ cá nhân của chính mình.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/UserProfileResponseDTO.java`:
+    - Tạo DTO chứa thông tin hồ sơ người dùng cá nhân gồm: `id`, `email`, `name` (tên hiển thị), `username`, `avatar`, `activated`, `createdDate`, `authorities`.
+    - Loại bỏ tuyệt đối các trường nhạy cảm (`password_hash`, `activation_key`, `reset_key`, `refresh_token`, `session_id`).
+    - Bổ sung helper `fromUser(User user)` ánh xạ từ thực thể `User`.
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional(readOnly = true) public UserProfileResponseDTO getUserProfile()`:
+      - Xác thực người dùng hiện tại từ Spring Security Context qua `SecurityUtils.getCurrentUserLogin()`, ném `BadRequestAlertException` (`notloggedin`) nếu chưa đăng nhập.
+      - Truy vấn người dùng từ database qua `userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)`, ném `BadRequestAlertException` (`usernotfound`) nếu không tồn tại.
+      - Trả về DTO hồ sơ người dùng tương ứng.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Tạo Controller mới với route `@RequestMapping("/api/v1/users")`, tag `"User Profile"`, yêu cầu `@SecurityRequirement(name = "bearerAuth")`.
+    - Cung cấp 2 endpoints:
+      - `GET /api/v1/users/profile`: Endpoint chính thức lấy thông tin hồ sơ cá nhân.
+      - `GET /api/v1/users/me`: Endpoint alias tương thích theo chuẩn RESTful.
+    - Được bọc tự động qua `ResFormatResponse` theo đúng cấu trúc wrapper `{ statusCode: 200, message: "...", data: {...} }`.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `getUserProfile_Success`: Kiểm tra trả về đúng thông tin hồ sơ khi đăng nhập thành công.
+    - `getUserProfile_Fail_WhenNotLoggedIn`: Kiểm tra ném lỗi `notloggedin` khi chưa đăng nhập.
+    - `getUserProfile_Fail_WhenUserNotFound`: Kiểm tra ném lỗi `usernotfound` khi người dùng không tồn tại.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `getUserProfile_Success`: MockMvc GET `/api/v1/users/profile` trả về HTTP 200 và json data hợp lệ.
+    - `getUserProfile_AliasMe_Success`: MockMvc GET `/api/v1/users/me` trả về HTTP 200.
+    - `getUserProfile_Fail_WhenNotLoggedIn`: MockMvc trả về HTTP 400 Problem Details khi chưa đăng nhập.
+    - `getUserProfile_Fail_WhenUserNotFound`: MockMvc trả về HTTP 400 Problem Details khi không tìm thấy user.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 7/7 tests (0 failures, 0 errors).
+  - `.\gradlew.bat compileJava`: BUILD SUCCESSFUL.
+- **Docs Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `GET /api/v1/users/profile` vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
+### [2026-10-25] FEAT-USER-PROFILE-UI — Làm UI Xem Hồ Sơ Cá Nhân & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng giao diện xem hồ sơ cá nhân chuẩn phong cách Cyber Dark, kết nối API backend `GET /api/v1/users/profile` và alias `/api/v1/users/me`, hiển thị đầy đủ thông tin người dùng và xử lý trọn vẹn các trạng thái loading, error, refresh.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js`:
+    - Tạo mới API client với các method `getProfile()` và `getMe()` gọi tới endpoint `/v1/users/profile` và `/v1/users/me`.
+  - `client/src/api/authApi.js`:
+    - Bổ sung `getProfile()` và `getMe()` nhằm đảm bảo tính tương thích ngược cho các component cũ.
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng tiện ích `formatJoinDate(dateInput, verbose)` định dạng ngày tham gia (hỗ trợ cả compact `DD/MM/YYYY` và verbose `DD tháng MM, YYYY`, kiểm soát tốt null/undefined/invalid date).
+    - Xây dựng `extractProfileData(response)` bóc tách dữ liệu từ cấu trúc bọc `RestResponse` (`res.data.data` hoặc `res.data`), ánh xạ đầy đủ `id`, `email`, `name`, `username`, `avatar`, `activated`, `createdDate`, `authorities`.
+    - Xây dựng `getProfileErrorMessage(error)` ánh xạ mã lỗi HTTP (401, 403, 404, 500, lỗi mạng) sang thông điệp tiếng Việt thân thiện.
+    - Xây dựng `getRoleDisplays(authorities)` ánh xạ quyền hạn sang nhãn hiển thị và màu sắc tag chuẩn Cyber Dark.
+  - `client/src/contexts/AuthContext.jsx`:
+    - Bổ sung `updateCurrentUser(userData)` giúp ProfilePage và các component khác có thể đồng bộ thông tin hồ sơ mới nhất từ API vào state và `localStorage` toàn cục.
+  - `client/src/pages/profile/profile.css`:
+    - Thiết kế hệ thống giao diện Cyber Dark: Glassmorphism card, Hero cover banner với tech grid pattern, Avatar glowing neon viền gradient, trạng thái hoạt động online dạng chấm xanh neon, grid thông tin chi tiết, và responsive tương thích mobile.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Nâng cấp toàn diện: tích hợp `userApi.getProfile()`, quản lý trạng thái `loading`, `error`, `refreshing`.
+    - Hiển thị Skeleton Cyber Dark mượt mà trong khi tải.
+    - Hiển thị card lỗi chuyên nghiệp kèm nút "Thử lại ngay".
+    - Hiển thị đầy đủ: Avatar lớn, Tên hiển thị, Username `@username`, Badge vai trò, Tag trạng thái kích hoạt, Thẻ Email, Thẻ ID tài khoản `#000x`, Thẻ Ngày gia nhập, Thẻ Quyền hạn hệ thống.
+    - Bổ sung thanh thao tác: Nút làm mới dữ liệu, Nút dẫn đường chỉnh sửa hồ sơ và đổi mật khẩu.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - Kiểm thử `formatJoinDate` với ISO date, simple date, timestamp và edge cases (null, undefined, invalid string).
+    - Kiểm thử `extractProfileData` bóc tách từ `ResFormatResponse` lồng nhau, payload trực tiếp, fallback username từ email.
+    - Kiểm thử `getProfileErrorMessage` với mã lỗi HTTP 401, 403, 404, 500, ERR_NETWORK và fallback generic.
+    - Kiểm thử `getRoleDisplays` với các quyền hạn quản trị viên, thành viên và fallback.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 7/7 tests (100%).
+  - `node --test tests/*.test.mjs`: PASS 80/80 tests (100%).
+  - `npm run build`: Vite v8.3.3 build production hoàn tất thành công 100%.
+- **Docs & Roadmaps Updated:**
+  - Cập nhật tiến độ hoàn thành UI xem hồ sơ cá nhân và kết nối API.
+
+---
 
 ### [2026-10-25] FEAT-SERVER-INVITE-API-INTEGRATION — Kết Nối UI Mã Mời Server Với API
 
