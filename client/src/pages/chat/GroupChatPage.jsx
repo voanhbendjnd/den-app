@@ -11,6 +11,7 @@ import {
   SettingOutlined,
   TeamOutlined,
   UserAddOutlined,
+  UserDeleteOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
@@ -20,11 +21,13 @@ import EditChannelModal from '../../components/common/EditChannelModal';
 import DeleteChannelModal from '../../components/common/DeleteChannelModal';
 import ServerInviteModal from '../../components/common/ServerInviteModal';
 import LeaveServerModal from '../../components/common/LeaveServerModal';
+import RemoveMemberModal from '../../components/common/RemoveMemberModal';
 import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
 import messageApi from '../../api/messageApi';
 import { canDeleteChannel, isChannelDeletable } from '../../utils/channelUtils';
+import { canRemoveMember } from '../../utils/serverMember';
 import {
   sortMessagesChronological,
   mergeMessagePages,
@@ -198,8 +201,11 @@ function MembersPanel({
   loading,
   error,
   onRetry,
+  server,
+  currentUser,
   isOwner,
   onOpenInvite,
+  onRemoveMember,
 }) {
   return (
     <div className="group-members">
@@ -249,7 +255,10 @@ function MembersPanel({
           {members.map((member) => {
             const displayName = member.nickname || member.name || member.username || 'Thành viên';
             const initial = displayName[0]?.toUpperCase() || 'U';
-            const isOwner = member.role === 'OWNER';
+            const isMemberOwner =
+              member.role === 'OWNER' ||
+              Boolean(server?.ownerId && String(member.userId) === String(server.ownerId));
+            const { canRemove } = canRemoveMember(server, currentUser, member);
 
             return (
               <div key={member.id} className="group-member-item" role="listitem">
@@ -265,7 +274,7 @@ function MembersPanel({
                     <span className="group-member-item__name" title={displayName}>
                       {displayName}
                     </span>
-                    {isOwner && (
+                    {isMemberOwner && (
                       <span className="group-member-item__badge" title="Chủ nhóm">
                         Chủ nhóm
                       </span>
@@ -277,6 +286,22 @@ function MembersPanel({
                     </span>
                   )}
                 </div>
+                {canRemove && (
+                  <button
+                    type="button"
+                    className="group-member-item__remove-btn"
+                    title={`Loại ${displayName} khỏi Server`}
+                    aria-label={`Loại ${displayName} khỏi Server`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onRemoveMember) {
+                        onRemoveMember(member);
+                      }
+                    }}
+                  >
+                    <UserDeleteOutlined />
+                  </button>
+                )}
               </div>
             );
           })}
@@ -305,11 +330,13 @@ export default function GroupChatPage() {
   const [isLeaveOpen, setIsLeaveOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState(null);
   const [deletingChannel, setDeletingChannel] = useState(null);
+  const [memberToRemove, setMemberToRemove] = useState(null);
   useEffect(() => { 
     setIsSettingsOpen(false); 
     setEditingChannel(null); 
     setDeletingChannel(null);
     setIsLeaveOpen(false);
+    setMemberToRemove(null);
   }, [serverId]);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
@@ -832,8 +859,11 @@ export default function GroupChatPage() {
             members={members}
             loading={membersLoading}
             error={membersError}
+            server={server}
+            currentUser={currentUser}
             isOwner={isOwner}
             onOpenInvite={() => setIsInviteOpen(true)}
+            onRemoveMember={(m) => setMemberToRemove(m)}
             onRetry={() => fetchMembers(serverId)}
           />
         </aside>
@@ -893,10 +923,16 @@ export default function GroupChatPage() {
           members={members}
           loading={membersLoading}
           error={membersError}
+          server={server}
+          currentUser={currentUser}
           isOwner={isOwner}
           onOpenInvite={() => {
             setMembersOpen(false);
             setIsInviteOpen(true);
+          }}
+          onRemoveMember={(m) => {
+            setMembersOpen(false);
+            setMemberToRemove(m);
           }}
           onRetry={() => fetchMembers(serverId)}
         />
@@ -948,6 +984,17 @@ export default function GroupChatPage() {
           refreshServers?.();
           setIsLeaveOpen(false);
           navigate('/', { replace: true });
+        }}
+      />
+      <RemoveMemberModal
+        open={Boolean(memberToRemove)}
+        server={server}
+        currentUser={currentUser}
+        member={memberToRemove}
+        onClose={() => setMemberToRemove(null)}
+        onSuccess={(removedUserId) => {
+          setMembers((prev) => prev.filter((m) => String(m.userId) !== String(removedUserId)));
+          setMemberToRemove(null);
         }}
       />
       <ServerSettingsModal key={serverId} open={isSettingsOpen && isOwner} server={server}

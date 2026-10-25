@@ -308,7 +308,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Server & Invite**          |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-14  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
-| **Member & Role**            |    TODO     | IMPLEMENTED |             IMPLEMENTED              |         DONE          |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
+| **Member & Role**            | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |         DONE          |     PASS     |            IN_PROGRESS             | 2026-10-26  |
 | **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
 | **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-25  |
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
@@ -412,6 +412,38 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-26] TASK-2.24-SERVER-REMOVE-MEMBER-UI — Làm UI Loại Thành Viên, Kết Nối API
+
+- **Mục tiêu:** Xây dựng giao diện cho phép Server Owner thực hiện thao tác loại thành viên khỏi Server và tích hợp trực tiếp với API backend `DELETE /api/v1/servers/{serverId}/members/{userId}`.
+- **Frontend Changes:**
+  - `client/src/api/serverApi.js`:
+    - Thêm method `removeMember: (serverId, userId) => axiosClient.delete('/v1/servers/' + serverId + '/members/' + userId)`.
+  - `client/src/utils/serverMember.js`:
+    - Tạo mới helper `canRemoveMember(server, currentUser, targetMember)`: Xác định quyền thực hiện của người dùng (chỉ duy nhất Owner), chặn loại Owner và chặn Owner tự loại chính mình.
+    - Tạo mới helper `getRemoveMemberErrorMessage(err, targetName)`: Ánh xạ lỗi HTTP (400, 401, 403, 404, network error, timeout) sang thông báo tiếng Việt an toàn, thân thiện.
+  - `client/src/components/common/RemoveMemberModal.jsx`:
+    - Tạo mới modal xác nhận loại thành viên theo phong cách Cyber Glassmorphism.
+    - Cảnh báo tên thành viên, username và tác động mất quyền truy cập vào Server.
+    - Trạng thái loading, disable nút và chống double-submit qua `submittingRef`.
+    - Bảo vệ an toàn lifecycle unmount qua `isMountedRef`.
+    - Hiển thị Alert lỗi và giữ nguyên danh sách khi API thất bại.
+  - `client/src/pages/chat/group-chat.css`:
+    - Thêm style `.group-member-item__remove-btn` cho nút loại thành viên (hiển thị khi hover/focus, hiệu ứng danger mượt mà).
+  - `client/src/pages/chat/GroupChatPage.jsx`:
+    - Tích hợp `RemoveMemberModal`.
+    - Cập nhật `MembersPanel` (desktop và drawer): hiển thị nút loại thành viên đối với các thành viên thỏa mãn `canRemoveMember`.
+    - Cập nhật state danh sách thành viên (`setMembers`) ngay sau khi API xác nhận thành công.
+- **Tests Added:**
+  - `client/tests/serverRemoveMember.test.mjs`:
+    - 9 test cases kiểm tra đầy đủ `canRemoveMember`, `getRemoveMemberErrorMessage`, và contract gọi API `serverApi.removeMember`.
+  - `client/package.json`:
+    - Bổ sung `tests/serverRemoveMember.test.mjs` vào script test.
+- **Verification:**
+  - `npm test`: 80 tests PASS (0 fail).
+  - `npm run build`: Build production hoàn tất thành công trong 556ms.
+- **Git:**
+  - Branch: `feature/server-remove-member-ui`.
 
 ### [2026-10-26] TASK-2.19-SERVER-REMOVE-MEMBER-API — Làm API Loại Thành Viên & Tests
 
