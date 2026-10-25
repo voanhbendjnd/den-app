@@ -12,6 +12,7 @@ import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.CursorPageResponse;
 import com.denhub.service.dto.MessageResponse;
 import com.denhub.service.dto.SendMessageRequest;
+import com.denhub.service.dto.UpdateMessageRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.data.domain.PageRequest;
@@ -163,6 +164,52 @@ public class MessageService {
         }
 
         Set<ConstraintViolation<SendMessageRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, violations.iterator().next().getMessage());
+        }
+    }
+
+    @Transactional
+    public MessageResponse updateMessage(Long messageId, UpdateMessageRequest request) {
+        if (messageId == null || messageId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID của tin nhắn không hợp lệ");
+        }
+        validateUpdateRequest(request);
+
+        String email = getAuthenticatedEmail();
+        User currentUser = userRepository.findOneByEmail(email)
+                .filter(user -> Boolean.TRUE.equals(user.getActivated()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Không tìm thấy tin nhắn"));
+
+        Long authorId = message.getAuthorId() != null ? message.getAuthorId() : message.getSenderId();
+        if (authorId == null || !authorId.equals(currentUser.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Bạn không có quyền sửa tin nhắn này");
+        }
+
+        message.setContent(request.content());
+        Message savedMessage = messageRepository.save(message);
+
+        return new MessageResponse(
+                savedMessage.getId(),
+                savedMessage.getChannelId(),
+                savedMessage.getAuthorId(),
+                savedMessage.getContent(),
+                savedMessage.getCreatedDate(),
+                savedMessage.getLastModifiedDate());
+    }
+
+    private void validateUpdateRequest(UpdateMessageRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Yêu cầu sửa tin nhắn không hợp lệ");
+        }
+
+        Set<ConstraintViolation<UpdateMessageRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, violations.iterator().next().getMessage());
         }
