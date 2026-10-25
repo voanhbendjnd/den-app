@@ -227,6 +227,52 @@ export function useFriendPosts(pageSize = DEFAULT_PAGE_SIZE) {
     }
   }, []);
 
+  // Chỉnh sửa bài viết
+  const editPost = useCallback(async (postId, payload) => {
+    try {
+      const res = await postApi.updatePost(postId, payload);
+      const updatedPost = res.data?.data ?? res.data;
+      if (updatedPost) {
+        setPosts((prev) =>
+          prev.map((post) => (post.id === postId ? { ...post, ...updatedPost } : post))
+        );
+      }
+      message.success('Cập nhật bài viết thành công! ✨');
+      return updatedPost;
+    } catch (err) {
+      console.error('[useFriendPosts] Failed to update post:', err);
+      const errMsg = err.response?.data?.message || err.message || 'Không thể cập nhật bài viết. Vui lòng thử lại sau.';
+      message.error(errMsg);
+      throw err;
+    }
+  }, []);
+
+  // Xóa bài viết với optimistic update và rollback
+  const deletePost = useCallback(async (postId) => {
+    let previousPosts = null;
+
+    // 1. Optimistic removal khỏi danh sách
+    setPosts((prev) => {
+      previousPosts = [...prev];
+      return prev.filter((post) => post.id !== postId);
+    });
+
+    // 2. Gửi request DELETE lên backend API
+    try {
+      await postApi.deletePost(postId);
+      message.success('Đã xóa bài viết thành công!');
+    } catch (err) {
+      console.error('[useFriendPosts] Failed to delete post:', err);
+      // 3. Rollback nếu có lỗi
+      if (previousPosts) {
+        setPosts(previousPosts);
+      }
+      const errMsg = err.response?.data?.message || err.message || 'Không thể xóa bài viết. Vui lòng thử lại sau.';
+      message.error(errMsg);
+      throw err;
+    }
+  }, []);
+
   return {
     posts,
     loading,
@@ -238,6 +284,9 @@ export function useFriendPosts(pageSize = DEFAULT_PAGE_SIZE) {
     loadMore,
     toggleLike,
     createPost,
+    editPost,
+    deletePost,
   };
 }
+
 
