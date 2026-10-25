@@ -455,6 +455,44 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ---
 
+### [2026-10-25] FEAT-USER-PROFILE-UI — Làm UI Xem Hồ Sơ Cá Nhân & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng giao diện xem hồ sơ cá nhân chuẩn phong cách Cyber Dark, kết nối API backend `GET /api/v1/users/profile` và alias `/api/v1/users/me`, hiển thị đầy đủ thông tin người dùng và xử lý trọn vẹn các trạng thái loading, error, refresh.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js`:
+    - Tạo mới API client với các method `getProfile()` và `getMe()` gọi tới endpoint `/v1/users/profile` và `/v1/users/me`.
+  - `client/src/api/authApi.js`:
+    - Bổ sung `getProfile()` và `getMe()` nhằm đảm bảo tính tương thích ngược cho các component cũ.
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng tiện ích `formatJoinDate(dateInput, verbose)` định dạng ngày tham gia (hỗ trợ cả compact `DD/MM/YYYY` và verbose `DD tháng MM, YYYY`, kiểm soát tốt null/undefined/invalid date).
+    - Xây dựng `extractProfileData(response)` bóc tách dữ liệu từ cấu trúc bọc `RestResponse` (`res.data.data` hoặc `res.data`), ánh xạ đầy đủ `id`, `email`, `name`, `username`, `avatar`, `activated`, `createdDate`, `authorities`.
+    - Xây dựng `getProfileErrorMessage(error)` ánh xạ mã lỗi HTTP (401, 403, 404, 500, lỗi mạng) sang thông điệp tiếng Việt thân thiện.
+    - Xây dựng `getRoleDisplays(authorities)` ánh xạ quyền hạn sang nhãn hiển thị và màu sắc tag chuẩn Cyber Dark.
+  - `client/src/contexts/AuthContext.jsx`:
+    - Bổ sung `updateCurrentUser(userData)` giúp ProfilePage và các component khác có thể đồng bộ thông tin hồ sơ mới nhất từ API vào state và `localStorage` toàn cục.
+  - `client/src/pages/profile/profile.css`:
+    - Thiết kế hệ thống giao diện Cyber Dark: Glassmorphism card, Hero cover banner với tech grid pattern, Avatar glowing neon viền gradient, trạng thái hoạt động online dạng chấm xanh neon, grid thông tin chi tiết, và responsive tương thích mobile.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Nâng cấp toàn diện: tích hợp `userApi.getProfile()`, quản lý trạng thái `loading`, `error`, `refreshing`.
+    - Hiển thị Skeleton Cyber Dark mượt mà trong khi tải.
+    - Hiển thị card lỗi chuyên nghiệp kèm nút "Thử lại ngay".
+    - Hiển thị đầy đủ: Avatar lớn, Tên hiển thị, Username `@username`, Badge vai trò, Tag trạng thái kích hoạt, Thẻ Email, Thẻ ID tài khoản `#000x`, Thẻ Ngày gia nhập, Thẻ Quyền hạn hệ thống.
+    - Bổ sung thanh thao tác: Nút làm mới dữ liệu, Nút dẫn đường chỉnh sửa hồ sơ và đổi mật khẩu.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - Kiểm thử `formatJoinDate` với ISO date, simple date, timestamp và edge cases (null, undefined, invalid string).
+    - Kiểm thử `extractProfileData` bóc tách từ `ResFormatResponse` lồng nhau, payload trực tiếp, fallback username từ email.
+    - Kiểm thử `getProfileErrorMessage` với mã lỗi HTTP 401, 403, 404, 500, ERR_NETWORK và fallback generic.
+    - Kiểm thử `getRoleDisplays` với các quyền hạn quản trị viên, thành viên và fallback.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 7/7 tests (100%).
+  - `node --test tests/*.test.mjs`: PASS 80/80 tests (100%).
+  - `npm run build`: Vite v8.3.3 build production hoàn tất thành công 100%.
+- **Docs & Roadmaps Updated:**
+  - Cập nhật tiến độ hoàn thành UI xem hồ sơ cá nhân và kết nối API.
+
+---
+
 ### [2026-10-25] FEAT-SERVER-INVITE-API-INTEGRATION — Kết Nối UI Mã Mời Server Với API
 
 - **Mục tiêu:** Hoàn thiện tích hợp frontend UI tạo và sao chép mã mời Server (`ServerInviteModal.jsx`) với API backend `POST /api/v1/servers/{serverId}/invites`.
