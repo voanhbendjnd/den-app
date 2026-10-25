@@ -473,6 +473,51 @@ Endpoint: `GET /api/channels/{channelId}/messages?before={id}&limit=30`
   - `MessageResourceIT`: 4 standalone MockMvc tests kiểm thử response code, JSON paths wrapper và Problem Details.
   - `MessageSecurityIT`: 5 SpringBootTest integration tests với JWT encoder và JPA/H2 thật kiểm thử sắp xếp giảm dần, phân trang `before`, chặn 401 khi thiếu token, chặn 403 khi không phải member, chặn 400 khi limit sai.
 
+### 7.8 API Chỉnh sửa tin nhắn văn bản — Edit Message (`IMPLEMENTED`)
+
+Endpoint: `PATCH /api/messages/{messageId}` & `PUT /api/messages/{messageId}`
+
+- **Xác thực & Phân quyền:**
+  - Yêu cầu Bearer JWT hợp lệ, tài khoản activated.
+  - Áp dụng Business Rule `BR-MSG-02`: **Chỉ tác giả gốc (`authorId` / `senderId`) mới được quyền sửa tin nhắn của mình**.
+  - Server Owner hay Admin không được phép sửa tin nhắn của thành viên khác; nếu cố tình gửi request sửa sẽ nhận `403 Forbidden` (`"Bạn không có quyền sửa tin nhắn này"`).
+- **Request Body (`UpdateMessageRequest`):**
+  ```json
+  {
+    "content": "Nội dung tin nhắn sau khi chỉnh sửa"
+  }
+  ```
+- **Validation Constraints:**
+  - `messageId` (path variable): kiểu Long, phải lớn hơn 0.
+  - `content`: `@NotBlank`, `@Pattern(regexp = "(?sU).*\\S.*")`, `@Size(max = 4000)` UTF-16 characters (tương thích validation `SendMessageRequest`).
+- **Response Format (Thành công 200 OK):**
+  Wrapper `ResFormatResponse` bọc `MessageResponse` trong `data`:
+  ```json
+  {
+    "statusCode": 200,
+    "error": null,
+    "message": "Chỉnh sửa tin nhắn thành công",
+    "data": {
+      "id": 101,
+      "channelId": 5,
+      "senderId": 2,
+      "content": "Nội dung tin nhắn sau khi chỉnh sửa",
+      "createdAt": "2026-10-10T07:30:00Z",
+      "updatedAt": "2026-10-10T08:00:00Z"
+    }
+  }
+  ```
+  *Ghi chú:* `MessageResponse.updatedAt` được cấu hình `@JsonInclude(JsonInclude.Include.NON_NULL)` nên chỉ xuất hiện khi tin nhắn có thông tin thời điểm sửa.
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `messageId` <= 0, content null, rỗng, toàn khoảng trắng Unicode hoặc vượt quá 4000 ký tự.
+  - `401 Unauthorized`: Người dùng chưa xác thực hoặc token không hợp lệ / session hết hạn.
+  - `403 Forbidden`: Người gửi request không phải tác giả của tin nhắn (áp dụng cả với Server Owner).
+  - `404 Not Found`: Không tìm thấy tin nhắn với `messageId`.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 9 unit tests kiểm thử sửa thành công, chặn invalid ID, blank content, content > 4000 ký tự, chưa đăng nhập, message không tồn tại, user khác sửa (403), server owner sửa (403).
+  - `MessageResourceIT`: 5 MockMvc tests kiểm thử PATCH & PUT trả 200 kèm envelope, 400 khi blank content, 404 khi not found, 403 khi forbidden.
+  - `MessageSecurityIT`: 7 SpringBootTest integration tests với JWT token thật và database H2 thật kiểm thử sửa qua PATCH và PUT thành công và cập nhật `lastModifiedDate`, chặn 403 khi member khác sửa, chặn 403 khi server owner sửa, chặn 401 khi không token, chặn 400 khi blank, chặn 404 khi tin nhắn không tồn tại.
+
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 
 - Dùng React + Ant Design; tái sử dụng hoặc tạo `MessageInput` sau khi kiểm tra component hiện tại.

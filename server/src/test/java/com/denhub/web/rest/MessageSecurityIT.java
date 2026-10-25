@@ -47,7 +47,9 @@ import java.util.stream.Stream;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /** Real filters, JWT signatures, services and JPA; each H2 fixture is rolled back. */
@@ -365,6 +367,142 @@ class MessageSecurityIT {
         problem(mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
                         .param("limit", "150")
                         .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+    @Test
+    void updateMessageSuccessWhenAuthor() throws Exception {
+        Message msg = createMessage(sender, "Nội dung ban đầu");
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "Nội dung đã sửa"));
+
+        mvc.perform(patch("/api/messages/{messageId}", msg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.message").value("Chỉnh sửa tin nhắn thành công"))
+                .andExpect(jsonPath("$.data.id").value(msg.getId()))
+                .andExpect(jsonPath("$.data.content").value("Nội dung đã sửa"))
+                .andExpect(jsonPath("$.data.updatedAt").isNotEmpty());
+
+        entityManager.flush();
+        entityManager.clear();
+        Message updated = messages.findById(msg.getId()).orElseThrow();
+        assertEquals("Nội dung đã sửa", updated.getContent());
+        assertNotNull(updated.getLastModifiedDate());
+    }
+
+    @Test
+    void updateMessageSuccessViaPutWhenAuthor() throws Exception {
+        Message msg = createMessage(sender, "Nội dung ban đầu");
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "Nội dung PUT"));
+
+        mvc.perform(put("/api/messages/{messageId}", msg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.content").value("Nội dung PUT"));
+    }
+
+    @Test
+    void updateMessageForbiddenWhenNotAuthor() throws Exception {
+        Message msg = createMessage(sender, "Tin nhắn của sender");
+        User otherMember = createAnotherMember();
+        String otherToken = "Bearer " + tokenForUser(otherMember);
+
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "Hacker sửa tin nhắn"));
+
+        problem(mvc.perform(patch("/api/messages/{messageId}", msg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload)), 403);
+
+        entityManager.flush();
+        entityManager.clear();
+        Message unchanged = messages.findById(msg.getId()).orElseThrow();
+        assertEquals("Tin nhắn của sender", unchanged.getContent());
+    }
+
+    @Test
+    void updateMessageForbiddenWhenServerOwnerTriesToEditMemberMessage() throws Exception {
+        User member = createAnotherMember();
+        Message memberMsg = createMessage(member, "Tin nhắn của member");
+
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "Server owner sửa"));
+
+        problem(mvc.perform(patch("/api/messages/{messageId}", memberMsg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload)), 403);
+
+        entityManager.flush();
+        entityManager.clear();
+        Message unchanged = messages.findById(memberMsg.getId()).orElseThrow();
+        assertEquals("Tin nhắn của member", unchanged.getContent());
+    }
+
+    @Test
+    void updateMessageUnauthorizedWhenNoToken() throws Exception {
+        Message msg = createMessage(sender, "Tin nhắn");
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "Sửa"));
+
+        mvc.perform(patch("/api/messages/{messageId}", msg.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateMessageBadRequestWhenBlankContent() throws Exception {
+        Message msg = createMessage(sender, "Tin nhắn gốc");
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "   "));
+
+        problem(mvc.perform(patch("/api/messages/{messageId}", msg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload)), 400);
+
+        entityManager.flush();
+        entityManager.clear();
+        Message unchanged = messages.findById(msg.getId()).orElseThrow();
+        assertEquals("Tin nhắn gốc", unchanged.getContent());
+    }
+
+    @Test
+    void updateMessageNotFoundWhenMessageDoesNotExist() throws Exception {
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "Sửa tin không tồn tại"));
+
+        problem(mvc.perform(patch("/api/messages/{messageId}", 999999L)
+                        .header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload)), 404);
+    }
+
+    private Message createMessage(User author, String content) {
+        Message msg = new Message();
+        msg.setChannelId(channel.getId());
+        msg.setSenderId(author.getId());
+        msg.setContent(content);
+        return messages.saveAndFlush(msg);
+    }
+
+    private User createAnotherMember() {
+        User member = new User();
+        member.setEmail("member-" + UUID.randomUUID() + "@example.test");
+        member.setPassword("secret-" + UUID.randomUUID());
+        member.setName("Other Member");
+        member.setActivated(true);
+        member.setSessionId(UUID.randomUUID().toString());
+        member = users.saveAndFlush(member);
+
+        ServerMember sm = new ServerMember();
+        sm.setServerId(channel.getServerId());
+        sm.setUserId(member.getId());
+        sm.setNickname("Member2");
+        members.saveAndFlush(sm);
+        return member;
     }
 
 
