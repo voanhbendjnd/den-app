@@ -302,7 +302,6 @@ Bản ghi này độc lập với các vùng conflict lịch sử phía dưới.
 
 Phát hành local 2026-10-21: Backend và Frontend đã được commit theo từng cụm cùng tests; tài liệu/tiến độ được commit riêng. Không push. Xem log RELEASE-SERVER-DELETE.
 
-<<<<<<< HEAD
 | Module                       |     FE      |     BE      |                  DB                  |      Integration      |  Test  |               Status               | Last Update |
 | :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----: | :--------------------------------: | :---------: |
 | **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      | TESTED |            IN_PROGRESS             | 2026-10-11  |
@@ -315,7 +314,6 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Real-time (1-1)**          |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Search User & Friendship** |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
-=======
 | Module | FE | BE | DB | Integration | Test | Status | Last Update |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
@@ -328,7 +326,6 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Search User & Friendship** | IMPLEMENTED | DONE | CONFIRMED | IMPLEMENTED | PASS (build) | IN_PROGRESS | 2026-10-14 |
->>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
