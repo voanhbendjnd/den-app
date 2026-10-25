@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Avatar, Typography, Tag, Button, Tooltip, Image } from 'antd';
+import { Avatar, Typography, Tag, Button, Tooltip, Image, Dropdown, Modal } from 'antd';
 import {
   HeartOutlined,
   HeartFilled,
@@ -9,7 +9,13 @@ import {
   TeamOutlined,
   LockOutlined,
   UserOutlined,
+  MoreOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ExclamationCircleFilled,
 } from '@ant-design/icons';
+import { useAuth } from '../../hooks/useAuth';
+import EditPostModal from './EditPostModal';
 
 const { Text, Paragraph } = Typography;
 
@@ -89,13 +95,16 @@ function renderPrivacyTag(privacy) {
   }
 }
 
-export default function PostCard({ post, onLike }) {
+export default function PostCard({ post, onLike, onEdit, onDelete }) {
+  const { currentUser } = useAuth();
   const [isBouncing, setIsBouncing] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   if (!post) return null;
 
   const {
     id,
+    userId,
     authorName,
     authorUsername,
     authorAvatar,
@@ -107,6 +116,7 @@ export default function PostCard({ post, onLike }) {
     isLiked = false,
   } = post;
 
+  const isAuthor = Boolean(currentUser && (currentUser.id === userId));
   const displayName = authorName || authorUsername || 'Người dùng';
   const relativeTime = formatRelativeTime(createdDate);
 
@@ -115,6 +125,39 @@ export default function PostCard({ post, onLike }) {
     setTimeout(() => setIsBouncing(false), 300);
     onLike?.(id);
   };
+
+  const handleDeleteClick = () => {
+    Modal.confirm({
+      title: 'Xóa bài viết?',
+      icon: <ExclamationCircleFilled style={{ color: '#EF4444' }} />,
+      content: 'Bạn có chắc chắn muốn xóa bài viết này không? Bài viết sau khi xóa sẽ không thể khôi phục.',
+      okText: 'Xóa bài viết',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      centered: true,
+      onOk: async () => {
+        await onDelete?.(id);
+      },
+    });
+  };
+
+  const menuItems = [
+    {
+      key: 'edit',
+      label: 'Chỉnh sửa bài viết',
+      icon: <EditOutlined style={{ color: '#818CF8' }} />,
+      onClick: () => setEditModalOpen(true),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'delete',
+      label: <span style={{ color: '#EF4444' }}>Xóa bài viết</span>,
+      icon: <DeleteOutlined style={{ color: '#EF4444' }} />,
+      onClick: handleDeleteClick,
+    },
+  ];
 
   return (
     <div
@@ -179,6 +222,21 @@ export default function PostCard({ post, onLike }) {
             </div>
           </div>
         </div>
+
+        {/* Author Action Menu: Edit & Delete */}
+        {isAuthor && (
+          <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={['click']}>
+            <Button
+              type="text"
+              icon={<MoreOutlined style={{ color: '#94A3B8', fontSize: 18 }} />}
+              style={{
+                borderRadius: 8,
+                padding: '4px 8px',
+                color: '#94A3B8',
+              }}
+            />
+          </Dropdown>
+        )}
       </div>
 
       {/* Body: Post Content */}
@@ -309,6 +367,17 @@ export default function PostCard({ post, onLike }) {
           />
         </Tooltip>
       </div>
+
+      {/* Edit Post Modal */}
+      {isAuthor && (
+        <EditPostModal
+          open={editModalOpen}
+          post={post}
+          onCancel={() => setEditModalOpen(false)}
+          onSubmit={onEdit}
+        />
+      )}
     </div>
   );
 }
+

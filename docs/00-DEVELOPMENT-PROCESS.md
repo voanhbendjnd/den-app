@@ -294,116 +294,109 @@ _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoà
 
 ### Tiến độ riêng — Delete Server (2026-10-21)
 
-| Phạm vi | FE | BE | DB | Verification | Trạng thái |
-| :--- | :--- | :--- | :--- | :--- | :--- |
+| Phạm vi                                        | FE          | BE          | DB                                              | Verification                                                          | Trạng thái                                                       |
+| :--------------------------------------------- | :---------- | :---------- | :---------------------------------------------- | :-------------------------------------------------------------------- | :--------------------------------------------------------------- |
 | Owner xóa Server, cảnh báo và countdown 3 giây | IMPLEMENTED | IMPLEMENTED | Tái sử dụng schema; metadata SQL Server chỉ đọc | 322 BE tests/check; 51 browser cases; 35 Node logic tests; build PASS | Hoàn tất code/H2/browser mock; chưa kiểm thử xóa SQL Server thật |
 
 Bản ghi này độc lập với các vùng conflict lịch sử phía dưới. Không coi trạng thái Server & Invite DONE cũ là bằng chứng Delete Server đã có trước task này.
 
 Phát hành local 2026-10-21: Backend và Frontend đã được commit theo từng cụm cùng tests; tài liệu/tiến độ được commit riêng. Không push. Xem log RELEASE-SERVER-DELETE.
 
-<<<<<<< HEAD
-| Module                       |     FE      |     BE      |                  DB                  |      Integration      |  Test  |               Status               | Last Update |
-| :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----: | :--------------------------------: | :---------: |
-| **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      | TESTED |            IN_PROGRESS             | 2026-10-11  |
-| **Server & Invite**          |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |  PASS  |                DONE                | 2026-10-14  |
-| **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |  PASS  |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
-| **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |  PASS  | Release 6/6; còn apply schema thật | 2026-10-13  |
-| **Member & Role**            |    TODO     | IMPLEMENTED |             IMPLEMENTED              |         DONE          | TESTED |            IN_PROGRESS             | 2026-10-13  |
-| **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      | TESTED |            IN_PROGRESS             | 2026-10-13  |
-| **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |  PASS  |                DONE                | 2026-10-25  |
-| **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
-| **Real-time (1-1)**          |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
-| **Search User & Friendship** |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
-=======
-| Module | FE | BE | DB | Integration | Test | Status | Last Update |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Authentication** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | IN_PROGRESS | TESTED | IN_PROGRESS | 2026-10-11 |
-| **Server & Invite** | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | DONE | TESTED | DONE | 2026-10-13 |
-| **Server Detail — phần vỏ** | IMPLEMENTED | IMPLEMENTED | REUSED | TESTED (H2 / FE mock) | PASS | DONE (phạm vi đã duyệt) | 2026-10-13 |
-| **Server CRUD — sửa 6 bug** | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 6/6; còn apply schema thật | 2026-10-13 |
-| **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
-| **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-13 |
-| **Message (Channel)** | DONE | DONE | IMPLEMENTED | DONE | PASS | DONE | 2026-10-25 |
-| **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
-| **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
-| **Search User & Friendship** | IMPLEMENTED | DONE | CONFIRMED | IMPLEMENTED | PASS (build) | IN_PROGRESS | 2026-10-14 |
->>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
+| Module                       |     FE      |     BE      |                  DB                  |      Integration      |     Test     |               Status               | Last Update |
+| :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----------: | :--------------------------------: | :---------: |
+| **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      |    TESTED    |            IN_PROGRESS             | 2026-10-11  |
+| **Server & Invite**          |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-14  |
+| **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
+| **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
+| **Member & Role**            |    TODO     | IMPLEMENTED |             IMPLEMENTED              |         DONE          |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
+| **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
+| **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-25  |
+| **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
+| **Real-time (1-1)**          |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
+| **Search User & Friendship** |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
+| Module                       |     FE      |     BE      |                  DB                  |      Integration      |     Test     |               Status               | Last Update |
+| :---                         |    :---:    |    :---:    |                :---:                 |         :---:         |    :---:     |               :---:                |    :---:    |
+| **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      |    TESTED    |            IN_PROGRESS             | 2026-10-11  |
+| **Server & Invite**          | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |         DONE          |    TESTED    |                DONE                | 2026-10-13  |
+| **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
+| **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
+| **Member & Role**            |    TODO     | IMPLEMENTED |             IMPLEMENTED              |         TODO          |     TODO     |            IN_PROGRESS             | 2026-10-06  |
+| **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
+| **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-25  |
+| **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
+| **Real-time (1-1)**          |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
+| **Search User & Friendship** | IMPLEMENTED |    DONE     |              CONFIRMED               |      IMPLEMENTED      | PASS (build) |            IN_PROGRESS             | 2026-10-14  |
 
 Các trạng thái module ngày 2026-10-06 được giữ như bản ghi trước đó, chưa được kiểm chứng lại toàn bộ trong đợt docs này. Không suy ra Task 1.07 đã có API hoàn chỉnh chỉ từ ô BE `IMPLEMENTED` của module Message.
 
 ### Tiến độ riêng — Cài đặt / chỉnh sửa Server (2026-10-15)
 
-| Phạm vi | FE | BE | Database | Verification | Trạng thái |
-| :--- | :--- | :--- | :--- | :--- | :--- |
+| Phạm vi                          | FE          | BE          | Database                             | Verification                                                   | Trạng thái                                                                      |
+| :------------------------------- | :---------- | :---------- | :----------------------------------- | :------------------------------------------------------------- | :------------------------------------------------------------------------------ |
 | Owner đổi tên, đổi/gỡ ảnh Server | IMPLEMENTED | IMPLEMENTED | Tái sử dụng mapping, không migration | 259 BE tests; 17 settings + 23 group browser tests; build PASS | DONE trong phạm vi code/H2/browser mock đã duyệt; chưa kiểm thử SQL Server thật |
 
 Bản ghi mới này nằm ngoài các vùng merge conflict có sẵn của bảng tiến độ cũ; không chọn thay nhóm giữa các bản lịch sử.
 
 ### Kiểm tra riêng — Channel/File binding và đường dẫn ảnh local (2026-10-15)
 
-| Công việc | Trạng thái | Bằng chứng / giới hạn |
-| :--- | :--- | :--- |
-| GET Channel và GET ảnh không phụ thuộc tên tham số compiler | TESTED | Hai regression tests tái hiện lỗi trước sửa; sau sửa toàn bộ backend PASS 228/228. |
-| Thư mục chạy VS Code cho ảnh upload | VERIFIED CONFIG | Hai cấu hình local dùng `cwd = ${workspaceFolder}/server`, giữ `envFile = ${workspaceFolder}/server/.env`; kiểm tra đường dẫn tồn tại và 5 ảnh cũ trong `server/uploads/servers`. Cần restart phiên Java để áp dụng. |
+| Công việc                                                   | Trạng thái      | Bằng chứng / giới hạn                                                                                                                                                                                                |
+| :---------------------------------------------------------- | :-------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET Channel và GET ảnh không phụ thuộc tên tham số compiler | TESTED          | Hai regression tests tái hiện lỗi trước sửa; sau sửa toàn bộ backend PASS 228/228.                                                                                                                                   |
+| Thư mục chạy VS Code cho ảnh upload                         | VERIFIED CONFIG | Hai cấu hình local dùng `cwd = ${workspaceFolder}/server`, giữ `envFile = ${workspaceFolder}/server/.env`; kiểm tra đường dẫn tồn tại và 5 ảnh cũ trong `server/uploads/servers`. Cần restart phiên Java để áp dụng. |
 
 Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không quyết định thay nhóm giữa hai bản tiến độ cũ. Không coi kiểm tra MockMvc/H2 và đường dẫn local là kiểm thử giao diện hoặc SQL Server thật.
 
 ### Tính năng Block & Gỡ Block User, Sửa Business Rules (2026-10-16)
 
-| Công việc | Trạng thái | Bằng chứng / bước còn lại |
-| :--- | :--- | :--- |
-| **Sửa business rule Block User (Backend)** | TESTED | `FriendshipService.blockUser`: cho phép block cả khi chưa có quan hệ và khi đã là bạn, kiểm tra user tồn tại, cập nhật `actionUserId = currentUserId`. `UserRepository.searchByUsername`: loại trừ người đã block người tìm kiếm qua điều kiện `NOT EXISTS (BLOCKED and actionUserId = u.id)`. 16 tests trong `FriendshipServiceTest` PASS 100%, toàn bộ backend suite PASS (`BUILD SUCCESSFUL`). |
-| **Tính năng Block User (Frontend)** | TESTED (BUILD) | `client/src/api/friendApi.js`: thêm `blockUser`. `client/src/hooks/useFriends.js`: thêm hàm `blockUser`, `blockLoading`, tự động xóa bạn bè khi bị chặn. `client/src/pages/direct/FriendRequestPage.jsx`: nút Chặn tại `FriendCard` kèm Popconfirm. `client/src/pages/direct/SearchUserPanel.jsx`: nút Chặn ngay trong kết quả tìm kiếm kèm Popconfirm. `npm run build` PASS 100%. |
-| **Tính năng Gỡ Block & Danh sách chặn (Backend & Frontend)** | TESTED | Backend: `FriendshipService.removeBlock` (xóa bản ghi khi unblock, chặn người bị block tự gỡ), `getAllBlockedUsers` (cursor pagination). `FriendshipController`: `/api/friendships/block-user/remove` và `/blocked-users`. 23 tests `FriendshipServiceTest` PASS 100%, backend suite PASS. Frontend: `useBlockedUsers.js`, tab "Đã chặn" trên `FriendRequestPage.jsx`, nút Bỏ chặn kèm Popconfirm. `npm run build` PASS. |
-| **Tắt realtime popup notification khi đồng ý kết bạn (BE & FE)** | TESTED | Gỡ bỏ `notificationFriendshipRequest.requestAccepted` trong BE (`acceptFriendRequest` và `sendRequestAddFriend`) và gỡ bỏ popup toast `notification.success` trong `useGlobalFriendNotification.jsx` để tránh spam màn hình khi nhiều người đồng ý kết bạn cùng lúc. Cập nhật test `FriendshipServiceTest` PASS 23/23, toàn bộ backend test suite PASS. |
+| Công việc                                                        | Trạng thái     | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                                                                                                                |
+| :--------------------------------------------------------------- | :------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sửa business rule Block User (Backend)**                       | TESTED         | `FriendshipService.blockUser`: cho phép block cả khi chưa có quan hệ và khi đã là bạn, kiểm tra user tồn tại, cập nhật `actionUserId = currentUserId`. `UserRepository.searchByUsername`: loại trừ người đã block người tìm kiếm qua điều kiện `NOT EXISTS (BLOCKED and actionUserId = u.id)`. 16 tests trong `FriendshipServiceTest` PASS 100%, toàn bộ backend suite PASS (`BUILD SUCCESSFUL`).                        |
+| **Tính năng Block User (Frontend)**                              | TESTED (BUILD) | `client/src/api/friendApi.js`: thêm `blockUser`. `client/src/hooks/useFriends.js`: thêm hàm `blockUser`, `blockLoading`, tự động xóa bạn bè khi bị chặn. `client/src/pages/direct/FriendRequestPage.jsx`: nút Chặn tại `FriendCard` kèm Popconfirm. `client/src/pages/direct/SearchUserPanel.jsx`: nút Chặn ngay trong kết quả tìm kiếm kèm Popconfirm. `npm run build` PASS 100%.                                       |
+| **Tính năng Gỡ Block & Danh sách chặn (Backend & Frontend)**     | TESTED         | Backend: `FriendshipService.removeBlock` (xóa bản ghi khi unblock, chặn người bị block tự gỡ), `getAllBlockedUsers` (cursor pagination). `FriendshipController`: `/api/friendships/block-user/remove` và `/blocked-users`. 23 tests `FriendshipServiceTest` PASS 100%, backend suite PASS. Frontend: `useBlockedUsers.js`, tab "Đã chặn" trên `FriendRequestPage.jsx`, nút Bỏ chặn kèm Popconfirm. `npm run build` PASS. |
+| **Tắt realtime popup notification khi đồng ý kết bạn (BE & FE)** | TESTED         | Gỡ bỏ `notificationFriendshipRequest.requestAccepted` trong BE (`acceptFriendRequest` và `sendRequestAddFriend`) và gỡ bỏ popup toast `notification.success` trong `useGlobalFriendNotification.jsx` để tránh spam màn hình khi nhiều người đồng ý kết bạn cùng lúc. Cập nhật test `FriendshipServiceTest` PASS 23/23, toàn bộ backend test suite PASS.                                                                  |
 
 ### Tính năng Lấy bài viết bạn bè & Bảng tin Feed (2026-10-21)
 
-| Công việc | Trạng thái | Bằng chứng / bước còn lại |
-| :--- | :--- | :--- |
-| **Sửa business rules & logic lấy bài viết (Backend)** | TESTED | Sửa `PostRepository.java`: truy vấn feed theo `p.privacy IN ('PUBLIC', 'FRIENDS_ONLY')` và bài viết của chính user, lọc cursor date và id; sửa alias trong `FriendshipRepository.java`; sửa `PostService.java`: xử lý list an toàn khi không có bạn bè, fetch thông tin tác giả (name, username, avatar) gán vào `PostDTO`, tính toán và set `hasMore`. 5 unit tests mới trong `PostServiceTest` PASS 100%, toàn bộ backend suite PASS (`BUILD SUCCESSFUL in 50s`). |
-| **Giao diện Bảng tin bạn bè (Frontend)** | TESTED (BUILD) | `postApi.js`: API client `getAllPostsFromFriends`. `useFriendPosts.js`: hook quản lý bài viết, cursor pagination (`loadMore`), refresh, optimistic like toggle. `PostCard.jsx`: Cyber Glassmorphism post card hiển thị avatar, tên, username, tag quyền riêng tư, thời gian tương đối, nội dung, ảnh đính kèm, tương tác Thích/Bình luận. `FriendFeedSection.jsx`: component Bảng tin tích hợp trên `HomePage.jsx` với skeleton loading, empty state, load more. `npm run build` PASS 100%. |
-| **Sửa lỗi & chuẩn hóa nghiệp vụ Post Feed Realtime (Backend)** | TESTED | Sửa lỗi gán null author mapping và lỗi DI trong `NotificationAsyncFeedPostService.java`; chuẩn hóa `PostFeedService.java` (`@Transactional`, kiểm tra `principal`, `user.activated`, validate rỗng, độ dài `content <= 120`, `mediaUrl <= 1000`, filter `privacy != PRIVATE` khi broadcast); đồng bộ WebSocket payload với `DisplayPostDTO`; đổi `PostFeedController.java` sang `@Controller`. 12 unit tests mới trong `PostFeedServiceTest` và 3 tests trong `PostFeedControllerTest` PASS 100%, toàn bộ backend test suite PASS (`BUILD SUCCESSFUL in 1m 8s`), frontend build PASS. |
-| **Giao diện Đăng bài viết mới & Realtime Feed (Frontend)** | TESTED (BUILD) | `CreatePostCard.jsx`: Khung tạo status Cyber Glassmorphism với Textarea đếm 120 ký tự, Dropdown chọn quyền riêng tư (`PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`), nút tải ảnh qua `fileApi.upload` (`/v1/files/upload`) kèm preview và nút xóa, phím tắt `Ctrl+Enter` để đăng nhanh. `useFriendPosts.js`: Kết nối STOMP `@stomp/stompjs`, subscribe `/user/queue/new-post` để tự động nhận bài bạn bè thời gian thực, cung cấp `createPost` gửi tới `/app/post` kèm optimistic update. `FriendFeedSection.jsx`: Nhúng `CreatePostCard`, thêm Tag trạng thái kết nối trực tiếp. 5 unit tests mới trong `createPost.test.mjs` PASS 100%, `npm run build` PASS (3207 modules). |
-
+| Công việc                                                      | Trạng thái     | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| :------------------------------------------------------------- | :------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sửa business rules & logic lấy bài viết (Backend)**          | TESTED         | Sửa `PostRepository.java`: truy vấn feed theo `p.privacy IN ('PUBLIC', 'FRIENDS_ONLY')` và bài viết của chính user, lọc cursor date và id; sửa alias trong `FriendshipRepository.java`; sửa `PostService.java`: xử lý list an toàn khi không có bạn bè, fetch thông tin tác giả (name, username, avatar) gán vào `PostDTO`, tính toán và set `hasMore`. 5 unit tests mới trong `PostServiceTest` PASS 100%, toàn bộ backend suite PASS (`BUILD SUCCESSFUL in 50s`).                                                                                                                                                                                                  |
+| **Giao diện Bảng tin bạn bè (Frontend)**                       | TESTED (BUILD) | `postApi.js`: API client `getAllPostsFromFriends`. `useFriendPosts.js`: hook quản lý bài viết, cursor pagination (`loadMore`), refresh, optimistic like toggle. `PostCard.jsx`: Cyber Glassmorphism post card hiển thị avatar, tên, username, tag quyền riêng tư, thời gian tương đối, nội dung, ảnh đính kèm, tương tác Thích/Bình luận. `FriendFeedSection.jsx`: component Bảng tin tích hợp trên `HomePage.jsx` với skeleton loading, empty state, load more. `npm run build` PASS 100%.                                                                                                                                                                          |
+| **Sửa lỗi & chuẩn hóa nghiệp vụ Post Feed Realtime (Backend)** | TESTED         | Sửa lỗi gán null author mapping và lỗi DI trong `NotificationAsyncFeedPostService.java`; chuẩn hóa `PostFeedService.java` (`@Transactional`, kiểm tra `principal`, `user.activated`, validate rỗng, độ dài `content <= 120`, `mediaUrl <= 1000`, filter `privacy != PRIVATE` khi broadcast); đồng bộ WebSocket payload với `DisplayPostDTO`; đổi `PostFeedController.java` sang `@Controller`. 12 unit tests mới trong `PostFeedServiceTest` và 3 tests trong `PostFeedControllerTest` PASS 100%, toàn bộ backend test suite PASS (`BUILD SUCCESSFUL in 1m 8s`), frontend build PASS.                                                                                |
+| **Giao diện Đăng bài viết mới & Realtime Feed (Frontend)**     | TESTED (BUILD) | `CreatePostCard.jsx`: Khung tạo status Cyber Glassmorphism với Textarea đếm 120 ký tự, Dropdown chọn quyền riêng tư (`PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`), nút tải ảnh qua `fileApi.upload` (`/v1/files/upload`) kèm preview và nút xóa, phím tắt `Ctrl+Enter` để đăng nhanh. `useFriendPosts.js`: Kết nối STOMP `@stomp/stompjs`, subscribe `/user/queue/new-post` để tự động nhận bài bạn bè thời gian thực, cung cấp `createPost` gửi tới `/app/post` kèm optimistic update. `FriendFeedSection.jsx`: Nhúng `CreatePostCard`, thêm Tag trạng thái kết nối trực tiếp. 5 unit tests mới trong `createPost.test.mjs` PASS 100%, `npm run build` PASS (3207 modules). |
 
 ### Theo dõi riêng phạm vi Duy (cập nhật 2026-10-13)
 
-<<<<<<< HEAD
-| Công việc                                   | Trạng thái                                                 | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                      |
-| :------------------------------------------ | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Đọc chi tiết phần vỏ Server + FE            | DONE trong phạm vi code/H2/FE mock                         | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
-| Sửa 6 bug Server CRUD                       | Release 6/6; còn apply schema audit SQL Server             | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng, chặn tạo khi icon đang upload, bỏ upload cũ, Home loading/error/retry. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi.                                                   |
-| Đồng bộ docs theo prompt                    | DONE                                                       | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database.                                                                                                                                                                                                          |
-| Xác minh schema SQL Server                  | DONE                                                       | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database.                                                                                                                                |
-| Task 1.07 — API gửi tin nhắn + test         | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE.                                                                                                               |
-| Task 1.07 / lượt 1A                         | DONE                                                       | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B.                                                                                                                                                                                                    |
-| Task 1.07 / đồng bộ wrapper thành công      | DONE                                                       | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE.                                                                                                                                |
-| Task 1.12 — UI nhập và gửi tin nhắn         | DONE                                                       | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53. |
-| Task 1.12 / khung Group và ô nhập độc lập   | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
-| Task 1.08 — API lấy lịch sử tin nhắn + test | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
-| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
-=======
-| Công việc | Trạng thái | Bằng chứng / bước còn lại |
-| :--- | :--- | :--- |
-| Đọc chi tiết phần vỏ Server + FE | DONE trong phạm vi code/H2/FE mock | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
-| Sửa 6 bug Server CRUD | Release 6/6; còn apply schema audit SQL Server | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng, chặn tạo khi icon đang upload, bỏ upload cũ, Home loading/error/retry. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi. |
-| Đồng bộ docs theo prompt | DONE | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database. |
-| Xác minh schema SQL Server | DONE | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database. |
-| Task 1.07 — API gửi tin nhắn + test | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE. |
-| Task 1.07 / lượt 1A | DONE | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B. |
-| Task 1.07 / đồng bộ wrapper thành công | DONE | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE. |
-| Task 1.12 — UI nhập và gửi tin nhắn | DONE | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53. |
-| Task 1.12 / khung Group và ô nhập độc lập | DONE | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE. |
-| Task 1.08 — API lấy lịch sử tin nhắn + test | DONE | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%. |
-| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test | DONE | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%. |
-| FEAT-FRIEND-REQUEST-UI — UI danh sách lời mời kết bạn + Realtime | DONE | 5 file FE: `friendApi.js` bổ sung `getFriendRequests`; `useFriendRequests.js` STOMP + cursor pagination; `FriendRequestPage.jsx` UI đầy đủ; route `/friends`; menu Bạn Bè. `npm run build` PASS 3192 modules. Không thay backend. |
-| FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE) | DONE | `friendApi.js` (accept/remove endpoints); `useFriendRequests.js` (`acceptRequest`, `removeRequest`, `actionLoading`); `FriendRequestPage.jsx` (Nút Đồng ý Indigo Gradient, Từ chối Dark Glass, spin loading độc lập, toast thông báo). `npm run build` PASS 3192 modules. |
-| FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) + Sửa query Friendship (BE) | DONE | Sửa typo `:status <> 'PENDING'` trong `FriendshipRepository`; `friendApi.js` (`getAllFriends`); `useFriends.js` (cursor pagination, filter search); `FriendRequestPage.jsx` (Tabs Tất cả / Chờ xử lý, FriendCard, nút Nhắn tin Direct Message); `npm run build` PASS 3193 modules. |
-| FIX-CHAT-AUTO-SCROLL — Sửa lỗi không tự động cuộn xuống đáy khi mở đoạn chat (FE) | DONE | Điều khiển `scrollTop` trực tiếp trên container; double-RAF + fallback timeout; duy trì scroll position khi load previous messages; tối ưu `DirectMessagePage.jsx` và `ChatPage.jsx`. `npm run build` PASS 3193 modules. |
-| FEAT-REMOVE-FRIEND — Chức năng Hủy kết bạn (Unfriend) (FE) | DONE | `friendApi.js` (`removeFriend`); `useFriends.js` (`unfriend`, optimistic update, toast); `FriendRequestPage.jsx` (Nút Hủy kết bạn có Popconfirm); `npm run build` PASS 3193 modules. |
->>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
+| Công việc                                                                         | Trạng thái                                                 | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                      |
+| :-------------------------------------------------------------------------------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Đọc chi tiết phần vỏ Server + FE                                                  | DONE trong phạm vi code/H2/FE mock                         | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
+| Sửa 6 bug Server CRUD                                                             | Release 6/6; còn apply schema audit SQL Server             | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng, chặn tạo khi icon đang upload, bỏ upload cũ, Home loading/error/retry. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi.                                                   |
+| Đồng bộ docs theo prompt                                                          | DONE                                                       | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database.                                                                                                                                                                                                          |
+| Xác minh schema SQL Server                                                        | DONE                                                       | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database.                                                                                                                                |
+| Task 1.07 — API gửi tin nhắn + test                                               | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE.                                                                                                               |
+| Task 1.07 / lượt 1A                                                               | DONE                                                       | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B.                                                                                                                                                                                                    |
+| Task 1.07 / đồng bộ wrapper thành công                                            | DONE                                                       | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE.                                                                                                                                |
+| Task 1.12 — UI nhập và gửi tin nhắn                                               | DONE                                                       | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53.                                                    |
+| Task 1.12 / khung Group và ô nhập độc lập                                         | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
+| Task 1.08 — API lấy lịch sử tin nhắn + test                                       | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
+| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test                                 | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
+| Công việc                                                                         | Trạng thái                                                 | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                      |
+| :---                                                                              | :---                                                       | :---                                                                                                                                                                                                                                                                                                                           |
+| Đọc chi tiết phần vỏ Server + FE                                                  | DONE trong phạm vi code/H2/FE mock                         | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
+| Sửa 6 bug Server CRUD                                                             | Release 6/6; còn apply schema audit SQL Server             | Đã đưa vào commit: audit email dài, create/list từ chối tài khoản inactive, nickname Owner dài/rỗng, chặn tạo khi icon đang upload, bỏ upload cũ, Home loading/error/retry. Kiểm tra bản staged trước commit; SQL script preview chưa chạy. Join/Channel/UUID ngoài phạm vi.                                                   |
+| Đồng bộ docs theo prompt                                                          | DONE                                                       | Đã cập nhật 4 tài liệu; kiểm tra Markdown/JSON/link, contract và diff đạt. Không thay application code hoặc database.                                                                                                                                                                                                          |
+| Xác minh schema SQL Server                                                        | DONE                                                       | `messages.content` là `NVARCHAR(MAX)`, nullable; không có CHECK/trigger giới hạn 4000. Sau xác minh, Duy giao agent lựa chọn; đã chọn giới hạn request 4000 đơn vị UTF-16, giữ nguyên database.                                                                                                                                |
+| Task 1.07 — API gửi tin nhắn + test                                               | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE.                                                                                                               |
+| Task 1.07 / lượt 1A                                                               | DONE                                                       | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B.                                                                                                                                                                                                    |
+| Task 1.07 / đồng bộ wrapper thành công                                            | DONE                                                       | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE.                                                                                                                                |
+| Task 1.12 — UI nhập và gửi tin nhắn                                               | DONE                                                       | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53.                                                    |
+| Task 1.12 / khung Group và ô nhập độc lập                                         | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
+| Task 1.08 — API lấy lịch sử tin nhắn + test                                       | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
+| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test                                 | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
+| FEAT-FRIEND-REQUEST-UI — UI danh sách lời mời kết bạn + Realtime                  | DONE                                                       | 5 file FE: `friendApi.js` bổ sung `getFriendRequests`; `useFriendRequests.js` STOMP + cursor pagination; `FriendRequestPage.jsx` UI đầy đủ; route `/friends`; menu Bạn Bè. `npm run build` PASS 3192 modules. Không thay backend.                                                                                              |
+| FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE)        | DONE                                                       | `friendApi.js` (accept/remove endpoints); `useFriendRequests.js` (`acceptRequest`, `removeRequest`, `actionLoading`); `FriendRequestPage.jsx` (Nút Đồng ý Indigo Gradient, Từ chối Dark Glass, spin loading độc lập, toast thông báo). `npm run build` PASS 3192 modules.                                                      |
+| FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) + Sửa query Friendship (BE)    | DONE                                                       | Sửa typo `:status <> 'PENDING'` trong `FriendshipRepository`; `friendApi.js` (`getAllFriends`); `useFriends.js` (cursor pagination, filter search); `FriendRequestPage.jsx` (Tabs Tất cả / Chờ xử lý, FriendCard, nút Nhắn tin Direct Message); `npm run build` PASS 3193 modules.                                             |
+| FIX-CHAT-AUTO-SCROLL — Sửa lỗi không tự động cuộn xuống đáy khi mở đoạn chat (FE) | DONE                                                       | Điều khiển `scrollTop` trực tiếp trên container; double-RAF + fallback timeout; duy trì scroll position khi load previous messages; tối ưu `DirectMessagePage.jsx` và `ChatPage.jsx`. `npm run build` PASS 3193 modules.                                                                                                       |
+| FEAT-REMOVE-FRIEND — Chức năng Hủy kết bạn (Unfriend) (FE)                        | DONE                                                       | `friendApi.js` (`removeFriend`); `useFriends.js` (`unfriend`, optimistic update, toast); `FriendRequestPage.jsx` (Nút Hủy kết bạn có Popconfirm); `npm run build` PASS 3193 modules.                                                                                                                                           |
 
 Chỉ đánh dấu `TESTED` khi đã thực sự chạy và vượt qua các kiểm thử phù hợp. Kiểm tra docs không thay thế test code hoặc integration test SQL Server.
 
@@ -419,6 +412,82 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-25] FEAT-USER-PROFILE-API — Làm API Xem Hồ Sơ Cá Nhân & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `GET /api/v1/users/profile` (kèm alias `GET /api/v1/users/me`) cho phép người dùng đang đăng nhập xem đầy đủ thông tin hồ sơ cá nhân của chính mình.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/UserProfileResponseDTO.java`:
+    - Tạo DTO chứa thông tin hồ sơ người dùng cá nhân gồm: `id`, `email`, `name` (tên hiển thị), `username`, `avatar`, `activated`, `createdDate`, `authorities`.
+    - Loại bỏ tuyệt đối các trường nhạy cảm (`password_hash`, `activation_key`, `reset_key`, `refresh_token`, `session_id`).
+    - Bổ sung helper `fromUser(User user)` ánh xạ từ thực thể `User`.
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional(readOnly = true) public UserProfileResponseDTO getUserProfile()`:
+      - Xác thực người dùng hiện tại từ Spring Security Context qua `SecurityUtils.getCurrentUserLogin()`, ném `BadRequestAlertException` (`notloggedin`) nếu chưa đăng nhập.
+      - Truy vấn người dùng từ database qua `userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)`, ném `BadRequestAlertException` (`usernotfound`) nếu không tồn tại.
+      - Trả về DTO hồ sơ người dùng tương ứng.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Tạo Controller mới với route `@RequestMapping("/api/v1/users")`, tag `"User Profile"`, yêu cầu `@SecurityRequirement(name = "bearerAuth")`.
+    - Cung cấp 2 endpoints:
+      - `GET /api/v1/users/profile`: Endpoint chính thức lấy thông tin hồ sơ cá nhân.
+      - `GET /api/v1/users/me`: Endpoint alias tương thích theo chuẩn RESTful.
+    - Được bọc tự động qua `ResFormatResponse` theo đúng cấu trúc wrapper `{ statusCode: 200, message: "...", data: {...} }`.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `getUserProfile_Success`: Kiểm tra trả về đúng thông tin hồ sơ khi đăng nhập thành công.
+    - `getUserProfile_Fail_WhenNotLoggedIn`: Kiểm tra ném lỗi `notloggedin` khi chưa đăng nhập.
+    - `getUserProfile_Fail_WhenUserNotFound`: Kiểm tra ném lỗi `usernotfound` khi người dùng không tồn tại.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `getUserProfile_Success`: MockMvc GET `/api/v1/users/profile` trả về HTTP 200 và json data hợp lệ.
+    - `getUserProfile_AliasMe_Success`: MockMvc GET `/api/v1/users/me` trả về HTTP 200.
+    - `getUserProfile_Fail_WhenNotLoggedIn`: MockMvc trả về HTTP 400 Problem Details khi chưa đăng nhập.
+    - `getUserProfile_Fail_WhenUserNotFound`: MockMvc trả về HTTP 400 Problem Details khi không tìm thấy user.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 7/7 tests (0 failures, 0 errors).
+  - `.\gradlew.bat compileJava`: BUILD SUCCESSFUL.
+- **Docs Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `GET /api/v1/users/profile` vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
+### [2026-10-25] FEAT-USER-PROFILE-UI — Làm UI Xem Hồ Sơ Cá Nhân & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng giao diện xem hồ sơ cá nhân chuẩn phong cách Cyber Dark, kết nối API backend `GET /api/v1/users/profile` và alias `/api/v1/users/me`, hiển thị đầy đủ thông tin người dùng và xử lý trọn vẹn các trạng thái loading, error, refresh.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js`:
+    - Tạo mới API client với các method `getProfile()` và `getMe()` gọi tới endpoint `/v1/users/profile` và `/v1/users/me`.
+  - `client/src/api/authApi.js`:
+    - Bổ sung `getProfile()` và `getMe()` nhằm đảm bảo tính tương thích ngược cho các component cũ.
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng tiện ích `formatJoinDate(dateInput, verbose)` định dạng ngày tham gia (hỗ trợ cả compact `DD/MM/YYYY` và verbose `DD tháng MM, YYYY`, kiểm soát tốt null/undefined/invalid date).
+    - Xây dựng `extractProfileData(response)` bóc tách dữ liệu từ cấu trúc bọc `RestResponse` (`res.data.data` hoặc `res.data`), ánh xạ đầy đủ `id`, `email`, `name`, `username`, `avatar`, `activated`, `createdDate`, `authorities`.
+    - Xây dựng `getProfileErrorMessage(error)` ánh xạ mã lỗi HTTP (401, 403, 404, 500, lỗi mạng) sang thông điệp tiếng Việt thân thiện.
+    - Xây dựng `getRoleDisplays(authorities)` ánh xạ quyền hạn sang nhãn hiển thị và màu sắc tag chuẩn Cyber Dark.
+  - `client/src/contexts/AuthContext.jsx`:
+    - Bổ sung `updateCurrentUser(userData)` giúp ProfilePage và các component khác có thể đồng bộ thông tin hồ sơ mới nhất từ API vào state và `localStorage` toàn cục.
+  - `client/src/pages/profile/profile.css`:
+    - Thiết kế hệ thống giao diện Cyber Dark: Glassmorphism card, Hero cover banner với tech grid pattern, Avatar glowing neon viền gradient, trạng thái hoạt động online dạng chấm xanh neon, grid thông tin chi tiết, và responsive tương thích mobile.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Nâng cấp toàn diện: tích hợp `userApi.getProfile()`, quản lý trạng thái `loading`, `error`, `refreshing`.
+    - Hiển thị Skeleton Cyber Dark mượt mà trong khi tải.
+    - Hiển thị card lỗi chuyên nghiệp kèm nút "Thử lại ngay".
+    - Hiển thị đầy đủ: Avatar lớn, Tên hiển thị, Username `@username`, Badge vai trò, Tag trạng thái kích hoạt, Thẻ Email, Thẻ ID tài khoản `#000x`, Thẻ Ngày gia nhập, Thẻ Quyền hạn hệ thống.
+    - Bổ sung thanh thao tác: Nút làm mới dữ liệu, Nút dẫn đường chỉnh sửa hồ sơ và đổi mật khẩu.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - Kiểm thử `formatJoinDate` với ISO date, simple date, timestamp và edge cases (null, undefined, invalid string).
+    - Kiểm thử `extractProfileData` bóc tách từ `ResFormatResponse` lồng nhau, payload trực tiếp, fallback username từ email.
+    - Kiểm thử `getProfileErrorMessage` với mã lỗi HTTP 401, 403, 404, 500, ERR_NETWORK và fallback generic.
+    - Kiểm thử `getRoleDisplays` với các quyền hạn quản trị viên, thành viên và fallback.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 7/7 tests (100%).
+  - `node --test tests/*.test.mjs`: PASS 80/80 tests (100%).
+  - `npm run build`: Vite v8.3.3 build production hoàn tất thành công 100%.
+- **Docs & Roadmaps Updated:**
+  - Cập nhật tiến độ hoàn thành UI xem hồ sơ cá nhân và kết nối API.
+
+---
 
 ### [2026-10-25] FEAT-SERVER-LEAVE-FE — Xây dựng UI Rời Server và Kết Nối API
 
@@ -604,6 +673,7 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 ### [2026-10-25] FEAT-CHANNEL-MESSAGES-UI — Làm UI hiển thị lịch sử tin nhắn kênh & Mở khóa ô chat (FE)
 
 Implemented:
+
 - Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
   - Khắc phục lỗi ô chat bị khóa (disabled): truyền prop `onSend={handleSendMessage}` và `onSent={handleSentMessage}` vào `<MessageInput />`.
   - Kết nối gửi tin nhắn REST API `messageApi.sendMessage(channelId, { content })`, cập nhật tức thời vào danh sách tin nhắn và cuộn mượt xuống đáy.
@@ -631,6 +701,7 @@ Implemented:
 ### [2026-10-24] FEAT-CHANNEL-DELETE-UI — Làm UI Xóa Channel, Kết Nối API (Kỳ Anh)
 
 Implemented:
+
 - Cập nhật `client/src/api/channelApi.js`:
   - Thêm phương thức `delete: (channelId) => axiosClient.delete('/v1/channels/' + channelId)`.
 - Cập nhật `client/src/utils/channelUtils.js`:
@@ -670,6 +741,7 @@ Implemented:
 ### [2026-10-22] FEAT-CHANNEL-DELETE — Làm API Xóa Channel & Tests (Kỳ Anh)
 
 Implemented:
+
 - Cập nhật `MessageRepository.java`:
   - Thêm phương thức `hasConversationReferencesInChannel(Long channelId)` kiểm tra tin nhắn trong kênh có đang liên kết hội thoại riêng hay không (bảo toàn tính toàn vẹn dữ liệu).
   - Thêm phương thức `deleteByChannelId(Long channelId)` xóa dọn dẹp toàn bộ tin nhắn thuộc kênh bị xóa (chỉ khi `conversationId IS NULL`).
@@ -714,6 +786,7 @@ Implemented:
 ### [2026-10-18] FEAT-CHANNEL-UPDATE — Làm API Cập nhật Channel & Tests
 
 Implemented:
+
 - Tạo mới `UpdateChannelDTO.java`:
   - `name`: `@NotBlank`, `@Pattern(regexp = "(?sU).*\\S.*")`, `@Size(min = 2, max = 20)`.
   - `position`: `@Min(value = 0)`, tùy chọn (nếu null giữ nguyên position hiện tại).
@@ -754,6 +827,7 @@ Implemented:
 ### [2026-10-18] FEAT-CHANNEL-UI-EDIT — Làm UI sửa Channel, kết nối API (Kỳ Anh)
 
 Implemented:
+
 - Tạo mới `client/src/utils/channelUtils.js`:
   - `formatChannelName(raw)`: Tự động chuẩn hóa tên kênh sang chữ thường, thay khoảng trắng bằng dấu gạch ngang, lọc bỏ ký tự đặc biệt.
   - `validateChannelName(name)`: Kiểm tra độ dài (2–20 ký tự), bắt buộc ký tự `a-z0-9-_`, không để trống.
@@ -845,10 +919,11 @@ Implemented:
 - Git: FileResource đã nằm trong commit `c63b22f`, được tạo ngoài phiên xử lý của agent và trùng nội dung vừa kiểm thử. Sau triển khai, người dùng yêu cầu commit backend trên nhánh hiện tại; phạm vi commit tiếp theo là ChannelResource, hai regression test files và docs/00, docs/02. Launch chỉ local và bị ignore. Not pushed — AI agents are not allowed to push DenHub.
 
 <<<<<<< HEAD
+
 ### [2026-10-14] FEAT-SERVER-INVITE-CREATE-FE — UI Tạo & Sao Chép Mã Mời Server
 
-Implemented:
-=======
+# Implemented:
+
 ### [2026-10-18] FEAT-DISCORD-AUTH-UI-REGISTER-GOOGLE-LOGIN — Triển khai Giao diện Discord, API Đăng ký và Đăng nhập Google
 
 - Triển khai toàn diện theo yêu cầu người dùng: "lamf ui , api dang ky , login with gg luon , ui phai y chang discord".
@@ -985,12 +1060,17 @@ Implemented:
 
 =======
 <<<<<<< HEAD
->>>>>>> 8867d204a17499abfe4d1436c51b19a04d511e0f
+
+> > > > > > > 8867d204a17499abfe4d1436c51b19a04d511e0f
+
 ### [2026-10-13] FEAT-SERVER-MEMBER-LIST — API Lấy Danh Sách Thành Viên Server & Tests
 
 =======
+
 ### [2026-10-14] FEAT-REMOVE-FRIEND — Hủy kết bạn (Unfriend) (FE)
+
 Implemented:
+
 - Frontend:
   - Bổ sung `removeFriend(friendId)` vào `client/src/api/friendApi.js`: gọi `POST /api/friendships/remove-friend`.
   - Cập nhật `client/src/hooks/useFriends.js`: Bổ sung hàm `unfriend(friendId)`, quản lý `unfriendLoading` map theo từng `friendId`, loại bỏ bạn bè khỏi state ngay khi thành công, thông báo toast `message.success('Đã hủy kết bạn thành công.')`.
@@ -1004,7 +1084,9 @@ Implemented:
   - Uncommitted changes (chờ người dùng ủy quyền commit).
 
 ### [2026-10-14] FIX-CHAT-AUTO-SCROLL — Khắc phục lỗi Auto-scroll xuống đáy khi mở đoạn chat (FE)
+
 Implemented:
+
 - Frontend:
   - Khắc phục `DirectMessagePage.jsx`:
     - Thay thế `scrollIntoView({ behavior: 'smooth' })` vốn bị kẹt do layout reflow và xung đột container cha `Content` có `overflowY: auto`.
@@ -1020,7 +1102,9 @@ Implemented:
   - Uncommitted changes (chờ người dùng ủy quyền commit).
 
 ### [2026-10-14] FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) & Sửa Query Friendship (BE)
+
 Implemented:
+
 - Backend:
   - Khắc phục typo trong query `FriendshipRepository.java`: đổi `status <> 'PEDING'` thành `:status <> 'PENDING'`. Đảm bảo quan hệ bạn bè 2 chiều với `ACCEPT` hiển thị đúng cho cả hai phía, không bị ẩn bởi `actionUserId`.
   - Compile Java: `.\gradlew.bat compileJava` BUILD SUCCESSFUL.
@@ -1041,7 +1125,9 @@ Implemented:
   - Uncommitted changes (chờ người dùng ủy quyền commit).
 
 ### [2026-10-14] FIX-FRIEND-REQUEST-WEBSOCKET-REALTIME — Sửa lỗi WebSocket kết bạn realtime và thông báo toàn cục (FE + BE)
+
 Implemented:
+
 - Backend:
   - Cập nhật `WebSocketConfig.java`: Trích xuất User ID từ JWT claim `user.id` (với fallback `jwt.getSubject()` email) để gán cho `Principal.getName()` trong phiên STOMP. Khắc phục triệt để lỗi Spring UserDestinationResolver không khớp session khiến gói tin private queue bị drop.
   - Cập nhật `NotificationFriendshipRequest.java`: Thêm cơ chế gửi kép (dual-delivery) gửi tới cả `targetId.toString()` và email fallback thông qua `UserRepository.findById(targetId)`.
@@ -1062,7 +1148,9 @@ Implemented:
   - Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-14] FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE)
+
 Implemented:
+
 - Frontend:
   - Bổ sung `acceptFriendRequest(friendId)` và `removeFriendRequest(friendId)` vào `client/src/api/friendApi.js`: gọi `POST /api/friendships/accept-friend-request` và `POST /api/friendships/remove-friend-request`.
   - Cập nhật `client/src/hooks/useFriendRequests.js`: Bổ sung state `actionLoadingMap` theo từng `senderId`; hiện thực `acceptRequest(senderId)` và `removeRequest(senderId)` cập nhật optimistic danh sách, hiển thị toast `message.success` / `message.info` / `message.error`.
@@ -1079,7 +1167,9 @@ Implemented:
   - Uncommitted changes (chờ người dùng ủy quyền commit).
 
 ### [2026-10-14] FEAT-FRIEND-REQUEST-UI — Giao diện danh sách lời mời kết bạn + Realtime (FE)
+
 Implemented:
+
 - Frontend:
   - Bổ sung `getFriendRequests(size, cursor)` vào `client/src/api/friendApi.js`: gọi `POST /api/friendships/friend-requests` theo contract `FriendshipController` hiện có.
   - Tạo mới `client/src/hooks/useFriendRequests.js`: Hook quản lý kết nối STOMP WebSocket độc lập, subscribe `/user/queue/friend-requests/received`, nhận `FriendshipAction` realtime và inject vào đầu danh sách; load lần đầu qua API, cursor pagination bằng `cursorRef`.
@@ -1099,8 +1189,9 @@ Implemented:
 ---
 
 ### [2026-10-14] FEAT-MESSAGE-HISTORY-API — Làm API lấy lịch sử tin nhắn Channel (Cursor Pagination) + Test
->>>>>>> 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
-Implemented:
+
+> > > > > > > 0d9c42f (feat: implement friendship system with UI pages, backend services, and WebSocket notifications)
+> > > > > > > Implemented:
 
 - Backend:
   - Tạo mới `ServerMemberResponseDTO`: trả về thông tin thành viên an toàn (`id`, `serverId`, `userId`, `username`, `name`, `nickname`, `avatar`, `role`), không để lộ thông tin nhạy cảm (`email`, `password_hash`).
@@ -2384,17 +2475,69 @@ Implemented:
   - Frontend Logic: `node --test` PASS 45/45 tests.
 
 Docs Updated:
+
 - `docs/02-SYSTEM-ARCHITECTURE.md` (REST table + Section 13).
 - `docs/00-DEVELOPMENT-PROCESS.md` (Completed Work Log & Handoff).
 
 Commit:
+
+- PENDING (Chờ ủy quyền commit).
+
+---
+
+### [2026-10-25] BE-FE-POST-EDIT-DELETE — Triển khai tính năng Chỉnh sửa và Xóa bài viết (Edit & Delete Post)
+
+Implemented:
+
+- Backend:
+  - Tạo mới `UpdatePostDTO.java` (`content` tối đa 120 ký tự, `privacy`: `PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`, `mediaUrl` tối đa 1000 ký tự).
+  - Cập nhật `PostService.java`:
+    - `updatePost(postId, dto)`: Xác thực tác giả (`post.userId == currentUserId`), kiểm tra bài tồn tại, validate không rỗng cả text và media, cập nhật nội dung, privacy, mediaUrl và trả về `DisplayPostDTO`.
+    - `deletePost(postId)`: Xác thực tác giả, xóa bài viết khỏi cơ sở dữ liệu (`postRepository.delete(post)`) và dọn dẹp key Redis Set lưu likes của bài viết (`stringRedisTemplate.delete("post:{postId}:likes")`).
+    - Chặn và ném `AccessDeniedException("postNotOwner")` (403 Forbidden) nếu user không phải tác giả bài viết.
+  - Cập nhật `PostController.java`:
+    - `PUT /api/posts/{postId}`: Nhận `UpdatePostDTO`, trả về HTTP 200 kèm `DisplayPostDTO`.
+    - `DELETE /api/posts/{postId}`: Trả về HTTP 204 No Content.
+  - Viết 10 unit tests mới trong `PostServiceTest.java` và 3 tests trong `PostControllerTest.java` (bao phủ thành công, bài không tồn tại, người khác cố tình sửa/xóa, bài rỗng, text quá dài, dọn dẹp Redis).
+- Frontend:
+  - Cập nhật `postApi.js`: Thêm `updatePost(postId, data)` và `deletePost(postId)`.
+  - Nâng cấp hook `useFriendPosts.js`: Bổ sung `editPost` và `deletePost` với Optimistic update, rollback khi lỗi và toast thông báo `message.success` / `message.error`.
+  - Tạo mới `EditPostModal.jsx`: Modal phong cách Cyber Glassmorphism cho phép chỉnh sửa nội dung bài viết, đếm 120 ký tự, đổi quyền riêng tư, thay đổi hoặc gỡ bỏ ảnh đính kèm.
+  - Cập nhật `PostCard.jsx`: Thêm menu ba chấm (`...`) cho tác giả bài viết gồm 2 tùy chọn "Chỉnh sửa bài viết" và "Xóa bài viết", tích hợp hộp thoại xác nhận an toàn `Modal.confirm` trước khi xóa.
+  - Cập nhật `FriendFeedSection.jsx`: Truyền `editPost` và `deletePost` xuống các thẻ `PostCard`.
+  - Tạo mới `client/tests/postEditDelete.test.mjs`: 7 unit tests kiểm thử logic validate payload chỉnh sửa, optimistic edit/delete và rollback.
+- Tests & Verification:
+  - Backend: `.\gradlew.bat test` PASS 100% (toàn bộ test suite).
+  - Frontend: `npm run build` PASS 100% (0 errors).
+  - Frontend Unit Tests: `node --test` PASS 52/52 tests.
+
+Docs Updated:
+
+- `docs/02-SYSTEM-ARCHITECTURE.md` (REST table + Section 14).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Completed Work Log & Handoff).
+
+Commit:
+
 - PENDING (Chờ ủy quyền commit).
 
 ---
 
 ## 12. CURRENT WORK / HANDOFF
 
-### Handoff hiện tại — Post Like & Feed UI (2026-10-24)
+### Handoff hiện tại — Post Edit & Delete (2026-10-25)
+
+- Tính năng Chỉnh sửa và Xóa bài viết đã hoàn thiện toàn diện từ Backend tới Frontend:
+  - API `PUT /api/posts/{postId}`: Cho phép tác giả cập nhật content, privacy, mediaUrl; kiểm tra chặt chẽ quyền sở hữu (403), tồn tại (400) và độ dài ký tự.
+  - API `DELETE /api/posts/{postId}`: Cho phép tác giả xóa bài viết, xóa sạch bản ghi trong DB và dọn dẹp Redis Set likes; trả về 204 No Content.
+  - Giao diện: Menu thao tác chỉ hiển thị với tác giả bài viết, xác nhận xóa qua `Modal.confirm`, modal chỉnh sửa `EditPostModal` chuẩn Cyber Glassmorphism.
+  - Frontend `useFriendPosts` hỗ trợ cập nhật danh sách tức thì và rollback an toàn nếu gặp lỗi mạng.
+- Verification:
+  - Toàn bộ backend test `gradlew.bat test` PASS 100%.
+  - Frontend build `npm run build` PASS 100%.
+  - Frontend logic `node --test` PASS 52/52 tests.
+- Chưa commit; AI Agent tuân thủ nghiêm ngặt quy tắc không push và không tự ý commit khi chưa có ủy quyền rõ ràng từ người dùng.
+
+### Handoff trước — Post Like & Feed UI (2026-10-24)
 
 - Tính năng Like bài viết đã hoàn thiện toàn diện từ Backend tới Frontend:
   - API `POST /api/posts/{postId}/like` kiểm tra quyền theo privacy (`PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`), trạng thái active của user, lưu trữ Redis Set và đồng bộ trường `post.like_counts` trong SQL Server.
@@ -2407,7 +2550,6 @@ Commit:
 - Chưa commit; AI Agent tuân thủ nghiêm ngặt quy tắc không push và không tự ý commit khi chưa có ủy quyền rõ ràng từ người dùng.
 
 ### Handoff trước — Delete Server (2026-10-21)
-
 
 - Owner vào Server → Cài đặt Server → Xóa Server. Đọc cảnh báo, chờ đủ 3 giây rồi bấm Xác nhận xóa; hủy trước khi gửi không phát sinh DELETE. Trong lúc chờ không thể gửi trùng/đóng bằng UI. API vẫn kiểm lại quyền và điều kiện dữ liệu trên mỗi request.
 - Contract chính thức ở docs/02 mục 12; dữ liệu/metadata ở docs/03 mục 4.6. Chỉ Owner active được xóa, không cần Server rỗng hoặc membership Owner; general được dọn khi xóa cả Server. Chat riêng, User, Server khác và file vật lý được bảo toàn.
@@ -2470,7 +2612,7 @@ Chỉ tiếp tục sau khi hoàn tất lượt gửi Message và Duy yêu cầu 
 
 ### Handoff UI trước khi đổi ưu tiên (lịch sử)
 
-```yaml
+````yaml
 Current Task: UI Group chat trước tích hợp API (2026-10-11)
 Status: Hoàn tất phạm vi UI đã duyệt; Task 1.07 và 1.12 vẫn IN_PROGRESS, chưa nối gửi thật
 Completed:
@@ -2563,7 +2705,7 @@ Verification Scope:
 Git Status:
   - Sẵn sàng review git diff; chờ lệnh cho phép commit nếu người dùng yêu cầu.
   - Tuân thủ quy định: AI Agent tuyệt đối KHÔNG PUSH.
-```
+````
 
 ---
 
