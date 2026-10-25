@@ -3,6 +3,31 @@
  */
 
 /**
+ * Extracts and validates invite data from the Axios response wrapper (RestResponse).
+ * @param {any} response - Axios response or response data object.
+ * @returns {{ id?: number, serverId?: number, code: string, createdBy?: number, expiresAt?: string | null, status?: string, createdAt?: string }}
+ */
+export function extractInviteResponse(response) {
+  if (!response) {
+    throw new Error('Không nhận được phản hồi từ máy chủ.');
+  }
+
+  const payload = response.data !== undefined ? response.data : response;
+  const inviteData = payload && typeof payload === 'object' && payload.data !== undefined ? payload.data : payload;
+
+  if (!inviteData || typeof inviteData !== 'object') {
+    throw new Error('Dữ liệu mã mời trả về không hợp lệ.');
+  }
+
+  const code = inviteData.code;
+  if (!code || typeof code !== 'string' || !code.trim()) {
+    throw new Error('Dữ liệu mã mời trả về không hợp lệ (thiếu mã code).');
+  }
+
+  return inviteData;
+}
+
+/**
  * Copies text to the clipboard with fallback for non-secure / unsupported environments.
  * @param {string} text - The text string to copy.
  * @returns {Promise<{ success: boolean, error?: string }>}

@@ -420,6 +420,44 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-25] FEAT-SERVER-INVITE-API-INTEGRATION — Kết Nối UI Mã Mời Server Với API
+
+- **Mục tiêu:** Hoàn thiện tích hợp frontend UI tạo và sao chép mã mời Server (`ServerInviteModal.jsx`) với API backend `POST /api/v1/servers/{serverId}/invites`.
+- **Backend & Contract Verification:**
+  - Xác minh endpoint `POST /api/v1/servers/{serverId}/invites` (chỉ duy nhất Owner Server được phép tạo mã mời).
+  - Response wrapper chuẩn `RestResponse<ServerInviteResponseDTO>` gồm các trường: `id`, `serverId`, `code` (8 ký tự Base62 ngẫu nhiên an toàn), `createdBy`, `expiresAt`, `status` ("ACTIVE"), `createdAt`.
+  - Xác nhận Backend không trả URL mời và Frontend không có route URL mời (người dùng tham gia bằng mã mời qua `JoinServerModal` gọi `POST /api/v1/servers/join-invite/{code}`). Đúng theo quy tắc bài toán, hệ thống chỉ tạo và sao chép mã mời 8 ký tự, không tự dựng link URL giả định.
+- **Frontend Changes:**
+  - `client/src/utils/serverInvite.js`: Bổ sung hàm `extractInviteResponse(response)` chuẩn hóa trích xuất `RestResponse<ServerInviteResponseDTO>` và validate mã code không rỗng. Giữ vững `copyToClipboard`, `getInviteErrorMessage`, `formatExpiresAt`.
+  - `client/src/components/common/ServerInviteModal.jsx`:
+    - Sử dụng `extractInviteResponse(res)` để chuẩn hóa bóc tách response backend.
+    - Thêm `isMountedRef` chống rò rỉ bộ nhớ và chặn cập nhật state sau khi unmount.
+    - Thêm `copyTimerRef` quản lý và tự động dọn dẹp timer nút copy khi component unmount hoặc khi người dùng sao chép liên tiếp.
+    - Bổ sung cơ chế phát hiện stale request (`activeServerIdRef.current !== currentServerId`): khi người dùng chuyển đổi sang Server khác trong lúc API đang chạy, kết quả của Server cũ sẽ tự động bị bỏ qua, không ghi đè vào state của Server mới.
+    - Bảo vệ chống spam nút bấm kép qua `submittingRef` và `loading` state.
+    - Cải thiện trạng thái lỗi: hiển thị alert thân thiện kèm nút "Thử lại" (Retry).
+  - `client/package.json`: Bổ sung script `"test"` chạy toàn bộ unit/integration test suites trong `client/tests/`.
+- **Tests Added / Updated:**
+  - `client/tests/serverInvite.test.mjs`: Mở rộng từ 7 lên 15 tests:
+    - Bóc tách dữ liệu từ `RestResponse` chuẩn backend (`extractInviteResponse`).
+    - Bóc tách payload unwrapped.
+    - Bắt lỗi khi payload null, undefined hoặc không phải object.
+    - Bắt lỗi khi mã code bị thiếu, rỗng hoặc toàn khoảng trắng.
+    - Xác minh contract API `serverApi.createInvite` gửi đúng `POST /v1/servers/{serverId}/invites`.
+    - Kiểm thử stale response guard khi chuyển đổi Server.
+    - Kiểm thử unmounted component guard.
+    - Kiểm thử chống double-click / rapid-click (`submittingRef`).
+    - Bao phủ các mã lỗi HTTP (400, 401, 403, 404, 500, Network error).
+    - Sao chép clipboard và xử lý fallback thủ công.
+- **Verification:**
+  - Frontend test suite: `npm test` PASS **66/66** tests (247ms).
+  - Frontend build: `npm run build` PASS **100%** (3209 modules, 0 errors, 933ms).
+  - Backend test suite: `.\gradlew.bat test --rerun-tasks` PASS **100%** (322+ tests, 57s, 0 failures/errors).
+- **Git Status:**
+  - Uncommitted changes (Chờ người dùng ủy quyền commit).
+- **Push:**
+  - Not pushed — AI agents are not allowed to push DenHub.
+
 ### [2026-10-21] RELEASE-SERVER-DELETE — Chia commit theo cụm Backend, Frontend và tài liệu
 
 - Người dùng trực tiếp yêu cầu chia thành nhiều commit theo từng cụm và push. Đã thực hiện phần commit local; không thực hiện push theo AGENTS.md mục 21 và quy định Push Rule của dự án.
