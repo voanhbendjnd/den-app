@@ -14,8 +14,11 @@ import com.denhub.domain.User;
 import com.denhub.repository.AuthorityRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.AuthoritiesConstants;
+import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.RegisterReqDTO;
 import com.denhub.service.dto.UserDTO;
+import com.denhub.service.dto.UserProfileResponseDTO;
+import com.denhub.web.rest.errors.BadRequestAlertException;
 import com.denhub.web.rest.errors.LoginAlreadyUsedException;
 import tech.jhipster.security.RandomUtil;
 
@@ -39,6 +42,23 @@ public class UserService {
     public Optional<User> getUserWithAuthorities() {
         return com.denhub.security.SecurityUtils.getCurrentUserLogin()
                 .flatMap(userRepository::findOneWithAuthoritiesByEmail);
+    }
+
+    /**
+     * Lấy thông tin hồ sơ của người dùng hiện tại đang đăng nhập.
+     *
+     * @return UserProfileResponseDTO thông tin hồ sơ người dùng
+     * @throws BadRequestAlertException nếu chưa đăng nhập hoặc không tìm thấy người dùng
+     */
+    @Transactional(readOnly = true)
+    public UserProfileResponseDTO getUserProfile() {
+        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+
+        User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+
+        return UserProfileResponseDTO.fromUser(user);
     }
 
     public User registerUser(RegisterReqDTO req) {
