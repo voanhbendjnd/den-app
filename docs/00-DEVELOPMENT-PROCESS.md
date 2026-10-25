@@ -420,6 +420,67 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-25] FEAT-SERVER-LEAVE-FE — Xây dựng UI Rời Server và Kết Nối API
+
+- **Mục tiêu:** Xây dựng giao diện cho phép thành viên tự rời khỏi Server (`Leave Server`), kết nối với API backend `POST /api/v1/servers/{serverId}/leave`, hiển thị modal xác nhận, xử lý loading/success/error, chống double-click, và điều hướng an toàn về trang chủ.
+- **Frontend Changes:**
+  - `client/src/api/serverApi.js`: Bổ sung endpoint `leave: (serverId) => axiosClient.post('/v1/servers/' + serverId + '/leave')`.
+  - `client/src/utils/serverLeave.js`:
+    - `canLeaveServer(server, currentUser)`: Kiểm tra điều kiện rời, chặn Server Owner tự rời theo BR-SRV-01.
+    - `getLeaveErrorMessage(error, serverName)`: Ánh xạ mã lỗi 401, 403, 404, 400 (`ownerCannotLeave`, `notMember`), Network Error và timeout sang thông báo tiếng Việt an toàn, không rò rỉ stack trace.
+  - `client/src/components/common/LeaveServerModal.jsx`: Modal xác nhận rời Server chuẩn Cyber Glassmorphism với Ant Design v5, cảnh báo mất quyền truy cập, bảo vệ unmount (`isMountedRef`), và chặn gửi lặp (`submittingRef`).
+  - `client/src/pages/chat/GroupChatPage.jsx`:
+    - Tích hợp nút "Rời" (`LogoutOutlined`) trên sidebar và header của Server, chỉ hiển thị cho thành viên (`!isOwner`).
+    - Kết nối mở `LeaveServerModal`.
+    - Sau khi rời thành công: hiển thị toast `message.success`, gọi `onServerDeleted(serverId)` để loại bỏ Server khỏi dock ngay lập tức, gọi `refreshServers()`, đóng modal và điều hướng `navigate('/', { replace: true })`.
+  - `client/src/pages/chat/group-chat.css`: Bổ sung CSS cho `.group-sidebar-leave-btn` và `.group-header-leave-btn`.
+  - `client/package.json`: Bổ sung `tests/serverLeave.test.mjs` vào script `"test"`.
+- **Tests Added / Updated:**
+  - `client/tests/serverLeave.test.mjs`: 5 unit & contract tests:
+    - `canLeaveServer`: Phân biệt chính xác quyền Owner và Member theo BR-SRV-01.
+    - `getLeaveErrorMessage`: Ánh xạ đúng 401, 403, 404, 400 (`ownerCannotLeave`, `notMember`), timeout, network error, 500 fallback không lộ stack trace.
+    - `serverApi.leave`: Xác minh gọi đúng `POST /v1/servers/{serverId}/leave`.
+- **Verification:**
+  - Frontend test suite: `npm test` PASS **71/71** tests (260ms).
+  - Frontend build: `npm run build` PASS **100%** (3211 modules, 0 errors, 722ms).
+  - Backend test suite: `cd server; .\gradlew.bat test` PASS **100%** (0 failures).
+- **Git Status:**
+  - Uncommitted changes (Chờ người dùng ủy quyền commit).
+- **Push:**
+  - Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-25] FEAT-SERVER-LEAVE — Implement Leave Server API + Tests
+
+- **Mục tiêu:** Triển khai API cho phép người dùng đã đăng nhập tự rời khỏi Server mà họ đang là thành viên (`Leave Server`), đảm bảo kiểm soát phân quyền chặt chẽ, tuân thủ quy tắc BR-SRV-01 (Owner không được rời Server), và duy trì tính toàn vẹn dữ liệu.
+- **Backend & Business Rules:**
+  - `ServerMemberRepository.java`: Bổ sung `findByServerIdAndUserId(serverId, userId)` và `@Modifying @Query deleteByServerIdAndUserId(serverId, userId)`.
+  - `ServerService.java`: Bổ sung phương thức `@Transactional leaveServer(serverId)`:
+    - Xác thực người dùng qua `getActiveCurrentUser()` (yêu cầu Bearer JWT, `activated = true`, 401 nếu thiếu).
+    - Validate `serverId` hợp lệ (400 nếu null hoặc <= 0).
+    - Khóa ghi Server qua `findByIdForUpdate(serverId)` phối hợp khóa bi quan với các thao tác ghi Server/Delete Server (404 nếu không tìm thấy Server).
+    - Kiểm soát nghiêm ngặt quy tắc Owner (BR-SRV-01): Nếu người dùng hiện tại là Server Owner (`currentUser.getId().equals(server.getOwnerId())`), từ chối với HTTP `400 Bad Request` ("Chủ sở hữu không thể rời khỏi Server. Bạn chỉ có thể chuyển quyền sở hữu hoặc xóa Server").
+    - Kiểm tra tư cách thành viên: Nếu người dùng không phải là thành viên (`!existsByServerIdAndUserId`), từ chối với HTTP `400 Bad Request` ("Bạn không phải là thành viên của Server này").
+    - Xóa bản ghi thành viên khỏi `server_member` qua `deleteByServerIdAndUserId`.
+  - `ServerResource.java`:
+    - Endpoint chính: `POST /api/v1/servers/{serverId}/leave` (chuẩn đối ứng với `POST /api/v1/servers/{serverId}/join`, trả về HTTP `204 No Content`).
+    - Alias RESTful: `DELETE /api/v1/servers/{serverId}/members/me` (trả về HTTP `204 No Content`).
+- **Tests Added / Updated:**
+  - `ServerServiceTest.java`: Bổ sung 6 unit tests bao phủ: thành viên rời thành công, từ chối khi chưa đăng nhập (401), từ chối server không tồn tại (404), cấm Owner rời Server (400 BR-SRV-01), từ chối non-member (400), validate serverId không hợp lệ (400).
+  - `ServerResourceTest.java`: Bổ sung 2 controller tests kiểm thử HTTP `204 No Content` và liên kết tham số cho cả `POST /leave` và `DELETE /members/me`.
+  - `ServerSecurityIT.java`: Bổ sung 6 integration tests toàn chuỗi với JWT và H2 DB: thành viên rời thành công (xóa bản ghi thật trong DB, 204), Owner bị từ chối (400), outsider bị từ chối (400), missing server (404), missing JWT (401), alias `DELETE /members/me` (204).
+- **Verification:**
+  - `.\gradlew.bat test --tests com.denhub.service.ServerServiceTest`: PASS.
+  - `.\gradlew.bat test --tests com.denhub.web.rest.ServerResourceTest`: PASS.
+  - `.\gradlew.bat test --tests com.denhub.web.rest.ServerSecurityIT`: PASS.
+  - `.\gradlew.bat test`: PASS 100% toàn bộ test suite backend (0 failures/errors).
+- **Documentation Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Cập nhật `POST /api/v1/servers/{serverId}/leave` sang `IMPLEMENTED` kèm mô tả và alias `DELETE /api/v1/servers/{serverId}/members/me`.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật tiến độ & Completed Work Log.
+- **Git Status:**
+  - Uncommitted changes (Chờ người dùng ủy quyền commit).
+- **Push:**
+  - Not pushed — AI agents are not allowed to push DenHub.
+
 ### [2026-10-25] FEAT-SERVER-INVITE-API-INTEGRATION — Kết Nối UI Mã Mời Server Với API
 
 - **Mục tiêu:** Hoàn thiện tích hợp frontend UI tạo và sao chép mã mời Server (`ServerInviteModal.jsx`) với API backend `POST /api/v1/servers/{serverId}/invites`.
