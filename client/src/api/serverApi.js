@@ -10,6 +10,7 @@ const serverApi = {
   joinByInvite: (code) => axiosClient.post(`/v1/servers/join-invite/${encodeURIComponent(code)}`),
   getMembers: (serverId) => axiosClient.get(`/v1/servers/${serverId}/members`),
   createInvite: (serverId, data) => axiosClient.post(`/v1/servers/${serverId}/invites`, data),
+  leave: (serverId) => axiosClient.post(`/v1/servers/${serverId}/leave`),
 };
 
 export default serverApi;

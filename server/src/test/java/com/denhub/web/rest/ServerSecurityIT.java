@@ -35,7 +35,10 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -729,5 +732,92 @@ class ServerSecurityIT {
                 .claim("sessionId", sessionId).claim("authorities", authorities).build();
         return "Bearer " + encoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(SecurityUtils.JWT_ALGORITHM).build(), claims)).getTokenValue();
+    }
+
+    @Test
+    void memberLeavesServerSuccessfully() throws Exception {
+        User rawMember = new User();
+        rawMember.setEmail("member-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawMember.setPassword("fixture-" + UUID.randomUUID());
+        rawMember.setName("Server Member");
+        rawMember.setActivated(true);
+        rawMember.setSessionId(UUID.randomUUID().toString());
+        User memberUser = users.saveAndFlush(rawMember);
+
+        ServerMember sm = new ServerMember();
+        sm.setServerId(server.getId());
+        sm.setUserId(memberUser.getId());
+        sm.setNickname("Member Nick");
+        members.saveAndFlush(sm);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), memberUser.getId()));
+
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(memberUser)))
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertFalse(members.existsByServerIdAndUserId(server.getId(), memberUser.getId()));
+    }
+
+    @Test
+    void ownerCannotLeaveServer_Returns400() throws Exception {
+        addMembership(server.getId());
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), reader.getId()));
+    }
+
+    @Test
+    void nonMemberCannotLeaveServer_Returns400() throws Exception {
+        User rawOutsider = new User();
+        rawOutsider.setEmail("outsider-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawOutsider.setPassword("fixture-" + UUID.randomUUID());
+        rawOutsider.setName("Outsider User");
+        rawOutsider.setActivated(true);
+        rawOutsider.setSessionId(UUID.randomUUID().toString());
+        User outsider = users.saveAndFlush(rawOutsider);
+
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(outsider))), 400);
+    }
+
+    @Test
+    void missingServer_LeaveReturns404() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/999999/leave")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void missingJwt_LeaveReturns401() throws Exception {
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")), 401);
+    }
+
+    @Test
+    void deleteServerMembersMeAlias_Success() throws Exception {
+        User rawMember = new User();
+        rawMember.setEmail("member2-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawMember.setPassword("fixture-" + UUID.randomUUID());
+        rawMember.setName("Server Member 2");
+        rawMember.setActivated(true);
+        rawMember.setSessionId(UUID.randomUUID().toString());
+        User memberUser = users.saveAndFlush(rawMember);
+
+        ServerMember sm = new ServerMember();
+        sm.setServerId(server.getId());
+        sm.setUserId(memberUser.getId());
+        sm.setNickname("Member 2");
+        members.saveAndFlush(sm);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), memberUser.getId()));
+
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/me")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(memberUser)))
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertFalse(members.existsByServerIdAndUserId(server.getId(), memberUser.getId()));
     }
 }

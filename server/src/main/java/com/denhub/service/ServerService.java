@@ -287,6 +287,29 @@ public class ServerService {
         serverMemberRepository.save(member);
     }
 
+    @Transactional
+    public void leaveServer(Long serverId) {
+        if (serverId == null || serverId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Server ID không hợp lệ");
+        }
+
+        User currentUser = getActiveCurrentUser();
+
+        Server server = serverRepository.findByIdForUpdate(serverId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
+
+        if (currentUser.getId().equals(server.getOwnerId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Chủ sở hữu không thể rời khỏi Server. Bạn chỉ có thể chuyển quyền sở hữu hoặc xóa Server");
+        }
+
+        if (!serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn không phải là thành viên của Server này");
+        }
+
+        serverMemberRepository.deleteByServerIdAndUserId(serverId, currentUser.getId());
+    }
+
     public ServerResponseDTO joinServerByInviteCode(String rawCode) {
         if (rawCode == null || rawCode.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã mời không được để trống");

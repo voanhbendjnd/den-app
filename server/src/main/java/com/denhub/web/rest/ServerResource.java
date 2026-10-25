@@ -80,6 +80,21 @@ public class ServerResource {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{serverId}/leave")
+    @ApiMessage("Rời Server thành công")
+    @Operation(summary = "Rời khỏi Server", description = "Cho phép thành viên hiện tại rời khỏi Server. Yêu cầu đăng nhập. Chủ sở hữu không được phép rời Server.")
+    public ResponseEntity<Void> leaveServer(@PathVariable("serverId") Long serverId) {
+        serverService.leaveServer(serverId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{serverId}/members/me")
+    @Operation(summary = "Rời khỏi Server (RESTful member alias)", description = "Alias RESTful cho phép thành viên hiện tại tự rời khỏi Server.")
+    public ResponseEntity<Void> leaveServerByMemberMe(@PathVariable("serverId") Long serverId) {
+        serverService.leaveServer(serverId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{serverId}/invites")
     @ApiMessage("Tạo mã mời thành công")
     @Operation(summary = "Tạo mã mời tham gia Server", description = "Tạo mã mời mới cho Server. Yêu cầu đăng nhập và chỉ Server Owner mới có quyền tạo.")

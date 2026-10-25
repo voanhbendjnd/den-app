@@ -11,6 +11,7 @@ import {
   SettingOutlined,
   TeamOutlined,
   UserAddOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import MessageInput from '../../components/chat/MessageInput';
@@ -18,6 +19,7 @@ import CreateChannelModal from '../../components/common/CreateChannelModal';
 import EditChannelModal from '../../components/common/EditChannelModal';
 import DeleteChannelModal from '../../components/common/DeleteChannelModal';
 import ServerInviteModal from '../../components/common/ServerInviteModal';
+import LeaveServerModal from '../../components/common/LeaveServerModal';
 import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
@@ -41,6 +43,7 @@ function ChannelSidebar({
   activeChannel,
   isOwner,
   onOpenInvite,
+  onOpenLeave,
   onOpenSettings,
   onSelectChannel,
   onOpenCreateChannel,
@@ -59,7 +62,7 @@ function ChannelSidebar({
       <div className="group-sidebar__body">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <Link className="group-back-link" to="/"><ArrowLeftOutlined /> Tổng quan</Link>
-          {isOwner && (
+          {isOwner ? (
             <button
               type="button"
               className="group-sidebar-invite-btn"
@@ -68,6 +71,16 @@ function ChannelSidebar({
               aria-label="Mời thành viên vào Server"
             >
               <UserAddOutlined /> <span>Mời</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="group-sidebar-leave-btn"
+              onClick={onOpenLeave}
+              title="Rời khỏi Server"
+              aria-label="Rời khỏi Server"
+            >
+              <LogoutOutlined /> <span>Rời</span>
             </button>
           )}
         </div>
@@ -275,7 +288,7 @@ function MembersPanel({
 
 export default function GroupChatPage() {
   const { serverId } = useParams();
-  const { setServers, onServerDeleted } = useOutletContext();
+  const { setServers, onServerDeleted, refreshServers } = useOutletContext();
   const navigate = useNavigate();
   const currentServerId = useRef(serverId);
   useEffect(() => {
@@ -289,12 +302,14 @@ export default function GroupChatPage() {
   const [membersVisible, setMembersVisible] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLeaveOpen, setIsLeaveOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState(null);
   const [deletingChannel, setDeletingChannel] = useState(null);
   useEffect(() => { 
     setIsSettingsOpen(false); 
     setEditingChannel(null); 
     setDeletingChannel(null);
+    setIsLeaveOpen(false);
   }, [serverId]);
   const [detail, setDetail] = useState({ serverId, server: null, loading: true, error: null });
   const [reload, setReload] = useState(0);
@@ -600,6 +615,7 @@ export default function GroupChatPage() {
           activeChannel={activeChannel}
           isOwner={isOwner}
           onOpenInvite={() => setIsInviteOpen(true)}
+          onOpenLeave={() => setIsLeaveOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onSelectChannel={handleSelectChannel}
           onOpenCreateChannel={() => setIsCreateChannelOpen(true)}
@@ -651,6 +667,17 @@ export default function GroupChatPage() {
               title="Mời thành viên vào Server"
               aria-label="Mời thành viên vào Server"
               onClick={() => setIsInviteOpen(true)}
+            />
+          )}
+          {!isOwner && (
+            <Button
+              type="text"
+              danger
+              className="group-header-leave-btn"
+              icon={<LogoutOutlined />}
+              title="Rời khỏi Server"
+              aria-label="Rời khỏi Server"
+              onClick={() => setIsLeaveOpen(true)}
             />
           )}
           <Button
@@ -831,6 +858,10 @@ export default function GroupChatPage() {
             setChannelsOpen(false);
             setIsInviteOpen(true);
           }}
+          onOpenLeave={() => {
+            setChannelsOpen(false);
+            setIsLeaveOpen(true);
+          }}
           onOpenSettings={() => {
             setChannelsOpen(false);
             setIsSettingsOpen(true);
@@ -904,6 +935,20 @@ export default function GroupChatPage() {
         open={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
         server={server}
+      />
+      <LeaveServerModal
+        open={isLeaveOpen}
+        server={server}
+        currentUser={currentUser}
+        onClose={() => setIsLeaveOpen(false)}
+        onSuccess={(leftServerId) => {
+          if (onServerDeleted) {
+            onServerDeleted(leftServerId);
+          }
+          refreshServers?.();
+          setIsLeaveOpen(false);
+          navigate('/', { replace: true });
+        }}
       />
       <ServerSettingsModal key={serverId} open={isSettingsOpen && isOwner} server={server}
         onDeleted={id => {

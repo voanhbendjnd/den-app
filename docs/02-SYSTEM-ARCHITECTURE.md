@@ -171,7 +171,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Owner xóa vĩnh viễn Server, contract mục 12 | `IMPLEMENTED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers/{serverId}/invites` | Tạo mã mời Server mới (duy nhất Owner) | `IMPLEMENTED` |
-| **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server (Member, Admin; Owner cấm theo BR-SRV-01) | `IMPLEMENTED` |
 | **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `IMPLEMENTED` |
 | **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
@@ -215,7 +215,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/v1/servers/{serverId}`: Chi tiết phần vỏ Server theo phạm vi duyệt 2026-10-13 (mục 9); trả DTO Server hiện có. Thiết kế trước đó `/api/servers/{serverId}` kèm danh sách kênh được thu hẹp cho lượt này; dữ liệu Channel thuộc module Channel, không thêm alias `/api/servers/{serverId}`.
 - `PUT /api/v1/servers/{serverId}`: Cập nhật tên/ảnh server (Owner), contract mục 11 được duyệt 2026-10-15; thay thế đề xuất cũ `PATCH /api/servers/{serverId}`, không thêm alias.
 - `DELETE /api/v1/servers/{serverId}`: Owner xóa vĩnh viễn Server theo mục 12 (2026-10-21); thay thế đường dẫn thiết kế `/api/servers/{serverId}`, không thêm alias.
-- `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
+- `POST /api/v1/servers/{serverId}/leave`: Rời khỏi Server (Member, Admin; Owner cấm theo BR-SRV-01, alias `DELETE /api/v1/servers/{serverId}/members/me`, trả `204 No Content`)
 - `POST /api/v1/servers/{serverId}/invites`: Tạo invite code (duy nhất Server Owner, mã 8 ký tự Base62 an toàn, trả `ServerInviteResponseDTO` trong wrapper `RestResponse`)
 - `POST /api/v1/servers/join-invite/{code}`: Tham gia server qua invite code (Người dùng đã đăng nhập, trả `ServerResponseDTO` trong wrapper `RestResponse`)
 - `DELETE /api/invites/{code}`: Thu hồi invite code
