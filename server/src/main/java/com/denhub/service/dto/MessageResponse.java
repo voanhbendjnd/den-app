@@ -1,6 +1,7 @@
 package com.denhub.service.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -39,6 +40,20 @@ public class MessageResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     Instant createdAt;
 
+    @Schema(description = "Thời điểm cập nhật cuối", example = "2026-10-12T07:35:00Z")
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    Instant updatedAt;
+
+    public MessageResponse(Long id, Long channelId, Long senderId, String content, Instant createdAt) {
+        this.id = id;
+        this.channelId = channelId;
+        this.senderId = senderId;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.updatedAt = null;
+    }
+
     // Backward-compatible record-like accessors
     public Long id() {
         return this.id;
@@ -58,5 +73,9 @@ public class MessageResponse {
 
     public Instant createdAt() {
         return this.createdAt;
+    }
+
+    public Instant updatedAt() {
+        return this.updatedAt;
     }
 }
