@@ -43,12 +43,15 @@ class PostServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+
     private PostService postService;
     private MockedStatic<SecurityUtils> securityUtilsMockedStatic;
 
     @BeforeEach
     void setUp() {
-        postService = new PostService(postRepository, friendshipRepository, userRepository);
+        postService = new PostService(postRepository, friendshipRepository, userRepository, stringRedisTemplate);
         securityUtilsMockedStatic = mockStatic(SecurityUtils.class);
     }
 

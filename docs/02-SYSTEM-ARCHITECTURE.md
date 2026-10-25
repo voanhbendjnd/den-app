@@ -154,6 +154,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Friendship** | `POST` | `/api/friendships/block-user/remove` | Gỡ chặn người dùng (Unblock user) | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
 | **Post** | `POST` | `/api/posts/all-friends` | Lấy danh sách bài viết từ bạn bè & bản thân trên Newsfeed (Cursor pagination theo date và id) | `CONFIRMED` |
+| **Post** | `POST` | `/api/posts/{postId}/like` | Thích hoặc bỏ thích một bài viết (Toggle Like, đồng bộ Redis Set & DB like_counts) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
@@ -710,3 +711,43 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 - Toàn bộ backend `gradlew.bat test check` PASS 322/322. Browser suite Server Settings/Group PASS 51/51; logic Node PASS 35/35; production build PASS. Screenshot cảnh báo desktop 1440/mobile 375 được kiểm tra; fixture browser dùng Playwright clock để kiểm countdown và animations riêng.
 - Sau tinh chỉnh clock/animation của fixture, chạy lại riêng `node --test tests/server-settings.browser.test.mjs` PASS 28/28; các 23 Group cases giữ kết quả PASS của lượt kết hợp. Không thêm production dependency cho browser tests.
 - SQL Server chỉ được kiểm tra metadata bằng SELECT, không xóa dữ liệu thật, không chạy DDL hoặc khởi động app bằng cấu hình SQL Server. H2 và API mock không chứng minh FE → BE → SQL Server thật; cần kiểm thử trên môi trường thử nghiệm của nhóm.
+
+## 13. Tương tác Thích Bài Viết (Post Like) (`CONFIRMED / IMPLEMENTED`, 2026-10-24)
+
+### 13.1 REST API Contract
+- **Endpoint**: `POST /api/posts/{postId}/like`
+- **Authentication**: Bắt buộc (JWT Bearer Token qua Spring Security).
+- **Quyền hạn & Privacy Rule**:
+  - `PUBLIC`: Bất kỳ user đã kích hoạt tài khoản nào cũng có thể like/unlike.
+  - `FRIENDS_ONLY`: Chỉ tác giả hoặc bạn bè của tác giả (xác thực qua `friendshipRepository.getAllFriendIdsByUserId`) mới được like/unlike.
+  - `PRIVATE`: Chỉ tác giả bài viết mới được tương tác like/unlike.
+  - Trả về `403 Forbidden` (`AccessDeniedException`) nếu vi phạm quyền riêng tư hoặc chưa đăng nhập.
+  - Trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`) nếu bài viết không tồn tại.
+  - Trả về `400 Bad Request` (`BadRequestResourceException` `notactivated`) nếu tài khoản bị khóa/chưa kích hoạt.
+- **Response**: `ApiResponse<LikeResponseDTO>`
+  ```json
+  {
+    "code": 200,
+    "message": "Thành công",
+    "data": {
+      "liked": true,
+      "totalLikes": 1
+    }
+  }
+  ```
+
+### 13.2 Cơ chế Lưu trữ & Đồng bộ Redis - SQL Server
+- Sử dụng Redis Set với key: `post:{postId}:likes`, lưu trữ tập các `userId` dạng String.
+- Kiểm tra trạng thái đã like: `stringRedisTemplate.opsForSet().isMember(redisKey, userStrId)`.
+- Toggle hành động: nếu đã like thì `opsForSet().remove`, ngược lại `opsForSet().add`.
+- Đồng bộ tính toàn vẹn: Cập nhật trường `like_counts` trong SQL Server Database (`post.setLikeCounts((int) safeTotalLikes); postRepository.save(post)`) để đảm bảo các query Newsfeed hiển thị chính xác số like.
+- Feed DTO: Bổ sung trường `Boolean isLiked` trong `DisplayPostDTO`, được `PostService.getAllPost` tra cứu từ Redis Set theo `userId` người dùng hiện tại để giao diện hiển thị trạng thái trái tim chính xác khi reload trang.
+
+### 13.3 Tích hợp Frontend & Micro-animations
+- `postApi.toggleLike(postId)`: Gọi `POST /api/posts/{postId}/like`.
+- `useFriendPosts`:
+  - Thực hiện Optimistic Update để toggle trạng thái icon và cập nhật `likeCounts` ngay tức thì.
+  - Đồng bộ lại dữ liệu chuẩn từ server khi có response (`liked`, `totalLikes`).
+  - Tự động rollback về trạng thái trước đó và hiển thị thông báo lỗi `message.error` nếu request thất bại.
+- `PostCard`: Thêm hiệu ứng micro-animation (bouncy scale spring effect và Cyber Red glow filter `drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))`) mang phong cách Discord Cyber Glassmorphism.
+
