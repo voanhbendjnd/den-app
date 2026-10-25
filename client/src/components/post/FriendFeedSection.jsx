@@ -26,7 +26,10 @@ export default function FriendFeedSection() {
     loadMore,
     toggleLike,
     createPost,
+    editPost,
+    deletePost,
   } = useFriendPosts(10);
+
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -178,7 +181,13 @@ export default function FriendFeedSection() {
         <div>
           {/* Post cards list */}
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} onLike={toggleLike} />
+            <PostCard
+              key={post.id}
+              post={post}
+              onLike={toggleLike}
+              onEdit={editPost}
+              onDelete={deletePost}
+            />
           ))}
 
           {/* Load More Button */}

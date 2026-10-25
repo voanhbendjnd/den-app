@@ -8,10 +8,14 @@ import {
   CloseOutlined,
   ClockCircleOutlined,
   ShareAltOutlined,
-  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import serverApi from '../../api/serverApi';
-import { copyToClipboard, getInviteErrorMessage, formatExpiresAt } from '../../utils/serverInvite';
+import {
+  copyToClipboard,
+  getInviteErrorMessage,
+  formatExpiresAt,
+  extractInviteResponse,
+} from '../../utils/serverInvite';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -20,8 +24,22 @@ export default function ServerInviteModal({ open, onClose, server }) {
   const [invite, setInvite] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [copied, setCopied] = useState(false);
+
   const submittingRef = useRef(false);
-  const activeServerIdRef = useRef(null);
+  const activeServerIdRef = useRef(server?.id || null);
+  const isMountedRef = useRef(true);
+  const copyTimerRef = useRef(null);
+
+  // Track component mount status and cleanup timers
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
 
   // Reset state when opening or when server changes
   useEffect(() => {
@@ -50,27 +68,35 @@ export default function ServerInviteModal({ open, onClose, server }) {
       return;
     }
 
+    const currentServerId = server.id;
     submittingRef.current = true;
     setLoading(true);
     setErrorMsg(null);
     setCopied(false);
 
     try {
-      const res = await serverApi.createInvite(server.id, {});
-      const inviteData = res.data?.data || res.data;
-      if (inviteData && inviteData.code) {
-        setInvite(inviteData);
-        message.success('Tạo mã mời Server thành công!');
-      } else {
-        throw new Error('Dữ liệu mã mời trả về không hợp lệ');
+      const res = await serverApi.createInvite(currentServerId, {});
+
+      // Stale check: discard response if user switched server or component unmounted
+      if (!isMountedRef.current || activeServerIdRef.current !== currentServerId) {
+        return;
       }
+
+      const inviteData = extractInviteResponse(res);
+      setInvite(inviteData);
+      message.success('Tạo mã mời Server thành công!');
     } catch (err) {
+      if (!isMountedRef.current || activeServerIdRef.current !== currentServerId) {
+        return;
+      }
       const msg = getInviteErrorMessage(err);
       setErrorMsg(msg);
       message.error(msg);
     } finally {
-      setLoading(false);
-      submittingRef.current = false;
+      if (isMountedRef.current) {
+        setLoading(false);
+        submittingRef.current = false;
+      }
     }
   };
 
@@ -78,11 +104,18 @@ export default function ServerInviteModal({ open, onClose, server }) {
     if (!invite?.code) return;
 
     const result = await copyToClipboard(invite.code);
+    if (!isMountedRef.current) return;
+
     if (result.success) {
       setCopied(true);
       message.success('Đã sao chép mã mời vào clipboard!');
-      setTimeout(() => {
-        setCopied(false);
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setCopied(false);
+        }
       }, 2500);
     } else {
       message.warning(result.error || 'Vui lòng bôi đen và sao chép mã mời thủ công.');

@@ -8,6 +8,7 @@ import com.denhub.repository.UserRepository;
 import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.DisplayPostDTO;
 import com.denhub.service.dto.ResultPaginationCursorDateId;
+import com.denhub.service.dto.UpdatePostDTO;
 import com.denhub.service.errors.AccessDeniedException;
 import com.denhub.service.errors.BadRequestResourceException;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,12 +45,15 @@ class PostServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+
     private PostService postService;
     private MockedStatic<SecurityUtils> securityUtilsMockedStatic;
 
     @BeforeEach
     void setUp() {
-        postService = new PostService(postRepository, friendshipRepository, userRepository);
+        postService = new PostService(postRepository, friendshipRepository, userRepository, stringRedisTemplate);
         securityUtilsMockedStatic = mockStatic(SecurityUtils.class);
     }
 
@@ -177,5 +182,186 @@ class PostServiceTest {
         assertThat(data.getFirst().getId()).isEqualTo(102L);
         assertThat(result.getCursorDate()).isEqualTo(now.toString());
         assertThat(result.getCursorId()).isEqualTo(102L);
+    }
+
+    @Test
+    void updatePost_Success() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User author = new User();
+        author.setId(1L);
+        author.setUsername("john");
+        author.setName("John Doe");
+        author.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+
+        Post post = new Post();
+        post.setId(100L);
+        post.setUserId(1L);
+        post.setContent("Old content");
+        post.setPrivacy("PUBLIC");
+        post.setMediaUrl("https://img.com/old.png");
+        post.setCreatedDate(Instant.now());
+        when(postRepository.findById(100L)).thenReturn(Optional.of(post));
+        when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdatePostDTO updateDTO = UpdatePostDTO.builder()
+                .content("Updated content")
+                .privacy("FRIENDS_ONLY")
+                .mediaUrl("https://img.com/new.png")
+                .build();
+
+        DisplayPostDTO result = postService.updatePost(100L, updateDTO);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo(100L);
+        assertThat(result.getContent()).isEqualTo("Updated content");
+        assertThat(result.getPrivacy()).isEqualTo("FRIENDS_ONLY");
+        assertThat(result.getMediaUrl()).isEqualTo("https://img.com/new.png");
+        assertThat(result.getAuthorName()).isEqualTo("John Doe");
+        verify(postRepository).save(post);
+    }
+
+    @Test
+    void updatePost_ThrowsBadRequest_WhenPostNotFound() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User author = new User();
+        author.setId(1L);
+        author.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+        when(postRepository.findById(999L)).thenReturn(Optional.empty());
+
+        UpdatePostDTO dto = UpdatePostDTO.builder().content("New content").build();
+
+        assertThatThrownBy(() -> postService.updatePost(999L, dto))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasFieldOrPropertyWithValue("errorKey", "postNotFound");
+    }
+
+    @Test
+    void updatePost_ThrowsAccessDenied_WhenNotOwner() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User caller = new User();
+        caller.setId(1L);
+        caller.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(caller));
+
+        Post post = new Post();
+        post.setId(100L);
+        post.setUserId(2L); // Different user
+        when(postRepository.findById(100L)).thenReturn(Optional.of(post));
+
+        UpdatePostDTO dto = UpdatePostDTO.builder().content("Hacked content").build();
+
+        assertThatThrownBy(() -> postService.updatePost(100L, dto))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasFieldOrPropertyWithValue("entityName", "postNotOwner");
+    }
+
+    @Test
+    void updatePost_ThrowsBadRequest_WhenEmptyPost() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User author = new User();
+        author.setId(1L);
+        author.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+
+        Post post = new Post();
+        post.setId(100L);
+        post.setUserId(1L);
+        when(postRepository.findById(100L)).thenReturn(Optional.of(post));
+
+        UpdatePostDTO dto = UpdatePostDTO.builder().content("   ").mediaUrl("").build();
+
+        assertThatThrownBy(() -> postService.updatePost(100L, dto))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasFieldOrPropertyWithValue("errorKey", "emptyPost");
+    }
+
+    @Test
+    void updatePost_ThrowsBadRequest_WhenContentTooLong() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User author = new User();
+        author.setId(1L);
+        author.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+
+        Post post = new Post();
+        post.setId(100L);
+        post.setUserId(1L);
+        when(postRepository.findById(100L)).thenReturn(Optional.of(post));
+
+        UpdatePostDTO dto = UpdatePostDTO.builder().content("a".repeat(121)).build();
+
+        assertThatThrownBy(() -> postService.updatePost(100L, dto))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasFieldOrPropertyWithValue("errorKey", "contentTooLong");
+    }
+
+    @Test
+    void deletePost_Success() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User author = new User();
+        author.setId(1L);
+        author.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+
+        Post post = new Post();
+        post.setId(100L);
+        post.setUserId(1L);
+        when(postRepository.findById(100L)).thenReturn(Optional.of(post));
+
+        postService.deletePost(100L);
+
+        verify(postRepository).delete(post);
+        verify(stringRedisTemplate).delete("post:100:likes");
+    }
+
+    @Test
+    void deletePost_ThrowsBadRequest_WhenPostNotFound() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User author = new User();
+        author.setId(1L);
+        author.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+        when(postRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> postService.deletePost(999L))
+                .isInstanceOf(BadRequestResourceException.class)
+                .hasFieldOrPropertyWithValue("errorKey", "postNotFound");
+    }
+
+    @Test
+    void deletePost_ThrowsAccessDenied_WhenNotOwner() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(1L);
+
+        User caller = new User();
+        caller.setId(1L);
+        caller.setActivated(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(caller));
+
+        Post post = new Post();
+        post.setId(100L);
+        post.setUserId(2L); // Different user
+        when(postRepository.findById(100L)).thenReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> postService.deletePost(100L))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasFieldOrPropertyWithValue("entityName", "postNotOwner");
+    }
+
+    @Test
+    void deletePost_ThrowsAccessDenied_WhenNotLoggedIn() {
+        securityUtilsMockedStatic.when(SecurityUtils::getCurrentUserIdAtHolder).thenReturn(null);
+
+        assertThatThrownBy(() -> postService.deletePost(100L))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasFieldOrPropertyWithValue("entityName", "userNotLoggedIn");
     }
 }

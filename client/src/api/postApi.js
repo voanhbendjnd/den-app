@@ -15,6 +15,33 @@ const postApi = {
    */
   getAllPostsFromFriends: (size = 10, cursorDate = null, cursorId = null) =>
     axiosClient.post('/posts/all-friends', { size, cursorDate, cursorId }),
+
+  /**
+   * Thích hoặc bỏ thích một bài viết.
+   * POST /api/posts/{postId}/like
+   * @param {number|string} postId - ID của bài viết
+   * @returns {Promise<{ code, message, data: { postId, liked, likeCounts } }>}
+   */
+  toggleLike: (postId) => axiosClient.post(`/posts/${postId}/like`),
+
+  /**
+   * Chỉnh sửa bài viết.
+   * PUT /api/posts/{postId}
+   * @param {number|string} postId - ID của bài viết
+   * @param {{ content?: string, privacy?: string, mediaUrl?: string }} data
+   * @returns {Promise<DisplayPostDTO>}
+   */
+  updatePost: (postId, data) => axiosClient.put(`/posts/${postId}`, data),
+
+  /**
+   * Xóa bài viết.
+   * DELETE /api/posts/{postId}
+   * @param {number|string} postId - ID của bài viết
+   * @returns {Promise<void>}
+   */
+  deletePost: (postId) => axiosClient.delete(`/posts/${postId}`),
 };
 
 export default postApi;
+
+

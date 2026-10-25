@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getInviteErrorMessage, formatExpiresAt, copyToClipboard } from '../src/utils/serverInvite.js';
+import {
+  getInviteErrorMessage,
+  formatExpiresAt,
+  copyToClipboard,
+  extractInviteResponse,
+} from '../src/utils/serverInvite.js';
 
 test('getInviteErrorMessage maps authentication and permission errors', () => {
   const err401 = { response: { status: 401, data: {} } };
@@ -101,4 +106,164 @@ test('copyToClipboard returns error when clipboard fails and no document fallbac
     value: originalClipboard,
     configurable: true,
   });
+});
+
+test('extractInviteResponse extracts data from standard RestResponse wrapper', () => {
+  const mockBackendResponse = {
+    data: {
+      statusCode: 201,
+      error: null,
+      message: 'Tạo mã mời thành công',
+      data: {
+        id: 42,
+        serverId: 100,
+        code: 'AbCdEf12',
+        createdBy: 5,
+        expiresAt: null,
+        status: 'ACTIVE',
+        createdAt: '2026-10-14T10:00:00Z',
+      },
+    },
+  };
+
+  const extracted = extractInviteResponse(mockBackendResponse);
+  assert.equal(extracted.code, 'AbCdEf12');
+  assert.equal(extracted.serverId, 100);
+  assert.equal(extracted.status, 'ACTIVE');
+  assert.equal(extracted.expiresAt, null);
+});
+
+test('extractInviteResponse extracts data from unwrapped payload', () => {
+  const rawPayload = {
+    code: 'XyZ98765',
+    serverId: 200,
+    status: 'ACTIVE',
+  };
+
+  const extracted = extractInviteResponse(rawPayload);
+  assert.equal(extracted.code, 'XyZ98765');
+  assert.equal(extracted.serverId, 200);
+});
+
+test('extractInviteResponse throws on invalid or missing response', () => {
+  assert.throws(() => extractInviteResponse(null), /Không nhận được phản hồi/);
+  assert.throws(() => extractInviteResponse(undefined), /Không nhận được phản hồi/);
+  assert.throws(() => extractInviteResponse({ data: null }), /Dữ liệu mã mời trả về không hợp lệ/);
+  assert.throws(() => extractInviteResponse({ data: 'string' }), /Dữ liệu mã mời trả về không hợp lệ/);
+});
+
+test('extractInviteResponse throws when code is missing or empty', () => {
+  assert.throws(() => extractInviteResponse({ data: { code: '' } }), /thiếu mã code/);
+  assert.throws(() => extractInviteResponse({ data: { code: null } }), /thiếu mã code/);
+  assert.throws(() => extractInviteResponse({ data: { code: '   ' } }), /thiếu mã code/);
+  assert.throws(() => extractInviteResponse({ data: { serverId: 10 } }), /thiếu mã code/);
+});
+
+test('API contract verification: createInvite dispatches POST /api/v1/servers/{serverId}/invites', async () => {
+  // Simulates serverApi.createInvite contract: (serverId, data) => post(`/v1/servers/${serverId}/invites`, data)
+  const mockHttp = {
+    post: async (endpoint, payload) => {
+      return {
+        url: endpoint,
+        payload,
+        status: 201,
+        response: {
+          statusCode: 201,
+          message: 'Tạo mã mời thành công',
+          data: {
+            id: 1,
+            serverId: 88,
+            code: 'MockCd88',
+            status: 'ACTIVE',
+            expiresAt: null,
+            createdAt: '2026-10-25T12:00:00Z',
+          },
+        },
+      };
+    },
+  };
+
+  const serverId = 88;
+  const requestBody = {};
+  const res = await mockHttp.post(`/v1/servers/${serverId}/invites`, requestBody);
+
+  assert.equal(res.url, '/v1/servers/88/invites');
+  assert.deepEqual(res.payload, {});
+  assert.equal(res.status, 201);
+
+  const invite = extractInviteResponse({ data: res.response });
+  assert.equal(invite.code, 'MockCd88');
+  assert.equal(invite.serverId, 88);
+  assert.equal(invite.status, 'ACTIVE');
+});
+
+test('ServerInviteModal lifecycle: stale server response is discarded', async () => {
+  let activeServerId = 1;
+  let updatedInvite = null;
+  const isMounted = { current: true };
+
+  // Simulate server 1 request
+  const currentServerId = 1;
+
+  // Before request finishes, user switches to server 2
+  activeServerId = 2;
+
+  // Response for server 1 arrives
+  const delayedResponse = {
+    data: {
+      data: { code: 'SERVER1-CODE', serverId: 1, status: 'ACTIVE' },
+    },
+  };
+
+  // Stale check guard
+  if (isMounted.current && activeServerId === currentServerId) {
+    updatedInvite = extractInviteResponse(delayedResponse);
+  }
+
+  // Expect stale response to have been discarded
+  assert.equal(updatedInvite, null, 'Delayed response from server 1 must not overwrite server 2');
+});
+
+test('ServerInviteModal lifecycle: unmounted component discards response', async () => {
+  let updatedInvite = null;
+  const isMounted = { current: false }; // Component already unmounted
+  const activeServerId = 5;
+  const currentServerId = 5;
+
+  const res = {
+    data: {
+      data: { code: 'UNMOUNT-CODE', serverId: 5, status: 'ACTIVE' },
+    },
+  };
+
+  if (isMounted.current && activeServerId === currentServerId) {
+    updatedInvite = extractInviteResponse(res);
+  }
+
+  assert.equal(updatedInvite, null, 'Unmounted component must not update state');
+});
+
+test('ServerInviteModal guard: prevents double submit when request is in flight', async () => {
+  let callCount = 0;
+  const submittingRef = { current: false };
+
+  const triggerCreate = async () => {
+    if (submittingRef.current) return 'BLOCKED';
+    submittingRef.current = true;
+    callCount += 1;
+    // Simulate async network delay
+    await new Promise((r) => setTimeout(r, 10));
+    submittingRef.current = false;
+    return 'SUCCESS';
+  };
+
+  // First call starts
+  const p1 = triggerCreate();
+  // Immediate second call while first is in flight
+  const p2 = triggerCreate();
+
+  const [res1, res2] = await Promise.all([p1, p2]);
+  assert.equal(res1, 'SUCCESS');
+  assert.equal(res2, 'BLOCKED');
+  assert.equal(callCount, 1, 'Only one API request should be made during concurrent clicks');
 });

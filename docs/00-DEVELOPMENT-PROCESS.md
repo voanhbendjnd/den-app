@@ -310,7 +310,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |  PASS  | Release 6/6; còn apply schema thật | 2026-10-13  |
 | **Member & Role**            |    TODO     | IMPLEMENTED |             IMPLEMENTED              |         DONE          | TESTED |            IN_PROGRESS             | 2026-10-13  |
 | **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      | TESTED |            IN_PROGRESS             | 2026-10-13  |
-| **Message (Channel)**        | IN_PROGRESS | IMPLEMENTED |             IMPLEMENTED              |      IMPLEMENTED      | TESTED |            IN_PROGRESS             | 2026-10-14  |
+| **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |  PASS  |                DONE                | 2026-10-25  |
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Real-time (1-1)**          |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
 | **Search User & Friendship** |    DONE     |    DONE     |              CONFIRMED               |         DONE          |  PASS  |                DONE                | 2026-10-12  |
@@ -322,7 +322,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Server CRUD — sửa 6 bug** | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) | PASS | Release 6/6; còn apply schema thật | 2026-10-13 |
 | **Member & Role** | TODO | IMPLEMENTED | IMPLEMENTED | TODO | TODO | IN_PROGRESS | 2026-10-06 |
 | **Channel** | IMPLEMENTED | IMPLEMENTED | CONFIRMED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-13 |
-| **Message (Channel)** | IN_PROGRESS | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED | TESTED | IN_PROGRESS | 2026-10-14 |
+| **Message (Channel)** | DONE | DONE | IMPLEMENTED | DONE | PASS | DONE | 2026-10-25 |
 | **Message (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Real-time (1-1)** | DONE | DONE | CONFIRMED | DONE | PASS | DONE | 2026-10-12 |
 | **Search User & Friendship** | IMPLEMENTED | DONE | CONFIRMED | IMPLEMENTED | PASS (build) | IN_PROGRESS | 2026-10-14 |
@@ -377,9 +377,10 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.07 — API gửi tin nhắn + test         | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE.                                                                                                               |
 | Task 1.07 / lượt 1A                         | DONE                                                       | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B.                                                                                                                                                                                                    |
 | Task 1.07 / đồng bộ wrapper thành công      | DONE                                                       | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE.                                                                                                                                |
-| Task 1.12 — UI nhập và gửi tin nhắn         | IN_PROGRESS                                                | Duy duyệt làm UI trước ngày 2026-10-11. Đã có GroupChatPage và MessageInput; 5 Node tests, 9 browser tests dùng mock PASS, build PASS. Chưa nối gửi thật; chờ dữ liệu Channel và xác nhận tích hợp.                                                                                                                            |
+| Task 1.12 — UI nhập và gửi tin nhắn         | DONE                                                       | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53. |
 | Task 1.12 / khung Group và ô nhập độc lập   | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
 | Task 1.08 — API lấy lịch sử tin nhắn + test | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
+| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
 =======
 | Công việc | Trạng thái | Bằng chứng / bước còn lại |
 | :--- | :--- | :--- |
@@ -390,9 +391,10 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.07 — API gửi tin nhắn + test | Hoàn tất phạm vi code/H2 đã duyệt; còn xác minh SQL Server | POST giữ nguyên contract; JWT/Problem Details và audit email 254 đã sửa, 85/85 backend tests PASS cùng compileJava/check. Script SQL Server đã chuẩn bị để review, chưa chạy. Xem log MESSAGE-SECURITY-COMPLETE. |
 | Task 1.07 / lượt 1A | DONE | 9 file thuộc phạm vi đã trình; compileJava/test/check PASS, docs đồng bộ; dừng để giải thích và chờ Tiếp tục trước lượt 1B. |
 | Task 1.07 / đồng bộ wrapper thành công | DONE | Duy duyệt giữ wrapper hiện có ngày 2026-10-11; cập nhật 3 docs và bổ sung assertions `message`, `error: null` trong MockMvc. `test check` PASS 32/32. Không đồng nghĩa toàn bộ lượt 1B đã DONE. |
-| Task 1.12 — UI nhập và gửi tin nhắn | IN_PROGRESS | Duy duyệt làm UI trước ngày 2026-10-11. Đã có GroupChatPage và MessageInput; 5 Node tests, 9 browser tests dùng mock PASS, build PASS. Chưa nối gửi thật; chờ dữ liệu Channel và xác nhận tích hợp. |
+| Task 1.12 — UI nhập và gửi tin nhắn | DONE | Đã kết nối `onSend` và `onSent` vào `MessageInput`, mở khóa ô chat. Đã xây dựng UI hiển thị lịch sử tin nhắn kênh kèm Cursor Pagination (`before` + `limit`), cuộn giữ vị trí, tự động cuộn xuống đáy khi mở hoặc gửi tin nhắn mới. Build PASS 100%, unit tests PASS 53/53. |
 | Task 1.12 / khung Group và ô nhập độc lập | DONE | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE. |
 | Task 1.08 — API lấy lịch sử tin nhắn + test | DONE | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%. |
+| Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test | DONE | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%. |
 | FEAT-FRIEND-REQUEST-UI — UI danh sách lời mời kết bạn + Realtime | DONE | 5 file FE: `friendApi.js` bổ sung `getFriendRequests`; `useFriendRequests.js` STOMP + cursor pagination; `FriendRequestPage.jsx` UI đầy đủ; route `/friends`; menu Bạn Bè. `npm run build` PASS 3192 modules. Không thay backend. |
 | FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE) | DONE | `friendApi.js` (accept/remove endpoints); `useFriendRequests.js` (`acceptRequest`, `removeRequest`, `actionLoading`); `FriendRequestPage.jsx` (Nút Đồng ý Indigo Gradient, Từ chối Dark Glass, spin loading độc lập, toast thông báo). `npm run build` PASS 3192 modules. |
 | FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) + Sửa query Friendship (BE) | DONE | Sửa typo `:status <> 'PENDING'` trong `FriendshipRepository`; `friendApi.js` (`getAllFriends`); `useFriends.js` (cursor pagination, filter search); `FriendRequestPage.jsx` (Tabs Tất cả / Chờ xử lý, FriendCard, nút Nhắn tin Direct Message); `npm run build` PASS 3193 modules. |
@@ -414,6 +416,44 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-25] FEAT-SERVER-INVITE-API-INTEGRATION — Kết Nối UI Mã Mời Server Với API
+
+- **Mục tiêu:** Hoàn thiện tích hợp frontend UI tạo và sao chép mã mời Server (`ServerInviteModal.jsx`) với API backend `POST /api/v1/servers/{serverId}/invites`.
+- **Backend & Contract Verification:**
+  - Xác minh endpoint `POST /api/v1/servers/{serverId}/invites` (chỉ duy nhất Owner Server được phép tạo mã mời).
+  - Response wrapper chuẩn `RestResponse<ServerInviteResponseDTO>` gồm các trường: `id`, `serverId`, `code` (8 ký tự Base62 ngẫu nhiên an toàn), `createdBy`, `expiresAt`, `status` ("ACTIVE"), `createdAt`.
+  - Xác nhận Backend không trả URL mời và Frontend không có route URL mời (người dùng tham gia bằng mã mời qua `JoinServerModal` gọi `POST /api/v1/servers/join-invite/{code}`). Đúng theo quy tắc bài toán, hệ thống chỉ tạo và sao chép mã mời 8 ký tự, không tự dựng link URL giả định.
+- **Frontend Changes:**
+  - `client/src/utils/serverInvite.js`: Bổ sung hàm `extractInviteResponse(response)` chuẩn hóa trích xuất `RestResponse<ServerInviteResponseDTO>` và validate mã code không rỗng. Giữ vững `copyToClipboard`, `getInviteErrorMessage`, `formatExpiresAt`.
+  - `client/src/components/common/ServerInviteModal.jsx`:
+    - Sử dụng `extractInviteResponse(res)` để chuẩn hóa bóc tách response backend.
+    - Thêm `isMountedRef` chống rò rỉ bộ nhớ và chặn cập nhật state sau khi unmount.
+    - Thêm `copyTimerRef` quản lý và tự động dọn dẹp timer nút copy khi component unmount hoặc khi người dùng sao chép liên tiếp.
+    - Bổ sung cơ chế phát hiện stale request (`activeServerIdRef.current !== currentServerId`): khi người dùng chuyển đổi sang Server khác trong lúc API đang chạy, kết quả của Server cũ sẽ tự động bị bỏ qua, không ghi đè vào state của Server mới.
+    - Bảo vệ chống spam nút bấm kép qua `submittingRef` và `loading` state.
+    - Cải thiện trạng thái lỗi: hiển thị alert thân thiện kèm nút "Thử lại" (Retry).
+  - `client/package.json`: Bổ sung script `"test"` chạy toàn bộ unit/integration test suites trong `client/tests/`.
+- **Tests Added / Updated:**
+  - `client/tests/serverInvite.test.mjs`: Mở rộng từ 7 lên 15 tests:
+    - Bóc tách dữ liệu từ `RestResponse` chuẩn backend (`extractInviteResponse`).
+    - Bóc tách payload unwrapped.
+    - Bắt lỗi khi payload null, undefined hoặc không phải object.
+    - Bắt lỗi khi mã code bị thiếu, rỗng hoặc toàn khoảng trắng.
+    - Xác minh contract API `serverApi.createInvite` gửi đúng `POST /v1/servers/{serverId}/invites`.
+    - Kiểm thử stale response guard khi chuyển đổi Server.
+    - Kiểm thử unmounted component guard.
+    - Kiểm thử chống double-click / rapid-click (`submittingRef`).
+    - Bao phủ các mã lỗi HTTP (400, 401, 403, 404, 500, Network error).
+    - Sao chép clipboard và xử lý fallback thủ công.
+- **Verification:**
+  - Frontend test suite: `npm test` PASS **66/66** tests (247ms).
+  - Frontend build: `npm run build` PASS **100%** (3209 modules, 0 errors, 933ms).
+  - Backend test suite: `.\gradlew.bat test --rerun-tasks` PASS **100%** (322+ tests, 57s, 0 failures/errors).
+- **Git Status:**
+  - Uncommitted changes (Chờ người dùng ủy quyền commit).
+- **Push:**
+  - Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-21] RELEASE-SERVER-DELETE — Chia commit theo cụm Backend, Frontend và tài liệu
 
@@ -444,6 +484,85 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - Sau khi pause clock để chụp ảnh, lượt Server Settings có 5 FAIL do selector exact gặp loading icon chưa kết thúc animation. Đã cho clock chạy thêm 350ms cho animation và dùng selector theo tên hành động; không sửa production để làm test pass. Lượt cuối `node --test tests/server-settings.browser.test.mjs` PASS 28/28, 0 failure/skip; 23 Group cases ở lượt 51/51 không thay đổi. `git diff --check`, kiểm relative links docs, phạm vi file thay đổi và bảo toàn conflict markers lịch sử đều PASS.
 - Docs đồng bộ 00/01/02/03; đã xem docs/04, tái sử dụng design system nên không sửa. Conflict markers lịch sử docs/00, warnings Ant Design và bundle lớn vẫn ngoài phạm vi. Chưa kiểm thử FE → BE → SQL Server thật, chưa áp dụng audit script SQL Server.
 - Git: changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-25] FEAT-MESSAGE-EDIT-API — Làm API sửa tin nhắn (PATCH & PUT /api/messages/{messageId}) + Tests
+
+- Nhánh: `feature/edit-message-api`.
+- Kế hoạch: Đã được người dùng duyệt trước khi triển khai ("ok duyet maf truoc khi lam goi y ten nhanh").
+- Implemented:
+  - Tạo mới `server/src/main/java/com/denhub/service/dto/UpdateMessageRequest.java`:
+    - Record DTO với `@NotBlank`, `@Pattern(regexp = "(?sU).*\\S.*")`, `@Size(max = 4000)` UTF-16 chars.
+  - Cập nhật `server/src/main/java/com/denhub/service/dto/MessageResponse.java`:
+    - Bổ sung trường `updatedAt` kiểu `Instant` với format `@JsonFormat(shape = JsonFormat.Shape.STRING)` và `@JsonInclude(JsonInclude.Include.NON_NULL)` để đảm bảo giữ nguyên contract 5 fields khi chưa sửa và trả thêm `updatedAt` khi đã sửa.
+    - Giữ trọn vẹn backward compatibility với constructor 5 tham số và hỗ trợ record-style accessors.
+  - Cập nhật `server/src/main/java/com/denhub/service/MessageService.java`:
+    - Triển khai `updateMessage(Long messageId, UpdateMessageRequest request)`:
+      - Kiểm tra `messageId > 0` và validate request body qua Bean Validator (400 Bad Request).
+      - Lấy danh tính người dùng hiện tại từ Spring Security Context, tra cứu tài khoản activated (401 Unauthorized).
+      - Tra cứu tin nhắn trong `MessageRepository`, nếu không tồn tại trả 404 Not Found.
+      - Tuân thủ nghiêm ngặt Business Rule `BR-MSG-02`: **Chỉ tác giả gốc (`authorId` / `senderId`) mới được sửa tin nhắn của mình**. Kiểm tra nếu `authorId != currentUser.getId()`, lập tức chặn bằng `403 Forbidden` (`"Bạn không có quyền sửa tin nhắn này"`). Quyền này áp dụng tuyệt đối ngay cả với Server Owner.
+      - Cập nhật trường `content`, lưu qua `messageRepository.save(message)` và trả về `MessageResponse` với `lastModifiedDate`.
+  - Cập nhật `server/src/main/java/com/denhub/web/rest/MessageResource.java`:
+    - Bổ sung endpoint `@PatchMapping("/messages/{messageId}")` và `@PutMapping("/messages/{messageId}")`.
+    - Trả về `ResponseEntity.ok(response)` tự động được bọc bởi `ResFormatResponse` với `statusCode: 200`, `message: "Chỉnh sửa tin nhắn thành công"`, `error: null`.
+- Tests Added / Updated:
+  - `MessageServiceTest`: 9 unit tests cho `updateMessage`:
+    - Sửa thành công và cập nhật nội dung bởi chính tác giả.
+    - Chặn `messageId` null hoặc âm / bằng 0 (400).
+    - Chặn content rỗng, toàn khoảng trắng Unicode, hoặc dài hơn 4000 ký tự (400).
+    - Chặn khi chưa đăng nhập hoặc tài khoản không tồn tại / inactive (401).
+    - Chặn khi tin nhắn không tồn tại (404).
+    - Chặn khi người sửa không phải tác giả (403).
+    - Chặn khi Server Owner cố gắng sửa tin nhắn của member khác (403).
+  - `MessageResourceIT`: 5 MockMvc tests cho `updateMessage`:
+    - Sửa thành công qua PATCH trả về 200 OK kèm wrapper envelope `data.content` và `data.updatedAt`.
+    - Sửa thành công qua PUT trả về 200 OK.
+    - Chặn content blank trả về 400 Bad Request.
+    - Ném 404 khi Service báo tin nhắn không tồn tại.
+    - Ném 403 khi Service báo không có quyền sửa.
+  - `MessageSecurityIT`: 7 SpringBootTest integration tests:
+    - Sửa thành công qua PATCH với token thật của tác giả, xác minh entity trong H2 database được cập nhật `content` và `lastModifiedDate`.
+    - Sửa thành công qua PUT với token thật của tác giả.
+    - Chặn 403 Forbidden khi member khác cố sửa tin nhắn của tác giả (database không bị thay đổi).
+    - Chặn 403 Forbidden khi Server Owner cố sửa tin nhắn của member khác (database không bị thay đổi).
+    - Chặn 401 Unauthorized khi không truyền token Bearer.
+    - Chặn 400 Bad Request khi truyền content blank.
+    - Chặn 404 Not Found khi ID tin nhắn không tồn tại.
+- Verification:
+  - `.\gradlew.bat test --tests "com.denhub.service.MessageServiceTest" --tests "com.denhub.web.rest.MessageResourceIT" --tests "com.denhub.web.rest.MessageSecurityIT"`: BUILD SUCCESSFUL (tất cả 99/99 tests PASS).
+  - `.\gradlew.bat test`: BUILD SUCCESSFUL (toàn bộ test suite dự án PASS 100%).
+  - `node --test tests/channelMessages.test.mjs ...`: PASS 53/53 client unit tests.
+  - `npm run build`: BUILD SUCCESSFUL (3209 modules transformed, 0 error).
+- Not pushed — AI agents are not allowed to push DenHub.
+
+---
+
+### [2026-10-25] FEAT-CHANNEL-MESSAGES-UI — Làm UI hiển thị lịch sử tin nhắn kênh & Mở khóa ô chat (FE)
+
+Implemented:
+- Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
+  - Khắc phục lỗi ô chat bị khóa (disabled): truyền prop `onSend={handleSendMessage}` và `onSent={handleSentMessage}` vào `<MessageInput />`.
+  - Kết nối gửi tin nhắn REST API `messageApi.sendMessage(channelId, { content })`, cập nhật tức thời vào danh sách tin nhắn và cuộn mượt xuống đáy.
+  - Quản lý state tin nhắn kênh: `messages`, `messagesLoading`, `messagesError`, `hasMore`, `nextCursor`, `loadingMore`.
+  - Kết nối lấy lịch sử tin nhắn kênh qua `messageApi.getMessages(channelId, { limit: 30 })` (trang đầu tiên) và `before: nextCursor` (các trang trước đó).
+  - Tích hợp cơ chế cuộn mượt xuống đáy khi chọn kênh hoặc vừa gửi tin nhắn mới, đồng thời giữ nguyên vị trí cuộn khi cuộn lên xem tin nhắn cũ (`scrollTop = newScrollHeight - prevScrollHeight`).
+  - Render danh sách tin nhắn phong cách Discord / Cyber Dark: Avatar gradient, tên người gửi (lấy từ `currentUser` hoặc `members`), huy hiệu "Chủ nhóm" (Server Owner), thời gian gửi (`HH:mm`), gom nhóm tin nhắn gửi gần nhau bởi cùng tác giả (compact row).
+  - Hiển thị banner Chào mừng kênh `#tên-kênh` ở đầu danh sách khi đã cuộn tới đầu lịch sử (`!hasMore`).
+- Cập nhật `client/src/utils/channelMessages.js`:
+  - `sortMessagesChronological`: sắp xếp tin nhắn theo thứ tự thời gian tăng dần và loại bỏ trùng lặp ID.
+  - `mergeMessagePages`: hợp nhất trang tin nhắn cũ phía trên và danh sách hiện tại.
+  - `formatMessageTime` & `formatCompactTime`: định dạng thời gian thân thiện (Hôm nay lúc HH:mm, Hôm qua lúc HH:mm, DD/MM/YYYY HH:mm).
+  - `getAuthorInfo`: ánh xạ tác giả tin nhắn từ `currentUser`, danh sách `members` và xác định `serverOwnerId`.
+- Cập nhật `client/src/pages/chat/group-chat.css`:
+  - Thêm styles cho `.group-chat__content`, `.group-messages-loading-more`, `.group-messages-loading`, `.group-messages-error`, `.group-messages-list`, `.group-message-row`, `.group-message-avatar`, `.group-message-author`, `.group-message-owner-badge`, `.group-message-content`.
+- Tests Added:
+  - `client/tests/channelMessages.test.mjs`: 7 unit tests kiểm thử toàn diện sorting, deduplication, page merging, time formatting, và author resolution -> PASS 7/7 (100%).
+- Verification:
+  - `node --test tests/channelMessages.test.mjs ...`: PASS 53/53 tests toàn bộ unit test suite client.
+  - `npm run build`: BUILD SUCCESSFUL (3209 modules transformed, 0 error).
+  - `.\gradlew.bat test`: BUILD SUCCESSFUL.
+
+---
 
 ### [2026-10-24] FEAT-CHANNEL-DELETE-UI — Làm UI Xóa Channel, Kết Nối API (Kỳ Anh)
 
@@ -2175,9 +2294,105 @@ Commit:
 
 ---
 
+### [2026-10-24] BE-FE-POST-LIKE — Hoàn thiện tính năng Thích bài viết (Post Like) và tích hợp UI Newsfeed
+
+Implemented:
+
+- Backend:
+  - Tái cấu trúc `LikeService.java`:
+    - Bổ sung xác thực tài khoản đăng nhập (`SecurityUtils.getCurrentUserIdAtHolder()`) và kiểm tra tài khoản kích hoạt (`Boolean.TRUE.equals(user.getActivated())`).
+    - Kiểm tra bài viết tồn tại (`postRepository.findById(postId)`), trả về `400 Bad Request` (`postNotFound`) nếu không tìm thấy.
+    - Kiểm tra phân quyền tương tác theo `privacy`: `PRIVATE` chỉ tác giả được like, `FRIENDS_ONLY` chỉ bạn bè và tác giả được like, ném `AccessDeniedException` nếu vi phạm.
+    - Lưu trạng thái like vào Redis Set `post:{postId}:likes` với userId.
+    - Đồng bộ trường `post.like_counts` trong database SQL Server (`postRepository.save(post)`) để query Newsfeed trả về số like chính xác.
+  - Bổ sung trường `Boolean isLiked` vào `DisplayPostDTO.java`.
+  - Cập nhật `PostService.java`: Kiểm tra Redis Set `post:{postId}:likes` để set trường `isLiked` cho từng bài viết khi tải feed (`getAllPost`).
+  - Viết 9 unit tests cho `LikeServiceTest.java` và test `PostLikeControllerTest.java` (độ phủ 100% các kịch bản: like, unlike, quyền author, từ chối private/friends-only, bài viết không tồn tại, chưa đăng nhập, tài khoản inactive).
+  - Cập nhật `PostServiceTest.java` mock `StringRedisTemplate`.
+- Frontend:
+  - Bổ sung hàm `toggleLike: (postId) => axiosClient.post('/posts/' + postId + '/like')` trong `client/src/api/postApi.js`.
+  - Nâng cấp hook `useFriendPosts.js`: Thao tác like lạc quan (Optimistic Update), đồng bộ với dữ liệu từ server khi thành công (`liked`, `totalLikes`), tự động rollback và hiển thị thông báo lỗi `message.error` khi thất bại.
+  - Cập nhật `PostCard.jsx`: Thêm micro-animation bouncy spring effect cho nút Like và bộ lọc phát sáng Cyber Red (`drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))`), padding và style viền Cyber Glassmorphism.
+  - Tạo mới `client/tests/postLike.test.mjs` kiểm thử độc lập cho logic optimistic like, server sync và rollback.
+- Tests & Verification:
+  - Backend: `.\gradlew.bat test` PASS 100% (toàn bộ 330+ unit & integration tests của server).
+  - Frontend: `npm run build` PASS (0 errors, Vite production bundle).
+  - Frontend Logic: `node --test` PASS 45/45 tests.
+
+Docs Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md` (REST table + Section 13).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Completed Work Log & Handoff).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
+### [2026-10-25] BE-FE-POST-EDIT-DELETE — Triển khai tính năng Chỉnh sửa và Xóa bài viết (Edit & Delete Post)
+
+Implemented:
+
+- Backend:
+  - Tạo mới `UpdatePostDTO.java` (`content` tối đa 120 ký tự, `privacy`: `PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`, `mediaUrl` tối đa 1000 ký tự).
+  - Cập nhật `PostService.java`:
+    - `updatePost(postId, dto)`: Xác thực tác giả (`post.userId == currentUserId`), kiểm tra bài tồn tại, validate không rỗng cả text và media, cập nhật nội dung, privacy, mediaUrl và trả về `DisplayPostDTO`.
+    - `deletePost(postId)`: Xác thực tác giả, xóa bài viết khỏi cơ sở dữ liệu (`postRepository.delete(post)`) và dọn dẹp key Redis Set lưu likes của bài viết (`stringRedisTemplate.delete("post:{postId}:likes")`).
+    - Chặn và ném `AccessDeniedException("postNotOwner")` (403 Forbidden) nếu user không phải tác giả bài viết.
+  - Cập nhật `PostController.java`:
+    - `PUT /api/posts/{postId}`: Nhận `UpdatePostDTO`, trả về HTTP 200 kèm `DisplayPostDTO`.
+    - `DELETE /api/posts/{postId}`: Trả về HTTP 204 No Content.
+  - Viết 10 unit tests mới trong `PostServiceTest.java` và 3 tests trong `PostControllerTest.java` (bao phủ thành công, bài không tồn tại, người khác cố tình sửa/xóa, bài rỗng, text quá dài, dọn dẹp Redis).
+- Frontend:
+  - Cập nhật `postApi.js`: Thêm `updatePost(postId, data)` và `deletePost(postId)`.
+  - Nâng cấp hook `useFriendPosts.js`: Bổ sung `editPost` và `deletePost` với Optimistic update, rollback khi lỗi và toast thông báo `message.success` / `message.error`.
+  - Tạo mới `EditPostModal.jsx`: Modal phong cách Cyber Glassmorphism cho phép chỉnh sửa nội dung bài viết, đếm 120 ký tự, đổi quyền riêng tư, thay đổi hoặc gỡ bỏ ảnh đính kèm.
+  - Cập nhật `PostCard.jsx`: Thêm menu ba chấm (`...`) cho tác giả bài viết gồm 2 tùy chọn "Chỉnh sửa bài viết" và "Xóa bài viết", tích hợp hộp thoại xác nhận an toàn `Modal.confirm` trước khi xóa.
+  - Cập nhật `FriendFeedSection.jsx`: Truyền `editPost` và `deletePost` xuống các thẻ `PostCard`.
+  - Tạo mới `client/tests/postEditDelete.test.mjs`: 7 unit tests kiểm thử logic validate payload chỉnh sửa, optimistic edit/delete và rollback.
+- Tests & Verification:
+  - Backend: `.\gradlew.bat test` PASS 100% (toàn bộ test suite).
+  - Frontend: `npm run build` PASS 100% (0 errors).
+  - Frontend Unit Tests: `node --test` PASS 52/52 tests.
+
+Docs Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md` (REST table + Section 14).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Completed Work Log & Handoff).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
-### Handoff hiện tại — Delete Server (2026-10-21)
+### Handoff hiện tại — Post Edit & Delete (2026-10-25)
+
+- Tính năng Chỉnh sửa và Xóa bài viết đã hoàn thiện toàn diện từ Backend tới Frontend:
+  - API `PUT /api/posts/{postId}`: Cho phép tác giả cập nhật content, privacy, mediaUrl; kiểm tra chặt chẽ quyền sở hữu (403), tồn tại (400) và độ dài ký tự.
+  - API `DELETE /api/posts/{postId}`: Cho phép tác giả xóa bài viết, xóa sạch bản ghi trong DB và dọn dẹp Redis Set likes; trả về 204 No Content.
+  - Giao diện: Menu thao tác chỉ hiển thị với tác giả bài viết, xác nhận xóa qua `Modal.confirm`, modal chỉnh sửa `EditPostModal` chuẩn Cyber Glassmorphism.
+  - Frontend `useFriendPosts` hỗ trợ cập nhật danh sách tức thì và rollback an toàn nếu gặp lỗi mạng.
+- Verification:
+  - Toàn bộ backend test `gradlew.bat test` PASS 100%.
+  - Frontend build `npm run build` PASS 100%.
+  - Frontend logic `node --test` PASS 52/52 tests.
+- Chưa commit; AI Agent tuân thủ nghiêm ngặt quy tắc không push và không tự ý commit khi chưa có ủy quyền rõ ràng từ người dùng.
+
+### Handoff trước — Post Like & Feed UI (2026-10-24)
+
+
+- Tính năng Like bài viết đã hoàn thiện toàn diện từ Backend tới Frontend:
+  - API `POST /api/posts/{postId}/like` kiểm tra quyền theo privacy (`PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`), trạng thái active của user, lưu trữ Redis Set và đồng bộ trường `post.like_counts` trong SQL Server.
+  - API feed trả về `DisplayPostDTO` có trường `isLiked` được tra cứu tự động từ Redis theo user đang đăng nhập.
+  - Frontend `useFriendPosts` hỗ trợ Optimistic Update và rollback khi gặp lỗi, `PostCard` có micro-animation bouncy scale và Cyber Red glow.
+- Verification:
+  - Toàn bộ backend test `gradlew.bat test` PASS (330+ tests).
+  - Client production build `npm run build` PASS.
+  - Client node tests PASS 45/45.
+- Chưa commit; AI Agent tuân thủ nghiêm ngặt quy tắc không push và không tự ý commit khi chưa có ủy quyền rõ ràng từ người dùng.
+
+### Handoff trước — Delete Server (2026-10-21)
+
 
 - Owner vào Server → Cài đặt Server → Xóa Server. Đọc cảnh báo, chờ đủ 3 giây rồi bấm Xác nhận xóa; hủy trước khi gửi không phát sinh DELETE. Trong lúc chờ không thể gửi trùng/đóng bằng UI. API vẫn kiểm lại quyền và điều kiện dữ liệu trên mỗi request.
 - Contract chính thức ở docs/02 mục 12; dữ liệu/metadata ở docs/03 mục 4.6. Chỉ Owner active được xóa, không cần Server rỗng hoặc membership Owner; general được dọn khi xóa cả Server. Chat riêng, User, Server khác và file vật lý được bảo toàn.

@@ -154,6 +154,9 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Friendship** | `POST` | `/api/friendships/block-user/remove` | Gỡ chặn người dùng (Unblock user) | `CONFIRMED` |
 | **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
 | **Post** | `POST` | `/api/posts/all-friends` | Lấy danh sách bài viết từ bạn bè & bản thân trên Newsfeed (Cursor pagination theo date và id) | `CONFIRMED` |
+| **Post** | `POST` | `/api/posts/{postId}/like` | Thích hoặc bỏ thích một bài viết (Toggle Like, đồng bộ Redis Set & DB like_counts) | `CONFIRMED` |
+| **Post** | `PUT` | `/api/posts/{postId}` | Chỉnh sửa nội dung, quyền riêng tư và ảnh đính kèm bài viết (yêu cầu là tác giả) | `CONFIRMED` |
+| **Post** | `DELETE` | `/api/posts/{postId}` | Xóa bài viết vĩnh viễn và dọn dẹp Redis Set (yêu cầu là tác giả) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
@@ -472,6 +475,51 @@ Endpoint: `GET /api/channels/{channelId}/messages?before={id}&limit=30`
   - `MessageResourceIT`: 4 standalone MockMvc tests kiểm thử response code, JSON paths wrapper và Problem Details.
   - `MessageSecurityIT`: 5 SpringBootTest integration tests với JWT encoder và JPA/H2 thật kiểm thử sắp xếp giảm dần, phân trang `before`, chặn 401 khi thiếu token, chặn 403 khi không phải member, chặn 400 khi limit sai.
 
+### 7.8 API Chỉnh sửa tin nhắn văn bản — Edit Message (`IMPLEMENTED`)
+
+Endpoint: `PATCH /api/messages/{messageId}` & `PUT /api/messages/{messageId}`
+
+- **Xác thực & Phân quyền:**
+  - Yêu cầu Bearer JWT hợp lệ, tài khoản activated.
+  - Áp dụng Business Rule `BR-MSG-02`: **Chỉ tác giả gốc (`authorId` / `senderId`) mới được quyền sửa tin nhắn của mình**.
+  - Server Owner hay Admin không được phép sửa tin nhắn của thành viên khác; nếu cố tình gửi request sửa sẽ nhận `403 Forbidden` (`"Bạn không có quyền sửa tin nhắn này"`).
+- **Request Body (`UpdateMessageRequest`):**
+  ```json
+  {
+    "content": "Nội dung tin nhắn sau khi chỉnh sửa"
+  }
+  ```
+- **Validation Constraints:**
+  - `messageId` (path variable): kiểu Long, phải lớn hơn 0.
+  - `content`: `@NotBlank`, `@Pattern(regexp = "(?sU).*\\S.*")`, `@Size(max = 4000)` UTF-16 characters (tương thích validation `SendMessageRequest`).
+- **Response Format (Thành công 200 OK):**
+  Wrapper `ResFormatResponse` bọc `MessageResponse` trong `data`:
+  ```json
+  {
+    "statusCode": 200,
+    "error": null,
+    "message": "Chỉnh sửa tin nhắn thành công",
+    "data": {
+      "id": 101,
+      "channelId": 5,
+      "senderId": 2,
+      "content": "Nội dung tin nhắn sau khi chỉnh sửa",
+      "createdAt": "2026-10-10T07:30:00Z",
+      "updatedAt": "2026-10-10T08:00:00Z"
+    }
+  }
+  ```
+  *Ghi chú:* `MessageResponse.updatedAt` được cấu hình `@JsonInclude(JsonInclude.Include.NON_NULL)` nên chỉ xuất hiện khi tin nhắn có thông tin thời điểm sửa.
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `messageId` <= 0, content null, rỗng, toàn khoảng trắng Unicode hoặc vượt quá 4000 ký tự.
+  - `401 Unauthorized`: Người dùng chưa xác thực hoặc token không hợp lệ / session hết hạn.
+  - `403 Forbidden`: Người gửi request không phải tác giả của tin nhắn (áp dụng cả với Server Owner).
+  - `404 Not Found`: Không tìm thấy tin nhắn với `messageId`.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 9 unit tests kiểm thử sửa thành công, chặn invalid ID, blank content, content > 4000 ký tự, chưa đăng nhập, message không tồn tại, user khác sửa (403), server owner sửa (403).
+  - `MessageResourceIT`: 5 MockMvc tests kiểm thử PATCH & PUT trả 200 kèm envelope, 400 khi blank content, 404 khi not found, 403 khi forbidden.
+  - `MessageSecurityIT`: 7 SpringBootTest integration tests với JWT token thật và database H2 thật kiểm thử sửa qua PATCH và PUT thành công và cập nhật `lastModifiedDate`, chặn 403 khi member khác sửa, chặn 403 khi server owner sửa, chặn 401 khi không token, chặn 400 khi blank, chặn 404 khi tin nhắn không tồn tại.
+
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 
 - Dùng React + Ant Design; tái sử dụng hoặc tạo `MessageInput` sau khi kiểm tra component hiện tại.
@@ -665,3 +713,91 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 - Toàn bộ backend `gradlew.bat test check` PASS 322/322. Browser suite Server Settings/Group PASS 51/51; logic Node PASS 35/35; production build PASS. Screenshot cảnh báo desktop 1440/mobile 375 được kiểm tra; fixture browser dùng Playwright clock để kiểm countdown và animations riêng.
 - Sau tinh chỉnh clock/animation của fixture, chạy lại riêng `node --test tests/server-settings.browser.test.mjs` PASS 28/28; các 23 Group cases giữ kết quả PASS của lượt kết hợp. Không thêm production dependency cho browser tests.
 - SQL Server chỉ được kiểm tra metadata bằng SELECT, không xóa dữ liệu thật, không chạy DDL hoặc khởi động app bằng cấu hình SQL Server. H2 và API mock không chứng minh FE → BE → SQL Server thật; cần kiểm thử trên môi trường thử nghiệm của nhóm.
+
+## 13. Tương tác Thích Bài Viết (Post Like) (`CONFIRMED / IMPLEMENTED`, 2026-10-24)
+
+### 13.1 REST API Contract
+- **Endpoint**: `POST /api/posts/{postId}/like`
+- **Authentication**: Bắt buộc (JWT Bearer Token qua Spring Security).
+- **Quyền hạn & Privacy Rule**:
+  - `PUBLIC`: Bất kỳ user đã kích hoạt tài khoản nào cũng có thể like/unlike.
+  - `FRIENDS_ONLY`: Chỉ tác giả hoặc bạn bè của tác giả (xác thực qua `friendshipRepository.getAllFriendIdsByUserId`) mới được like/unlike.
+  - `PRIVATE`: Chỉ tác giả bài viết mới được tương tác like/unlike.
+  - Trả về `403 Forbidden` (`AccessDeniedException`) nếu vi phạm quyền riêng tư hoặc chưa đăng nhập.
+  - Trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`) nếu bài viết không tồn tại.
+  - Trả về `400 Bad Request` (`BadRequestResourceException` `notactivated`) nếu tài khoản bị khóa/chưa kích hoạt.
+- **Response**: `ApiResponse<LikeResponseDTO>`
+  ```json
+  {
+    "code": 200,
+    "message": "Thành công",
+    "data": {
+      "liked": true,
+      "totalLikes": 1
+    }
+  }
+  ```
+
+### 13.2 Cơ chế Lưu trữ & Đồng bộ Redis - SQL Server
+- Sử dụng Redis Set với key: `post:{postId}:likes`, lưu trữ tập các `userId` dạng String.
+- Kiểm tra trạng thái đã like: `stringRedisTemplate.opsForSet().isMember(redisKey, userStrId)`.
+- Toggle hành động: nếu đã like thì `opsForSet().remove`, ngược lại `opsForSet().add`.
+- Đồng bộ tính toàn vẹn: Cập nhật trường `like_counts` trong SQL Server Database (`post.setLikeCounts((int) safeTotalLikes); postRepository.save(post)`) để đảm bảo các query Newsfeed hiển thị chính xác số like.
+- Feed DTO: Bổ sung trường `Boolean isLiked` trong `DisplayPostDTO`, được `PostService.getAllPost` tra cứu từ Redis Set theo `userId` người dùng hiện tại để giao diện hiển thị trạng thái trái tim chính xác khi reload trang.
+
+### 13.3 Tích hợp Frontend & Micro-animations
+- `postApi.toggleLike(postId)`: Gọi `POST /api/posts/{postId}/like`.
+- `useFriendPosts`:
+  - Thực hiện Optimistic Update để toggle trạng thái icon và cập nhật `likeCounts` ngay tức thì.
+  - Đồng bộ lại dữ liệu chuẩn từ server khi có response (`liked`, `totalLikes`).
+  - Tự động rollback về trạng thái trước đó và hiển thị thông báo lỗi `message.error` nếu request thất bại.
+- `PostCard`: Thêm hiệu ứng micro-animation (bouncy scale spring effect và Cyber Red glow filter `drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))`) mang phong cách Discord Cyber Glassmorphism.
+
+## 14. Chỉnh sửa và Xóa Bài Viết (Post Edit & Delete) (`CONFIRMED / IMPLEMENTED`, 2026-10-25)
+
+### 14.1 REST API Contracts
+- **Cập nhật bài viết**: `PUT /api/posts/{postId}`
+  - **Authentication**: Bắt buộc (JWT Bearer Token qua Spring Security).
+  - **Quyền hạn**: Duy nhất tác giả của bài viết (`post.userId == currentUserId`).
+  - **Request Body**: `UpdatePostDTO`
+    ```json
+    {
+      "content": "Nội dung bài viết mới...",
+      "privacy": "PUBLIC",
+      "mediaUrl": "https://..."
+    }
+    ```
+  - **Validation**:
+    - `content` và `mediaUrl` không được đồng thời rỗng (trả về `400 Bad Request` `emptyPost`).
+    - `content` tối đa 120 ký tự (trả về `400 Bad Request` `contentTooLong`).
+    - `mediaUrl` tối đa 1000 ký tự (trả về `400 Bad Request` `mediaUrlTooLong`).
+    - `privacy` phải thuộc `PUBLIC`, `FRIENDS_ONLY`, `PRIVATE` (trả về `400 Bad Request` `invalidformat`).
+    - Không phải tác giả trả về `403 Forbidden` (`AccessDeniedException` `postNotOwner`).
+    - Bài viết không tồn tại trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`).
+  - **Response**: `200 OK` kèm `DisplayPostDTO`.
+
+- **Xóa bài viết**: `DELETE /api/posts/{postId}`
+  - **Authentication**: Bắt buộc (JWT Bearer Token).
+  - **Quyền hạn**: Duy nhất tác giả bài viết (`post.userId == currentUserId`).
+  - **Xử lý**:
+    - Xóa bản ghi trong SQL Server database (`postRepository.delete(post)`).
+    - Dọn dẹp key Redis Set lưu likes của bài viết (`stringRedisTemplate.delete("post:{postId}:likes")`).
+    - Không phải tác giả trả về `403 Forbidden` (`AccessDeniedException` `postNotOwner`).
+    - Bài viết không tồn tại trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`).
+  - **Response**: `204 No Content` (body rỗng).
+
+### 14.2 Giao diện & Tích hợp Frontend
+- **PostCard**:
+  - Nhận biết tác giả bài viết qua `currentUser.id === post.userId`.
+  - Hiển thị menu `...` (MoreOutlined) góc trên bên phải thẻ bài viết cho tác giả.
+  - Dropdown menu gồm: "Chỉnh sửa bài viết" (EditOutlined) và "Xóa bài viết" (DeleteOutlined, màu đỏ nguy hiểm).
+  - Thao tác Xóa: Kích hoạt hộp thoại xác nhận `Modal.confirm` trước khi gọi xóa.
+- **EditPostModal**:
+  - Thiết kế Cyber Glassmorphism với Avatar tác giả, Dropdown quyền riêng tư, Textarea đếm 120 ký tự.
+  - Quản lý ảnh đính kèm: preview ảnh, nút gỡ ảnh, nút tải ảnh mới qua `fileApi.upload`.
+  - Disable nút Lưu khi dữ liệu rỗng hoặc đang upload/submit.
+- **useFriendPosts Hook**:
+  - `editPost(postId, payload)`: Gọi `postApi.updatePost`, cập nhật state bài viết tương ứng và toast thành công.
+  - `deletePost(postId)`: Cập nhật lạc quan (loại bỏ bài viết khỏi danh sách ngay lập tức), gọi `postApi.deletePost`, tự động rollback nếu server trả lỗi.
+
+

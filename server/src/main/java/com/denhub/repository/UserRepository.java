@@ -63,4 +63,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsById(@NonNull Long id);
 
+    @Query(value = "select u.activated from User u where u.id = :userId")
+    boolean getActivatedById(@Param("userId") Long userId);
+
 }

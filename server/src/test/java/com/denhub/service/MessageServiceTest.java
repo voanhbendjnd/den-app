@@ -10,6 +10,7 @@ import com.denhub.repository.UserRepository;
 import com.denhub.service.dto.CursorPageResponse;
 import com.denhub.service.dto.MessageResponse;
 import com.denhub.service.dto.SendMessageRequest;
+import com.denhub.service.dto.UpdateMessageRequest;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import org.springframework.data.domain.PageRequest;
@@ -482,5 +483,147 @@ class MessageServiceTest {
                 () -> messageService.sendMessage(CHANNEL_ID, new SendMessageRequest("Hello")));
         assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
         verifyNoInteractions(userRepository, channelRepository, serverMemberRepository, messageRepository);
+    }
+
+    @Test
+    void updateMessage_Success_WhenAuthor() {
+        authenticate(EMAIL);
+        stubSender();
+
+        Message message = new Message();
+        message.setId(101L);
+        message.setChannelId(CHANNEL_ID);
+        message.setAuthorId(SENDER_ID);
+        message.setContent("Old content");
+        message.setCreatedDate(CREATED_AT);
+
+        when(messageRepository.findById(101L)).thenReturn(Optional.of(message));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MessageResponse response = messageService.updateMessage(101L, new UpdateMessageRequest("New edited content"));
+
+        assertNotNull(response);
+        assertEquals(101L, response.id());
+        assertEquals("New edited content", response.content());
+        assertEquals(CHANNEL_ID, response.channelId());
+        assertEquals(SENDER_ID, response.senderId());
+        assertEquals(CREATED_AT, response.createdAt());
+        verify(messageRepository).save(message);
+    }
+
+    @Test
+    void updateMessage_Fail_WhenInvalidId() {
+        ResponseStatusException ex1 = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(null, new UpdateMessageRequest("Valid text")));
+        assertEquals(HttpStatus.BAD_REQUEST, ex1.getStatusCode());
+
+        ResponseStatusException ex2 = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(0L, new UpdateMessageRequest("Valid text")));
+        assertEquals(HttpStatus.BAD_REQUEST, ex2.getStatusCode());
+
+        ResponseStatusException ex3 = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(-5L, new UpdateMessageRequest("Valid text")));
+        assertEquals(HttpStatus.BAD_REQUEST, ex3.getStatusCode());
+        verifyNoInteractions(messageRepository);
+    }
+
+    @Test
+    void updateMessage_Fail_WhenBlankContent() {
+        assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, null));
+
+        ResponseStatusException ex1 = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, new UpdateMessageRequest(null)));
+        assertEquals(HttpStatus.BAD_REQUEST, ex1.getStatusCode());
+
+        ResponseStatusException ex2 = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, new UpdateMessageRequest("")));
+        assertEquals(HttpStatus.BAD_REQUEST, ex2.getStatusCode());
+
+        ResponseStatusException ex3 = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, new UpdateMessageRequest("   \t\n  ")));
+        assertEquals(HttpStatus.BAD_REQUEST, ex3.getStatusCode());
+        verifyNoInteractions(messageRepository);
+    }
+
+    @Test
+    void updateMessage_Fail_WhenContentTooLong() {
+        String longContent = "a".repeat(4001);
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, new UpdateMessageRequest(longContent)));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        verifyNoInteractions(messageRepository);
+    }
+
+    @Test
+    void updateMessage_Fail_WhenNotLoggedIn() {
+        SecurityContextHolder.clearContext();
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, new UpdateMessageRequest("Valid text")));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        verifyNoInteractions(messageRepository);
+    }
+
+    @Test
+    void updateMessage_Fail_WhenUserNotFoundOrInactive() {
+        authenticate(EMAIL);
+        when(userRepository.findOneByEmail(EMAIL)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, new UpdateMessageRequest("Valid text")));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        verifyNoInteractions(messageRepository);
+    }
+
+    @Test
+    void updateMessage_Fail_WhenMessageNotFound() {
+        authenticate(EMAIL);
+        stubSender();
+        when(messageRepository.findById(999L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(999L, new UpdateMessageRequest("Valid text")));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(messageRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMessage_Fail_WhenNotAuthor() {
+        authenticate(EMAIL);
+        stubSender(); // ID is SENDER_ID (2L)
+
+        Message message = new Message();
+        message.setId(101L);
+        message.setChannelId(CHANNEL_ID);
+        message.setAuthorId(999L); // Different author!
+        message.setContent("Original text");
+
+        when(messageRepository.findById(101L)).thenReturn(Optional.of(message));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(101L, new UpdateMessageRequest("Attempted edit")));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Bạn không có quyền sửa tin nhắn này"));
+        verify(messageRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMessage_Fail_WhenServerOwnerNotAuthor() {
+        // Enforces BR-MSG-02: Even if user is Owner/Admin, only author can edit
+        authenticate(EMAIL);
+        stubSender(); // User ID 2L
+
+        Message otherUsersMessage = new Message();
+        otherUsersMessage.setId(102L);
+        otherUsersMessage.setChannelId(CHANNEL_ID);
+        otherUsersMessage.setAuthorId(888L); // Author is 888L
+        otherUsersMessage.setContent("Member's message");
+
+        when(messageRepository.findById(102L)).thenReturn(Optional.of(otherUsersMessage));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.updateMessage(102L, new UpdateMessageRequest("Owner trying to edit member's message")));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verify(messageRepository, never()).save(any());
     }
 }

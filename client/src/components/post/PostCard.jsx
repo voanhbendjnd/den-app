@@ -1,5 +1,5 @@
-import React from 'react';
-import { Avatar, Typography, Tag, Button, Tooltip, Image } from 'antd';
+import React, { useState } from 'react';
+import { Avatar, Typography, Tag, Button, Tooltip, Image, Dropdown, Modal } from 'antd';
 import {
   HeartOutlined,
   HeartFilled,
@@ -9,7 +9,13 @@ import {
   TeamOutlined,
   LockOutlined,
   UserOutlined,
+  MoreOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ExclamationCircleFilled,
 } from '@ant-design/icons';
+import { useAuth } from '../../hooks/useAuth';
+import EditPostModal from './EditPostModal';
 
 const { Text, Paragraph } = Typography;
 
@@ -89,11 +95,16 @@ function renderPrivacyTag(privacy) {
   }
 }
 
-export default function PostCard({ post, onLike }) {
+export default function PostCard({ post, onLike, onEdit, onDelete }) {
+  const { currentUser } = useAuth();
+  const [isBouncing, setIsBouncing] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
   if (!post) return null;
 
   const {
     id,
+    userId,
     authorName,
     authorUsername,
     authorAvatar,
@@ -105,8 +116,48 @@ export default function PostCard({ post, onLike }) {
     isLiked = false,
   } = post;
 
+  const isAuthor = Boolean(currentUser && (currentUser.id === userId));
   const displayName = authorName || authorUsername || 'Người dùng';
   const relativeTime = formatRelativeTime(createdDate);
+
+  const handleLikeClick = () => {
+    setIsBouncing(true);
+    setTimeout(() => setIsBouncing(false), 300);
+    onLike?.(id);
+  };
+
+  const handleDeleteClick = () => {
+    Modal.confirm({
+      title: 'Xóa bài viết?',
+      icon: <ExclamationCircleFilled style={{ color: '#EF4444' }} />,
+      content: 'Bạn có chắc chắn muốn xóa bài viết này không? Bài viết sau khi xóa sẽ không thể khôi phục.',
+      okText: 'Xóa bài viết',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      centered: true,
+      onOk: async () => {
+        await onDelete?.(id);
+      },
+    });
+  };
+
+  const menuItems = [
+    {
+      key: 'edit',
+      label: 'Chỉnh sửa bài viết',
+      icon: <EditOutlined style={{ color: '#818CF8' }} />,
+      onClick: () => setEditModalOpen(true),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'delete',
+      label: <span style={{ color: '#EF4444' }}>Xóa bài viết</span>,
+      icon: <DeleteOutlined style={{ color: '#EF4444' }} />,
+      onClick: handleDeleteClick,
+    },
+  ];
 
   return (
     <div
@@ -171,6 +222,21 @@ export default function PostCard({ post, onLike }) {
             </div>
           </div>
         </div>
+
+        {/* Author Action Menu: Edit & Delete */}
+        {isAuthor && (
+          <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={['click']}>
+            <Button
+              type="text"
+              icon={<MoreOutlined style={{ color: '#94A3B8', fontSize: 18 }} />}
+              style={{
+                borderRadius: 8,
+                padding: '4px 8px',
+                color: '#94A3B8',
+              }}
+            />
+          </Dropdown>
+        )}
       </div>
 
       {/* Body: Post Content */}
@@ -229,24 +295,40 @@ export default function PostCard({ post, onLike }) {
           <Button
             type="text"
             icon={
-              isLiked ? (
-                <HeartFilled style={{ color: '#EF4444', fontSize: 17 }} />
-              ) : (
-                <HeartOutlined style={{ color: '#94A3B8', fontSize: 17 }} />
-              )
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  transform: isBouncing ? 'scale(1.35)' : 'scale(1)',
+                  transition: 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                }}
+              >
+                {isLiked ? (
+                  <HeartFilled
+                    style={{
+                      color: '#EF4444',
+                      fontSize: 17,
+                      filter: 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))',
+                    }}
+                  />
+                ) : (
+                  <HeartOutlined style={{ color: '#94A3B8', fontSize: 17 }} />
+                )}
+              </span>
             }
-            onClick={() => onLike?.(id)}
+            onClick={handleLikeClick}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              color: isLiked ? '#EF4444' : '#94A3B8',
+              color: isLiked ? '#F87171' : '#94A3B8',
               fontWeight: 600,
               fontSize: 13,
-              padding: '4px 10px',
+              padding: '4px 12px',
               borderRadius: 8,
-              background: isLiked ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
-              transition: 'all 0.2s ease',
+              background: isLiked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+              border: isLiked ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             <span>{likeCounts} Thích</span>
@@ -285,6 +367,17 @@ export default function PostCard({ post, onLike }) {
           />
         </Tooltip>
       </div>
+
+      {/* Edit Post Modal */}
+      {isAuthor && (
+        <EditPostModal
+          open={editModalOpen}
+          post={post}
+          onCancel={() => setEditModalOpen(false)}
+          onSubmit={onEdit}
+        />
+      )}
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
 import {
@@ -21,7 +21,15 @@ import ServerInviteModal from '../../components/common/ServerInviteModal';
 import ServerSettingsModal from '../../components/common/ServerSettingsModal';
 import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
+import messageApi from '../../api/messageApi';
 import { canDeleteChannel, isChannelDeletable } from '../../utils/channelUtils';
+import {
+  sortMessagesChronological,
+  mergeMessagePages,
+  formatMessageTime,
+  formatCompactTime,
+  getAuthorInfo,
+} from '../../utils/channelMessages';
 import './group-chat.css';
 
 function ChannelSidebar({
@@ -378,6 +386,115 @@ export default function GroupChatPage() {
     }
   };
 
+  // Channel Messages state
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const chatContainerRef = useRef(null);
+  const prevScrollHeightRef = useRef(0);
+
+  const fetchChannelMessages = useCallback(async (channelId) => {
+    if (!channelId) {
+      setMessages([]);
+      setHasMore(false);
+      setNextCursor(null);
+      return;
+    }
+    setMessagesLoading(true);
+    setMessagesError(null);
+    try {
+      const res = await messageApi.getMessages(channelId, { limit: 30 });
+      const pageData = res.data?.data || res.data || {};
+      const items = pageData.items || [];
+      const sorted = sortMessagesChronological(items);
+      setMessages(sorted);
+      setHasMore(Boolean(pageData.hasMore));
+      setNextCursor(pageData.nextCursor ?? null);
+      requestAnimationFrame(() => {
+        const el = chatContainerRef.current;
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+          setTimeout(() => {
+            if (chatContainerRef.current) {
+              chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+            }
+          }, 60);
+        }
+      });
+    } catch (err) {
+      setMessagesError(err.response?.data?.message || 'Không thể tải lịch sử tin nhắn.');
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeChannel?.id) {
+      fetchChannelMessages(activeChannel.id);
+    } else {
+      setMessages([]);
+      setHasMore(false);
+      setNextCursor(null);
+    }
+  }, [activeChannel?.id, fetchChannelMessages]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!activeChannel?.id || !hasMore || loadingMore || !nextCursor) return;
+    const container = chatContainerRef.current;
+    if (container) {
+      prevScrollHeightRef.current = container.scrollHeight;
+    }
+    setLoadingMore(true);
+    try {
+      const res = await messageApi.getMessages(activeChannel.id, { before: nextCursor, limit: 30 });
+      const pageData = res.data?.data || res.data || {};
+      const newItems = pageData.items || [];
+      setMessages((prev) => mergeMessagePages(prev, newItems));
+      setHasMore(Boolean(pageData.hasMore));
+      setNextCursor(pageData.nextCursor ?? null);
+      requestAnimationFrame(() => {
+        if (container) {
+          const newScrollHeight = container.scrollHeight;
+          container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+        }
+      });
+    } catch {
+      // Giữ nguyên tin nhắn hiện tại khi tải thêm thất bại
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeChannel?.id, hasMore, loadingMore, nextCursor]);
+
+  const handleChatScroll = () => {
+    const el = chatContainerRef.current;
+    if (!el || loadingMore || !hasMore) return;
+    if (el.scrollTop < 60) {
+      handleLoadMore();
+    }
+  };
+
+  const handleSendMessage = async (chId, payload) => {
+    const res = await messageApi.sendMessage(chId, payload);
+    return res.data?.data || res.data;
+  };
+
+  const handleSentMessage = (sentMessage) => {
+    if (!sentMessage) return;
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === sentMessage.id)) return prev;
+      return [...prev, sentMessage];
+    });
+    requestAnimationFrame(() => {
+      const el = chatContainerRef.current;
+      if (el) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
+    });
+  };
+
   const handleChannelCreated = (newChannel) => {
     if (serverId) {
       fetchChannels(serverId);
@@ -544,17 +661,115 @@ export default function GroupChatPage() {
             onClick={() => screens.xl ? setMembersVisible((visible) => !visible) : setMembersOpen(true)}
           />
         </header>
-        <div className="group-chat__content">
+        <div
+          className="group-chat__content"
+          ref={chatContainerRef}
+          onScroll={handleChatScroll}
+          role="region"
+          aria-label={activeChannel ? `Tin nhắn kênh #${activeChannel.name}` : 'Không gian trò chuyện'}
+        >
           {activeChannel ? (
-            <section className="group-welcome group-channel-welcome" aria-labelledby="channel-welcome-title">
-              <div className="group-welcome__visual" aria-hidden="true">
-                <div className="group-welcome__orbit" />
-                <span className="group-channel-avatar-hash">#</span>
-              </div>
-              <span className="group-welcome__eyebrow">KÊNH TRÒ CHUYỆN</span>
-              <h1 id="channel-welcome-title">Chào mừng đến với<br /><span>#{activeChannel.name}!</span></h1>
-              <p>Đây là phần khởi đầu của kênh <strong>#{activeChannel.name}</strong> trong không gian <strong>{server.name}</strong>.</p>
-            </section>
+            <>
+              {!hasMore && !messagesLoading && (
+                <section className="group-welcome group-channel-welcome" aria-labelledby="channel-welcome-title">
+                  <div className="group-welcome__visual" aria-hidden="true">
+                    <div className="group-welcome__orbit" />
+                    <span className="group-channel-avatar-hash">#</span>
+                  </div>
+                  <span className="group-welcome__eyebrow">KÊNH TRÒ CHUYỆN</span>
+                  <h1 id="channel-welcome-title">Chào mừng đến với<br /><span>#{activeChannel.name}!</span></h1>
+                  <p>Đây là phần khởi đầu của kênh <strong>#{activeChannel.name}</strong> trong không gian <strong>{server.name}</strong>.</p>
+                </section>
+              )}
+
+              {loadingMore && (
+                <div className="group-messages-loading-more" role="status" aria-label="Đang tải thêm tin nhắn cũ">
+                  <Spin size="small" />
+                  <span>Đang tải tin nhắn cũ...</span>
+                </div>
+              )}
+
+              {messagesLoading && messages.length === 0 ? (
+                <div className="group-messages-loading" role="status" aria-label="Đang tải lịch sử tin nhắn">
+                  <Spin size="large" />
+                  <span>Đang tải tin nhắn...</span>
+                </div>
+              ) : messagesError ? (
+                <div className="group-messages-error" role="alert">
+                  <span>{messagesError}</span>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={() => fetchChannelMessages(activeChannel.id)}
+                    style={{ color: '#00f2fe', padding: 0 }}
+                  >
+                    Thử lại
+                  </Button>
+                </div>
+              ) : (
+                <div className="group-messages-list" role="list">
+                  {messages.map((msg, index) => {
+                    const author = getAuthorInfo(msg.senderId, members, currentUser, server.ownerId);
+                    const prevMsg = messages[index - 1];
+                    const isSameSender = prevMsg && String(prevMsg.senderId) === String(msg.senderId);
+                    const isCloseInTime = isSameSender && Math.abs(new Date(msg.createdAt) - new Date(prevMsg.createdAt)) < 300000;
+                    const isGrouped = isSameSender && isCloseInTime;
+
+                    return (
+                      <div
+                        key={msg.id ?? `msg-${index}`}
+                        className={`group-message-row ${author.isOwn ? 'group-message-row--own' : ''} ${isGrouped ? 'group-message-row--grouped' : ''}`}
+                        role="listitem"
+                      >
+                        {!isGrouped ? (
+                          <div className="group-message-avatar-col">
+                            <Avatar
+                              size={40}
+                              src={author.avatar}
+                              className="group-message-avatar"
+                              style={{
+                                background: author.isOwn
+                                  ? 'linear-gradient(135deg, #6366f1, #00f2fe)'
+                                  : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {author.initial}
+                            </Avatar>
+                          </div>
+                        ) : (
+                          <div className="group-message-time-gutter" aria-hidden="true">
+                            <span className="group-message-compact-time">{formatCompactTime(msg.createdAt)}</span>
+                          </div>
+                        )}
+
+                        <div className="group-message-body">
+                          {!isGrouped && (
+                            <div className="group-message-header">
+                              <span className={`group-message-author ${author.isOwn ? 'group-message-author--own' : ''}`}>
+                                {author.name}
+                              </span>
+                              {author.isOwner && (
+                                <span className="group-message-owner-badge" title="Chủ nhóm">
+                                  Chủ nhóm
+                                </span>
+                              )}
+                              <span className="group-message-time">
+                                {formatMessageTime(msg.createdAt)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="group-message-content">
+                            {msg.content}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           ) : (
             <section className="group-welcome" aria-labelledby="group-welcome-title">
               <div className="group-welcome__visual" aria-hidden="true">
@@ -580,6 +795,8 @@ export default function GroupChatPage() {
           channelId={activeChannel?.id}
           channelName={activeChannel?.name}
           disabled={!activeChannel}
+          onSend={handleSendMessage}
+          onSent={handleSentMessage}
         />
       </main>
       {screens.xl && membersVisible && (

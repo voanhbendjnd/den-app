@@ -4,6 +4,7 @@ import com.denhub.service.MessageService;
 import com.denhub.service.dto.CursorPageResponse;
 import com.denhub.service.dto.MessageResponse;
 import com.denhub.service.dto.SendMessageRequest;
+import com.denhub.service.dto.UpdateMessageRequest;
 import com.denhub.util.ResFormatResponse;
 import com.denhub.web.rest.errors.ExceptionTranslator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,9 +34,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -247,5 +250,100 @@ class MessageResourceIT {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.detail").value("400 BAD_REQUEST \"Số lượng tin nhắn phải từ 1 đến 100\""));
+    }
+
+    @Test
+    void updateMessageSuccessReturns200Ok() throws Exception {
+        Long messageId = 101L;
+        String updatedContent = "Nội dung sau khi sửa";
+        Instant now = Instant.parse("2026-10-10T08:00:00Z");
+        MessageResponse response = new MessageResponse(
+                messageId, CHANNEL_ID, SENDER_ID, updatedContent, Instant.parse("2026-10-10T07:30:00Z"), now);
+
+        when(messageService.updateMessage(eq(messageId), any(UpdateMessageRequest.class))).thenReturn(response);
+
+        UpdateMessageRequest request = new UpdateMessageRequest(updatedContent);
+
+        mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.message").value("Chỉnh sửa tin nhắn thành công"))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.data.id").value(messageId))
+                .andExpect(jsonPath("$.data.content").value(updatedContent))
+                .andExpect(jsonPath("$.data.updatedAt").value("2026-10-10T08:00:00Z"));
+
+        verify(messageService).updateMessage(eq(messageId), any(UpdateMessageRequest.class));
+    }
+
+    @Test
+    void updateMessageViaPutSuccessReturns200Ok() throws Exception {
+        Long messageId = 101L;
+        String updatedContent = "Nội dung sau khi sửa qua PUT";
+        MessageResponse response = new MessageResponse(
+                messageId, CHANNEL_ID, SENDER_ID, updatedContent, Instant.parse("2026-10-10T07:30:00Z"), Instant.now());
+
+        when(messageService.updateMessage(eq(messageId), any(UpdateMessageRequest.class))).thenReturn(response);
+
+        UpdateMessageRequest request = new UpdateMessageRequest(updatedContent);
+
+        mockMvc.perform(put("/api/messages/{messageId}", messageId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.message").value("Chỉnh sửa tin nhắn thành công"))
+                .andExpect(jsonPath("$.data.content").value(updatedContent));
+
+        verify(messageService).updateMessage(eq(messageId), any(UpdateMessageRequest.class));
+    }
+
+    @Test
+    void updateMessageWithBlankContentReturns400BadRequest() throws Exception {
+        Long messageId = 101L;
+        UpdateMessageRequest request = new UpdateMessageRequest("   ");
+
+        mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(messageService);
+    }
+
+    @Test
+    void updateMessageWhenNotFoundReturns404() throws Exception {
+        Long messageId = 9999L;
+        when(messageService.updateMessage(eq(messageId), any(UpdateMessageRequest.class)))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy tin nhắn"));
+
+        UpdateMessageRequest request = new UpdateMessageRequest("Nội dung mới");
+
+        mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail").value("404 NOT_FOUND \"Không tìm thấy tin nhắn\""));
+    }
+
+    @Test
+    void updateMessageWhenForbiddenReturns403() throws Exception {
+        Long messageId = 101L;
+        when(messageService.updateMessage(eq(messageId), any(UpdateMessageRequest.class)))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền sửa tin nhắn này"));
+
+        UpdateMessageRequest request = new UpdateMessageRequest("Nội dung mới");
+
+        mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.detail").value("403 FORBIDDEN \"Bạn không có quyền sửa tin nhắn này\""));
     }
 }
