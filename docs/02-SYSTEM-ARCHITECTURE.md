@@ -155,6 +155,8 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
 | **Post** | `POST` | `/api/posts/all-friends` | Lấy danh sách bài viết từ bạn bè & bản thân trên Newsfeed (Cursor pagination theo date và id) | `CONFIRMED` |
 | **Post** | `POST` | `/api/posts/{postId}/like` | Thích hoặc bỏ thích một bài viết (Toggle Like, đồng bộ Redis Set & DB like_counts) | `CONFIRMED` |
+| **Post** | `PUT` | `/api/posts/{postId}` | Chỉnh sửa nội dung, quyền riêng tư và ảnh đính kèm bài viết (yêu cầu là tác giả) | `CONFIRMED` |
+| **Post** | `DELETE` | `/api/posts/{postId}` | Xóa bài viết vĩnh viễn và dọn dẹp Redis Set (yêu cầu là tác giả) | `CONFIRMED` |
 | **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
@@ -750,4 +752,52 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
   - Đồng bộ lại dữ liệu chuẩn từ server khi có response (`liked`, `totalLikes`).
   - Tự động rollback về trạng thái trước đó và hiển thị thông báo lỗi `message.error` nếu request thất bại.
 - `PostCard`: Thêm hiệu ứng micro-animation (bouncy scale spring effect và Cyber Red glow filter `drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))`) mang phong cách Discord Cyber Glassmorphism.
+
+## 14. Chỉnh sửa và Xóa Bài Viết (Post Edit & Delete) (`CONFIRMED / IMPLEMENTED`, 2026-10-25)
+
+### 14.1 REST API Contracts
+- **Cập nhật bài viết**: `PUT /api/posts/{postId}`
+  - **Authentication**: Bắt buộc (JWT Bearer Token qua Spring Security).
+  - **Quyền hạn**: Duy nhất tác giả của bài viết (`post.userId == currentUserId`).
+  - **Request Body**: `UpdatePostDTO`
+    ```json
+    {
+      "content": "Nội dung bài viết mới...",
+      "privacy": "PUBLIC",
+      "mediaUrl": "https://..."
+    }
+    ```
+  - **Validation**:
+    - `content` và `mediaUrl` không được đồng thời rỗng (trả về `400 Bad Request` `emptyPost`).
+    - `content` tối đa 120 ký tự (trả về `400 Bad Request` `contentTooLong`).
+    - `mediaUrl` tối đa 1000 ký tự (trả về `400 Bad Request` `mediaUrlTooLong`).
+    - `privacy` phải thuộc `PUBLIC`, `FRIENDS_ONLY`, `PRIVATE` (trả về `400 Bad Request` `invalidformat`).
+    - Không phải tác giả trả về `403 Forbidden` (`AccessDeniedException` `postNotOwner`).
+    - Bài viết không tồn tại trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`).
+  - **Response**: `200 OK` kèm `DisplayPostDTO`.
+
+- **Xóa bài viết**: `DELETE /api/posts/{postId}`
+  - **Authentication**: Bắt buộc (JWT Bearer Token).
+  - **Quyền hạn**: Duy nhất tác giả bài viết (`post.userId == currentUserId`).
+  - **Xử lý**:
+    - Xóa bản ghi trong SQL Server database (`postRepository.delete(post)`).
+    - Dọn dẹp key Redis Set lưu likes của bài viết (`stringRedisTemplate.delete("post:{postId}:likes")`).
+    - Không phải tác giả trả về `403 Forbidden` (`AccessDeniedException` `postNotOwner`).
+    - Bài viết không tồn tại trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`).
+  - **Response**: `204 No Content` (body rỗng).
+
+### 14.2 Giao diện & Tích hợp Frontend
+- **PostCard**:
+  - Nhận biết tác giả bài viết qua `currentUser.id === post.userId`.
+  - Hiển thị menu `...` (MoreOutlined) góc trên bên phải thẻ bài viết cho tác giả.
+  - Dropdown menu gồm: "Chỉnh sửa bài viết" (EditOutlined) và "Xóa bài viết" (DeleteOutlined, màu đỏ nguy hiểm).
+  - Thao tác Xóa: Kích hoạt hộp thoại xác nhận `Modal.confirm` trước khi gọi xóa.
+- **EditPostModal**:
+  - Thiết kế Cyber Glassmorphism với Avatar tác giả, Dropdown quyền riêng tư, Textarea đếm 120 ký tự.
+  - Quản lý ảnh đính kèm: preview ảnh, nút gỡ ảnh, nút tải ảnh mới qua `fileApi.upload`.
+  - Disable nút Lưu khi dữ liệu rỗng hoặc đang upload/submit.
+- **useFriendPosts Hook**:
+  - `editPost(postId, payload)`: Gọi `postApi.updatePost`, cập nhật state bài viết tương ứng và toast thành công.
+  - `deletePost(postId)`: Cập nhật lạc quan (loại bỏ bài viết khỏi danh sách ngay lập tức), gọi `postApi.deletePost`, tự động rollback nếu server trả lỗi.
+
 

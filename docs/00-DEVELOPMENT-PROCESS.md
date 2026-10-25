@@ -2293,9 +2293,58 @@ Commit:
 
 ---
 
+### [2026-10-25] BE-FE-POST-EDIT-DELETE — Triển khai tính năng Chỉnh sửa và Xóa bài viết (Edit & Delete Post)
+
+Implemented:
+
+- Backend:
+  - Tạo mới `UpdatePostDTO.java` (`content` tối đa 120 ký tự, `privacy`: `PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`, `mediaUrl` tối đa 1000 ký tự).
+  - Cập nhật `PostService.java`:
+    - `updatePost(postId, dto)`: Xác thực tác giả (`post.userId == currentUserId`), kiểm tra bài tồn tại, validate không rỗng cả text và media, cập nhật nội dung, privacy, mediaUrl và trả về `DisplayPostDTO`.
+    - `deletePost(postId)`: Xác thực tác giả, xóa bài viết khỏi cơ sở dữ liệu (`postRepository.delete(post)`) và dọn dẹp key Redis Set lưu likes của bài viết (`stringRedisTemplate.delete("post:{postId}:likes")`).
+    - Chặn và ném `AccessDeniedException("postNotOwner")` (403 Forbidden) nếu user không phải tác giả bài viết.
+  - Cập nhật `PostController.java`:
+    - `PUT /api/posts/{postId}`: Nhận `UpdatePostDTO`, trả về HTTP 200 kèm `DisplayPostDTO`.
+    - `DELETE /api/posts/{postId}`: Trả về HTTP 204 No Content.
+  - Viết 10 unit tests mới trong `PostServiceTest.java` và 3 tests trong `PostControllerTest.java` (bao phủ thành công, bài không tồn tại, người khác cố tình sửa/xóa, bài rỗng, text quá dài, dọn dẹp Redis).
+- Frontend:
+  - Cập nhật `postApi.js`: Thêm `updatePost(postId, data)` và `deletePost(postId)`.
+  - Nâng cấp hook `useFriendPosts.js`: Bổ sung `editPost` và `deletePost` với Optimistic update, rollback khi lỗi và toast thông báo `message.success` / `message.error`.
+  - Tạo mới `EditPostModal.jsx`: Modal phong cách Cyber Glassmorphism cho phép chỉnh sửa nội dung bài viết, đếm 120 ký tự, đổi quyền riêng tư, thay đổi hoặc gỡ bỏ ảnh đính kèm.
+  - Cập nhật `PostCard.jsx`: Thêm menu ba chấm (`...`) cho tác giả bài viết gồm 2 tùy chọn "Chỉnh sửa bài viết" và "Xóa bài viết", tích hợp hộp thoại xác nhận an toàn `Modal.confirm` trước khi xóa.
+  - Cập nhật `FriendFeedSection.jsx`: Truyền `editPost` và `deletePost` xuống các thẻ `PostCard`.
+  - Tạo mới `client/tests/postEditDelete.test.mjs`: 7 unit tests kiểm thử logic validate payload chỉnh sửa, optimistic edit/delete và rollback.
+- Tests & Verification:
+  - Backend: `.\gradlew.bat test` PASS 100% (toàn bộ test suite).
+  - Frontend: `npm run build` PASS 100% (0 errors).
+  - Frontend Unit Tests: `node --test` PASS 52/52 tests.
+
+Docs Updated:
+- `docs/02-SYSTEM-ARCHITECTURE.md` (REST table + Section 14).
+- `docs/00-DEVELOPMENT-PROCESS.md` (Completed Work Log & Handoff).
+
+Commit:
+- PENDING (Chờ ủy quyền commit).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
-### Handoff hiện tại — Post Like & Feed UI (2026-10-24)
+### Handoff hiện tại — Post Edit & Delete (2026-10-25)
+
+- Tính năng Chỉnh sửa và Xóa bài viết đã hoàn thiện toàn diện từ Backend tới Frontend:
+  - API `PUT /api/posts/{postId}`: Cho phép tác giả cập nhật content, privacy, mediaUrl; kiểm tra chặt chẽ quyền sở hữu (403), tồn tại (400) và độ dài ký tự.
+  - API `DELETE /api/posts/{postId}`: Cho phép tác giả xóa bài viết, xóa sạch bản ghi trong DB và dọn dẹp Redis Set likes; trả về 204 No Content.
+  - Giao diện: Menu thao tác chỉ hiển thị với tác giả bài viết, xác nhận xóa qua `Modal.confirm`, modal chỉnh sửa `EditPostModal` chuẩn Cyber Glassmorphism.
+  - Frontend `useFriendPosts` hỗ trợ cập nhật danh sách tức thì và rollback an toàn nếu gặp lỗi mạng.
+- Verification:
+  - Toàn bộ backend test `gradlew.bat test` PASS 100%.
+  - Frontend build `npm run build` PASS 100%.
+  - Frontend logic `node --test` PASS 52/52 tests.
+- Chưa commit; AI Agent tuân thủ nghiêm ngặt quy tắc không push và không tự ý commit khi chưa có ủy quyền rõ ràng từ người dùng.
+
+### Handoff trước — Post Like & Feed UI (2026-10-24)
+
 
 - Tính năng Like bài viết đã hoàn thiện toàn diện từ Backend tới Frontend:
   - API `POST /api/posts/{postId}/like` kiểm tra quyền theo privacy (`PUBLIC`, `FRIENDS_ONLY`, `PRIVATE`), trạng thái active của user, lưu trữ Redis Set và đồng bộ trường `post.like_counts` trong SQL Server.
