@@ -232,4 +232,24 @@ class ServerResourceTest {
 
         org.mockito.Mockito.verify(serverService).joinServerByInviteCode("abc12345");
     }
+
+    @Test
+    void leaveServer_ReturnsNoContent() throws Exception {
+        mockMvc = MockMvcBuilders.standaloneSetup(serverResource)
+                .setControllerAdvice(new com.denhub.util.ResFormatResponse()).build();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/servers/12/leave"))
+                .andExpect(status().isNoContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+        org.mockito.Mockito.verify(serverService).leaveServer(12L);
+    }
+
+    @Test
+    void leaveServerByMemberMe_ReturnsNoContent() throws Exception {
+        mockMvc = MockMvcBuilders.standaloneSetup(serverResource)
+                .setControllerAdvice(new com.denhub.util.ResFormatResponse()).build();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/servers/12/members/me"))
+                .andExpect(status().isNoContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+        org.mockito.Mockito.verify(serverService).leaveServer(12L);
+    }
 }

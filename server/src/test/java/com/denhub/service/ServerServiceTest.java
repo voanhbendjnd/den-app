@@ -871,4 +871,88 @@ class ServerServiceTest {
                 () -> serverService.joinServerByInviteCode("already1"));
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
+
+    @Test
+    void leaveServer_Success() {
+        prepareDetailUser();
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(2L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+
+        serverService.leaveServer(10L);
+
+        verify(serverMemberRepository, times(1)).deleteByServerIdAndUserId(10L, 1L);
+    }
+
+    @Test
+    void leaveServer_FailWhenNotLoggedIn() {
+        SecurityContextHolder.clearContext();
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(10L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void leaveServer_FailWhenServerNotFound() {
+        prepareDetailUser();
+        when(serverRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(999L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void leaveServer_FailWhenOwnerAttemptsToLeave() {
+        prepareDetailUser();
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(10L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).contains("Chủ sở hữu không thể rời khỏi Server");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+    }
+
+    @Test
+    void leaveServer_FailWhenUserIsNotMember() {
+        prepareDetailUser();
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(2L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(10L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).contains("Bạn không phải là thành viên");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+    }
+
+    @Test
+    void leaveServer_FailWhenServerIdInvalid() {
+        ResponseStatusException ex1 = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(null));
+        assertThat(ex1.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException ex2 = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(0L));
+        assertThat(ex2.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException ex3 = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(-1L));
+        assertThat(ex3.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
 }
