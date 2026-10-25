@@ -417,6 +417,44 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-25] FEAT-USER-PROFILE-API — Làm API Xem Hồ Sơ Cá Nhân & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `GET /api/v1/users/profile` (kèm alias `GET /api/v1/users/me`) cho phép người dùng đang đăng nhập xem đầy đủ thông tin hồ sơ cá nhân của chính mình.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/UserProfileResponseDTO.java`:
+    - Tạo DTO chứa thông tin hồ sơ người dùng cá nhân gồm: `id`, `email`, `name` (tên hiển thị), `username`, `avatar`, `activated`, `createdDate`, `authorities`.
+    - Loại bỏ tuyệt đối các trường nhạy cảm (`password_hash`, `activation_key`, `reset_key`, `refresh_token`, `session_id`).
+    - Bổ sung helper `fromUser(User user)` ánh xạ từ thực thể `User`.
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional(readOnly = true) public UserProfileResponseDTO getUserProfile()`:
+      - Xác thực người dùng hiện tại từ Spring Security Context qua `SecurityUtils.getCurrentUserLogin()`, ném `BadRequestAlertException` (`notloggedin`) nếu chưa đăng nhập.
+      - Truy vấn người dùng từ database qua `userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)`, ném `BadRequestAlertException` (`usernotfound`) nếu không tồn tại.
+      - Trả về DTO hồ sơ người dùng tương ứng.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Tạo Controller mới với route `@RequestMapping("/api/v1/users")`, tag `"User Profile"`, yêu cầu `@SecurityRequirement(name = "bearerAuth")`.
+    - Cung cấp 2 endpoints:
+      - `GET /api/v1/users/profile`: Endpoint chính thức lấy thông tin hồ sơ cá nhân.
+      - `GET /api/v1/users/me`: Endpoint alias tương thích theo chuẩn RESTful.
+    - Được bọc tự động qua `ResFormatResponse` theo đúng cấu trúc wrapper `{ statusCode: 200, message: "...", data: {...} }`.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `getUserProfile_Success`: Kiểm tra trả về đúng thông tin hồ sơ khi đăng nhập thành công.
+    - `getUserProfile_Fail_WhenNotLoggedIn`: Kiểm tra ném lỗi `notloggedin` khi chưa đăng nhập.
+    - `getUserProfile_Fail_WhenUserNotFound`: Kiểm tra ném lỗi `usernotfound` khi người dùng không tồn tại.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `getUserProfile_Success`: MockMvc GET `/api/v1/users/profile` trả về HTTP 200 và json data hợp lệ.
+    - `getUserProfile_AliasMe_Success`: MockMvc GET `/api/v1/users/me` trả về HTTP 200.
+    - `getUserProfile_Fail_WhenNotLoggedIn`: MockMvc trả về HTTP 400 Problem Details khi chưa đăng nhập.
+    - `getUserProfile_Fail_WhenUserNotFound`: MockMvc trả về HTTP 400 Problem Details khi không tìm thấy user.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 7/7 tests (0 failures, 0 errors).
+  - `.\gradlew.bat compileJava`: BUILD SUCCESSFUL.
+- **Docs Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `GET /api/v1/users/profile` vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
 ### [2026-10-25] FEAT-SERVER-INVITE-API-INTEGRATION — Kết Nối UI Mã Mời Server Với API
 
 - **Mục tiêu:** Hoàn thiện tích hợp frontend UI tạo và sao chép mã mời Server (`ServerInviteModal.jsx`) với API backend `POST /api/v1/servers/{serverId}/invites`.
