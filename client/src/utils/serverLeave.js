@@ -85,3 +85,33 @@ export function getLeaveErrorMessage(error, serverName = 'Server') {
 
   return `Không thể rời khỏi ${serverName}. Vui lòng thử lại sau!`;
 }
+
+/**
+ * Removes a server from the server list by its ID, supporting both string and number types.
+ *
+ * @param {Array<Object>} servers
+ * @param {string | number} serverIdToRemove
+ * @returns {Array<Object>}
+ */
+export function removeServerFromList(servers, serverIdToRemove) {
+  if (!Array.isArray(servers) || serverIdToRemove === null || serverIdToRemove === undefined) {
+    return Array.isArray(servers) ? [...servers] : [];
+  }
+  const targetId = String(serverIdToRemove);
+  return servers.filter((s) => String(s?.id) !== targetId);
+}
+
+/**
+ * Checks whether a server is present in the server list.
+ *
+ * @param {Array<Object>} servers
+ * @param {string | number} serverId
+ * @returns {boolean}
+ */
+export function isServerInList(servers, serverId) {
+  if (!Array.isArray(servers) || serverId === null || serverId === undefined) {
+    return false;
+  }
+  const targetId = String(serverId);
+  return servers.some((s) => String(s?.id) === targetId);
+}
