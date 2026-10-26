@@ -385,7 +385,12 @@ public class ServerService {
         member.setRole("MEMBER");
         member.setJoinedAt(Instant.now());
         member.setNickname(ownerNickname(currentUser.getName()));
-        serverMemberRepository.save(member);
+        try {
+            serverMemberRepository.saveAndFlush(member);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Bạn đã là thành viên của Server này rồi");
+        }
 
         ServerResponseDTO response = new ServerResponseDTO();
         response.setId(server.getId());
