@@ -175,3 +175,113 @@ export function formatMemberDisplayName(member) {
   if (!member) return 'Thành viên';
   return member.nickname || member.name || member.username || 'Thành viên';
 }
+
+/**
+ * Checks whether the current user is allowed access to a server based on ownership
+ * or presence in the server members list.
+ *
+ * @param {Object} server Server object with id and ownerId
+ * @param {Object} currentUser Current user object with id
+ * @param {Array<Object>} [members] List of active server members
+ * @returns {boolean} True if current user is owner or active member, false otherwise
+ */
+export function isMemberAllowedAccess(server, currentUser, members = null) {
+  if (!server || !currentUser) {
+    return false;
+  }
+  const currentUserId = currentUser.id ?? currentUser.userId;
+  if (!currentUserId) {
+    return false;
+  }
+
+  // Owner always has access
+  if (server.ownerId && String(server.ownerId) === String(currentUserId)) {
+    return true;
+  }
+
+  // If members list is loaded, verify membership
+  if (Array.isArray(members)) {
+    return members.some((m) => String(m.userId ?? m.id) === String(currentUserId));
+  }
+
+  return false;
+}
+
+/**
+ * Maps API errors when a removed member attempts to access a server, its channels,
+ * or its messages to a user-friendly Vietnamese notification message.
+ *
+ * @param {any} err Axios error or standard response error
+ * @returns {string} Localized error message
+ */
+export function getRemovedMemberAccessErrorMessage(err) {
+  if (!err) {
+    return 'Bạn không có quyền truy cập Server này.';
+  }
+
+  const status = err.response?.status;
+  const data = err.response?.data;
+  const message = String(data?.detail || data?.message || data?.errorKey || '').toLowerCase();
+
+  if (status === 401 || data?.errorKey === 'notloggedin') {
+    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!';
+  }
+
+  if (status === 403 || message.includes('forbidden') || message.includes('không có quyền')) {
+    return 'Bạn không còn là thành viên của Server này hoặc đã bị loại.';
+  }
+
+  if (status === 404 || message.includes('servernotfound') || message.includes('không tìm thấy')) {
+    return 'Server không tồn tại hoặc đã bị xóa.';
+  }
+
+  if (status === 400 && (message.includes('forbidden') || message.includes('permission') || message.includes('quyền'))) {
+    return 'Bạn không có quyền truy cập hoặc thực hiện thao tác trong Server này.';
+  }
+
+  if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+    return 'Yêu cầu quá thời gian chờ. Vui lòng kiểm tra lại kết nối mạng!';
+  }
+
+  if (err.code === 'ERR_NETWORK' || !err.response) {
+    return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng!';
+  }
+
+  return 'Bạn không có quyền truy cập Server này.';
+}
+
+/**
+ * Filters out a removed server from the client-side list of servers.
+ *
+ * @param {Array<Object>} serverList
+ * @param {string | number} removedServerId
+ * @returns {Array<Object>}
+ */
+export function filterActiveServersAfterRemoval(serverList, removedServerId) {
+  if (!Array.isArray(serverList)) {
+    return [];
+  }
+  if (!removedServerId) {
+    return [...serverList];
+  }
+  return serverList.filter((s) => String(s.id) !== String(removedServerId));
+}
+
+/**
+ * Resolves safe fallback redirect destination when a user is removed from their current active server.
+ *
+ * @param {string | number} currentServerId The server the user was actively browsing
+ * @param {string | number} removedServerId The server ID from which the user was removed
+ * @param {Array<Object>} remainingServers List of remaining accessible servers
+ * @returns {string | null} Target route path to redirect to, or null if no redirect needed
+ */
+export function resolveRemovalRedirectPath(currentServerId, removedServerId, remainingServers = []) {
+  if (String(currentServerId) !== String(removedServerId)) {
+    return null;
+  }
+  if (Array.isArray(remainingServers) && remainingServers.length > 0) {
+    return `/servers/${remainingServers[0].id}`;
+  }
+  return '/servers';
+}
+
