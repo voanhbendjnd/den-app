@@ -1189,6 +1189,76 @@ class ServerServiceTest {
         assertThat(ex3.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+
+    @Test
+    void removeMember_ThenTargetMemberBlockedFromAccessingServer() {
+        prepareDetailUser(); // User id = 1L (Owner)
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(true);
+
+        serverService.removeMember(10L, 2L);
+        verify(serverMemberRepository).deleteByServerIdAndUserId(10L, 2L);
+
+        // Target (User 2) is now removed. Target attempts to access Server 10
+        String targetEmail = "target_kicked@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(targetEmail, null, java.util.List.of()));
+        User targetUser = new User();
+        targetUser.setId(2L);
+        targetUser.setActivated(true);
+        when(userRepository.findOneByEmail(targetEmail)).thenReturn(Optional.of(targetUser));
+
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(false);
+
+        ResponseStatusException exDetail = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerDetail(10L));
+        assertThat(exDetail.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        ResponseStatusException exMembers = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerMembers(10L));
+        assertThat(exMembers.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        when(serverRepository.findAllByUserIdOrOwnerId(2L)).thenReturn(java.util.Collections.emptyList());
+        java.util.List<ServerResponseDTO> userServers = serverService.getUserServers();
+        assertThat(userServers).isEmpty();
+    }
+
+    @Test
+    void removeMember_TargetCannotPerformAdministrativeActions() {
+        prepareDetailUser(); // User id = 1L (Owner)
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(true);
+
+        serverService.removeMember(10L, 2L);
+
+        String targetEmail = "target_admin_fail@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(targetEmail, null, java.util.List.of()));
+        User targetUser = new User();
+        targetUser.setId(2L);
+        targetUser.setActivated(true);
+        when(userRepository.findOneByEmail(targetEmail)).thenReturn(Optional.of(targetUser));
+
+        ResponseStatusException exInvite = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, null));
+        assertThat(exInvite.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        ResponseStatusException exRemove = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 3L));
+        assertThat(exRemove.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     @Test
     void removeMember_SuccessWhenOwnerRemovesMember() {
         prepareDetailUser(); // User id = 1L
