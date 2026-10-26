@@ -413,6 +413,33 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-3.04-SERVER-MEMBER-LIST-AFTER-JOIN — Kiểm Tra Người Tham Gia Server Xuất Hiện Trong Danh Sách Thành Viên
+
+- **Mục tiêu:** Kiểm tra và bảo đảm tính toàn vẹn dữ liệu thành viên khi người dùng tham gia Server (qua cả 2 luồng: API tham gia trực tiếp và tham gia qua mã mời), đảm bảo người dùng mới xuất hiện chính xác trong danh sách thành viên ở cả Backend API (`GET /api/v1/servers/{serverId}/members`) và phía Frontend.
+- **Backend Testing & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Thêm `joinServer_ThenGetServerMembers_ContainsJoinedUser`: Xác nhận `getServerMembers` phản ánh đầy đủ `userId`, `username`, `name`, `nickname`, `role = "MEMBER"`, và `avatar` của thành viên vừa tham gia.
+    - Thêm `joinServerByInviteCode_ThenGetServerMembers_ContainsJoinedUser`: Xác nhận thành viên tham gia qua mã mời xuất hiện với vai trò `MEMBER`.
+    - Thêm `getServerMembers_GracefulHandlingWhenUserEntityMissingInRepository`: Xử lý an toàn không gây NPE khi bản ghi User bị thiếu trong repository.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - Thêm `joinServer_Directly_NewMemberAppearsInMembersList`: Vòng đời hoàn chỉnh từ khi là outsider (bị từ chối 403), join trực tiếp qua `POST /api/v1/servers/{id}/join` (204), đọc danh sách thành viên (200), xuất hiện đầy đủ thông tin thành viên mới; Owner cũng đọc được danh sách cập nhật.
+    - Thêm `joinServer_ByInviteCode_NewMemberAppearsInMembersList`: Tạo mã mời, tham gia qua `POST /api/v1/servers/join-invite/{code}` (200), xác minh người mới xuất hiện trong danh sách thành viên với vai trò `MEMBER`.
+- **Frontend State & Utility Tests:**
+  - `client/src/utils/serverMember.js`:
+    - Thêm helper `findMemberByUserId`: Tìm kiếm thành viên an toàn theo ID (number hoặc string).
+    - Thêm helper `mergeNewMemberIntoList`: Gộp thành viên mới vào danh sách an toàn, ngăn chặn trùng lặp và đồng bộ vai trò `OWNER`/`MEMBER`.
+    - Thêm helper `getMemberCountDisplay`: Định dạng chuỗi hiển thị số lượng thành viên `Thành viên (N)`.
+    - Thêm helper `formatMemberDisplayName`: Chuẩn hóa tên hiển thị theo thứ tự ưu tiên nickname > name > username > fallback.
+  - `client/tests/serverMemberListAfterJoin.test.mjs`:
+    - Test suite gồm 8 bài test unit kiểm thử toàn diện các hàm tiện ích quản lý danh sách thành viên sau khi tham gia.
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 84/84 tests PASS.
+  - Frontend `npm test`: 90/90 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công (3217 modules transformed trong 814ms).
+- **Git:**
+  - Branch: `test/server-member-list-after-join`.
+
 ### [2026-10-26] TASK-2.34-SERVER-MEMBER-REMOVAL-AUTHORIZATION — Kiểm Tra & Củng Cố Phân Quyền Loại Thành Viên
 
 - **Mục tiêu:** Kiểm tra và bảo đảm tuyệt đối chỉ người có quyền (Server Owner hợp pháp) mới được phép loại thành viên khỏi Server qua endpoint `DELETE /api/v1/servers/{serverId}/members/{userId}`.

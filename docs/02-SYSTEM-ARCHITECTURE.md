@@ -860,3 +860,35 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 ### 16.3 Cho phép tham gia lại sau khi rời hoặc bị loại (Rejoin Support)
 - Do cơ chế thành viên sử dụng hard-delete (`deleteByServerIdAndUserId`) khi rời nhóm (`leaveServer`) hoặc bị Server Owner loại (`removeMember`), toàn bộ bản ghi membership của người dùng đó được xóa hoàn toàn khỏi bảng `server_member`.
 - Khi người dùng nhận được lời mời hợp lệ hoặc tham gia lại, hệ thống cho phép tạo lại bản ghi thành viên mới duy nhất (1 bản ghi) và không bị xung đột khóa.
+
+---
+
+## 17. QUY TẮC XÁC MINH DANH SÁCH THÀNH VIÊN SAU KHI THAM GIA (TASK 3.04)
+
+### 17.1 Endpoints & Luồng dữ liệu thành viên
+- **Tham gia Server**:
+  - `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp (`204 No Content`).
+  - `POST /api/v1/servers/join-invite/{code}`: Tham gia bằng mã mời (`200 OK`, trả về `ServerResponseDTO`).
+- **Danh sách thành viên**:
+  - `GET /api/v1/servers/{serverId}/members`: Lấy danh sách thành viên của Server (`200 OK`, `ResFormatResponse<List<ServerMemberResponseDTO>>`).
+
+### 17.2 Quy tắc tính toàn vẹn dữ liệu thành viên (Data Integrity & Lifecycle)
+1. **Trước khi tham gia (Pre-join Guard)**:
+   - Outsider (người dùng chưa tham gia Server) tuyệt đối không được phép xem danh sách thành viên $\rightarrow$ `403 Forbidden` ("Bạn không có quyền xem danh sách thành viên của Server này").
+2. **Sau khi tham gia (Post-join Visibility)**:
+   - Ngay sau khi lệnh tham gia (trực tiếp hoặc qua invite code) thành công, quyền thành viên được kích hoạt ngay lập tức.
+   - Thành viên mới gọi `GET /api/v1/servers/{serverId}/members` $\rightarrow$ `200 OK`.
+   - Bản ghi của thành viên mới xuất hiện đầy đủ trong danh sách với các trường:
+     - `userId`: ID định danh người dùng.
+     - `username`: Tên đăng nhập.
+     - `name`: Tên đầy đủ.
+     - `nickname`: Tên hiển thị trong Server (mặc định lấy từ User.name).
+     - `avatar`: URL ảnh đại diện.
+     - `role`: `"MEMBER"` (chỉ `server.ownerId` mới có vai trò `"OWNER"`).
+   - Server Owner và các thành viên khác khi tải lại danh sách thành viên đều thấy thành viên mới.
+3. **Phía Frontend (UI State Management)**:
+   - `client/src/utils/serverMember.js` cung cấp các hàm hỗ trợ:
+     - `findMemberByUserId`: Tra cứu thành viên theo ID.
+     - `mergeNewMemberIntoList`: Hợp nhất an toàn thành viên mới vào state, ngăn chặn trùng lặp và bảo toàn vai trò `OWNER`/`MEMBER`.
+     - `getMemberCountDisplay`: Hiển thị số lượng chuẩn `Thành viên (N)`.
+     - `formatMemberDisplayName`: Ưu tiên `nickname` > `name` > `username` > fallback `Thành viên`.
