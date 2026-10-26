@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import com.denhub.domain.Channel;
 import com.denhub.domain.Server;
@@ -265,6 +266,10 @@ public class ServerService {
     }
 
     public void joinServer(Long serverId) {
+        if (serverId == null || serverId <= 0) {
+            throw new BadRequestAlertException("Invalid server ID", "server", "idinvalid");
+        }
+
         String currentUserEmail = SecurityUtils.getCurrentUserLogin()
                 .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "server", "notloggedin"));
 
@@ -284,7 +289,11 @@ public class ServerService {
         member.setRole("MEMBER");
         member.setJoinedAt(Instant.now());
         member.setNickname(currentUser.getName() != null ? currentUser.getName() : "Member");
-        serverMemberRepository.save(member);
+        try {
+            serverMemberRepository.saveAndFlush(member);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BadRequestAlertException("User is already a member of this server", "server", "alreadymember");
+        }
     }
 
     @Transactional
