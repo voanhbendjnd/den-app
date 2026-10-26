@@ -116,7 +116,7 @@ async function openPage({ authenticated = true, width = 1440, handler } = {}) {
   return { page, requests, errors };
 }
 
-async function fulfillServerRequest(route) {
+async function fulfillServerRequest(route, createdServers = []) {
   const request = route.request();
   assert.equal(request.method(), 'GET');
   const pathname = new URL(request.url()).pathname;
@@ -127,13 +127,18 @@ async function fulfillServerRequest(route) {
     return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: servers } });
   }
   if (pathname.endsWith('/channels')) {
-    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [] } });
+    const created = createdServers.find(server => String(server.id) === pathname.split('/')[4]);
+    const data = created ? [{ id: 9000 + created.id, serverId: created.id, name: 'general', position: 0 }] : [];
+    return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data } });
   }
   if (pathname.endsWith('/members')) {
     return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [] } });
   }
+  if (/^\/api\/channels\/\d+\/messages$/.test(pathname)) {
+    return route.fulfill({ json: { data: { items: [], hasMore: false, nextCursor: null } } });
+  }
   assert.match(pathname, /^\/api\/v1\/servers\/\d+$/);
-  const server = servers.find(item => String(item.id) === pathname.split('/').at(-1));
+  const server = [...createdServers, ...servers].find(item => String(item.id) === pathname.split('/').at(-1));
   if (!server) return route.fulfill({ status: 404, contentType: 'application/problem+json', json: { status: 404, title: 'Not Found' } });
   return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: server } });
 }
@@ -429,6 +434,97 @@ async function submitServer(page, name = 'Server vừa tạo') {
   await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).click();
 }
 
+for (const width of [1440, 375]) {
+  test(`successful creation opens the returned Server ID and general at viewport ${width}`, async () => {
+    const created = { id: 87, ownerId: 100, name: 'New Server', iconUrl: null };
+    const { page, requests, errors } = await openPage({ width, handler: async route => {
+      if (route.request().method() === 'POST') {
+        assert.equal(new URL(route.request().url()).pathname, '/api/v1/servers');
+        assert.equal(route.request().postDataJSON().name, created.name);
+        return route.fulfill({ status: 201, json: { data: created } });
+      }
+      return fulfillServerRequest(route, [created]);
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await openCreateModal(page);
+    await submitServer(page, created.name);
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.waitForURL(`${origin}/servers/87`);
+    const input = page.getByRole('textbox', { name: 'Nội dung tin nhắn' });
+    await input.waitFor();
+    assert.equal(await input.isEnabled(), true);
+    assert.match(await input.getAttribute('placeholder'), /general/);
+    assert.ok(requests.some(request => request.path === '/api/v1/servers/87'));
+    assert.ok(requests.some(request => request.path === '/api/v1/servers/87/channels'));
+    assert.equal(await page.getByRole('link', { name: 'Mở nhóm New Server', exact: true }).count(), 1);
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: created.name, exact: true }).waitFor();
+    assert.equal(new URL(page.url()).pathname, '/');
+    assert.deepEqual(errors, []);
+  });
+}
+
+for (const status of [400, 503]) {
+  test(`failed creation ${status} stays on the current page and retry opens the new Server`, async () => {
+    const created = { id: 87, ownerId: 100, name: 'Retry Server', iconUrl: null };
+    let attempts = 0;
+    const { page, errors } = await openPage({ handler: async route => {
+      if (route.request().method() === 'POST') {
+        attempts++;
+        return route.fulfill(attempts === 1 ? { status, json: { message: `Create rejected ${status}` } } : { status: 201, json: { data: created } });
+      }
+      return fulfillServerRequest(route, [created]);
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await openCreateModal(page);
+    await submitServer(page, created.name);
+    await page.getByText(`Create rejected ${status}`, { exact: true }).waitFor();
+    assert.equal(new URL(page.url()).pathname, '/');
+    assert.equal(await page.getByRole('dialog').isVisible(), true);
+    assert.equal(await page.getByPlaceholder('Ví dụ: Nhóm Học SBA301').inputValue(), created.name);
+    await page.getByRole('dialog').locator('form').evaluate(form => form.requestSubmit());
+    await page.waitForURL(`${origin}/servers/87`);
+    await page.locator('.group-sidebar__identity strong').filter({ hasText: created.name }).waitFor();
+    assert.equal(attempts, 2);
+    assert.deepEqual(errors, []);
+  });
+}
+
+for (const { closeForm, revisit } of [{ closeForm: true }, { closeForm: false }, { closeForm: false, revisit: true }]) {
+  test(`late creation cannot take over ${revisit ? 'a returned history entry' : 'a newer route'} when form was ${closeForm ? 'closed' : 'still open'}`, async t => {
+    const gate = deferred(t);
+    const created = { id: 87, ownerId: 100, name: 'Late Server', iconUrl: null };
+    const { page, errors } = await openPage({ handler: async route => {
+      if (route.request().method() === 'POST') {
+        await gate.promise;
+        return route.fulfill({ status: 201, json: { data: created } });
+      }
+      return fulfillServerRequest(route, [created]);
+    } });
+    await page.goto(`${origin}/servers/12`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('link', { name: 'Trang chủ DenHub', exact: true }).click();
+    await openCreateModal(page);
+    const request = page.waitForRequest(request => request.method() === 'POST');
+    await submitServer(page, created.name); await request;
+    if (closeForm) {
+      await page.getByRole('dialog').getByRole('button', { name: 'Hủy bỏ', exact: true }).click();
+      await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    }
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await page.waitForURL(`${origin}/servers/12`);
+    if (revisit) {
+      await page.goForward({ waitUntil: 'domcontentloaded' });
+      await page.waitForURL(`${origin}/`);
+    }
+    const response = page.waitForResponse(response => response.request().method() === 'POST');
+    gate.resolve(); await (await response).finished(); await settleUI(page);
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(new URL(page.url()).pathname, revisit ? '/' : '/servers/12');
+    assert.equal(await page.getByRole('link', { name: 'Mở nhóm Late Server', exact: true }).count(), 1);
+    assert.deepEqual(errors, []);
+  });
+}
+
 for (const oldStatus of [200, 503]) {
   test(`server creation keeps the new server visible when an old list returns ${oldStatus}`, async t => {
     let releaseOld, releaseFresh;
@@ -439,7 +535,7 @@ for (const oldStatus of [200, 503]) {
     let freshLists = 0;
     const created = { id: 33, name: 'Server vừa tạo', ownerId: 100, iconUrl: null };
     const { page, errors } = await openPage({ handler: async route => {
-      if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route);
+      if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route, [created]);
       if (route.request().method() === 'POST') {
         didCreate = true;
         return route.fulfill({ status: 201, json: { data: created } });
@@ -456,14 +552,17 @@ for (const oldStatus of [200, 503]) {
     await openCreateModal(page);
     await submitServer(page);
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
-    await page.getByRole('heading', { name: created.name, exact: true }).waitFor();
+    await page.waitForURL(`${origin}/servers/33`);
+    await page.locator('.group-sidebar__identity strong').filter({ hasText: created.name }).waitFor();
     const oldResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/servers' && response.request().method() === 'GET');
     releaseOld();
     await (await oldResponse).finished();
     await settleUI(page);
-    assert.equal(await page.getByRole('heading', { name: created.name, exact: true }).count(), 1);
+    assert.equal(new URL(page.url()).pathname, '/servers/33');
     assert.equal(await page.getByRole('link', { name: `Mở nhóm ${created.name}`, exact: true }).count(), 1);
     releaseFresh();
+    await page.getByRole('link', { name: 'Mở nhóm Nhóm học tập', exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Trang chủ DenHub', exact: true }).click();
     await page.getByRole('heading', { name: 'Không Gian Của Bạn (3)' }).waitFor();
     assert.ok(freshLists >= 1);
     assert.equal(await page.getByRole('heading', { name: 'Nhóm học tập', exact: true }).count(), 1);
@@ -478,7 +577,7 @@ test('creation recovers a failed list and keeps the created server visible if re
   let didCreate = false;
   const created = { id: 33, name: 'Server vừa tạo', ownerId: 100 };
   const { page, errors } = await openPage({ handler: async route => {
-    if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route);
+    if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route, [created]);
     if (route.request().method() === 'POST') {
       didCreate = true;
       return route.fulfill({ status: 201, json: { data: created } });
@@ -491,7 +590,9 @@ test('creation recovers a failed list and keeps the created server visible if re
   await openCreateModal(page);
   await submitServer(page);
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.getByRole('heading', { name: created.name, exact: true }).waitFor();
+  await page.waitForURL(`${origin}/servers/33`);
+  await page.locator('.group-sidebar__identity strong').filter({ hasText: created.name }).waitFor();
+  await page.getByRole('link', { name: 'Trang chủ DenHub', exact: true }).click();
   await page.getByText('Chưa tải được đầy đủ danh sách Server', { exact: true }).waitFor();
   assert.equal(refreshed, true);
   allowList = true;
@@ -508,7 +609,7 @@ test('creation refreshes the list even when the initial GET fails while POST is 
   let committed = false;
   const created = { id: 33, name: 'Server vừa tạo', ownerId: 100 };
   const { page, errors } = await openPage({ handler: async route => {
-    if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route);
+    if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route, [created]);
     if (route.request().method() === 'POST') {
       await createGate;
       committed = true;
@@ -527,6 +628,8 @@ test('creation refreshes the list even when the initial GET fails while POST is 
   await page.getByText('Chưa tải được danh sách Server', { exact: true }).waitFor();
   releaseCreate();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.waitForURL(`${origin}/servers/33`);
+  await page.getByRole('link', { name: 'Trang chủ DenHub', exact: true }).click();
   await page.getByRole('heading', { name: 'Không Gian Của Bạn (3)' }).waitFor();
   assert.equal(await page.getByRole('heading', { name: created.name, exact: true }).count(), 1);
   assert.deepEqual(errors, []);
@@ -539,13 +642,16 @@ for (const oldStatus of [201, 503]) {
     const newGate = new Promise(resolve => { releaseNew = resolve; });
     t.after(() => { releaseOld(); releaseNew(); });
     let creates = 0;
+    const createdServers = [];
     const { page, errors } = await openPage({ handler: async route => {
-      if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+      if (route.request().method() !== 'POST') return fulfillServerRequest(route, createdServers);
       const current = ++creates;
       await (current === 1 ? oldGate : newGate);
+      const created = { id: current === 1 ? 33 : 34, ownerId: 100, ...route.request().postDataJSON() };
+      if (current !== 1 || oldStatus === 201) createdServers.push(created);
       return route.fulfill(current === 1 && oldStatus === 503
         ? { status: 503, json: { detail: 'Old create error' } }
-        : { status: 201, json: { data: { id: current === 1 ? 33 : 34, ...route.request().postDataJSON() } } });
+        : { status: 201, json: { data: created } });
     } });
     await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
     await openCreateModal(page);
@@ -564,6 +670,7 @@ for (const oldStatus of [201, 503]) {
     await settleUI(page);
     const dialog = page.getByRole('dialog');
     assert.equal(await dialog.isVisible(), true);
+    assert.equal(new URL(page.url()).pathname, '/');
     assert.equal(await dialog.getByPlaceholder('Ví dụ: Nhóm Học SBA301').inputValue(), 'Bản nháp mới');
     await dialog.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit(); });
     await settleUI(page);
@@ -572,7 +679,8 @@ for (const oldStatus of [201, 503]) {
     if (oldStatus === 201) await page.getByRole('link', { name: 'Mở nhóm Server cũ', exact: true }).waitFor();
     releaseNew();
     await dialog.waitFor({ state: 'hidden' });
-    await page.getByRole('heading', { name: 'Bản nháp mới', exact: true }).waitFor();
+    await page.waitForURL(`${origin}/servers/34`);
+    await page.locator('.group-sidebar__identity strong').filter({ hasText: 'Bản nháp mới' }).waitFor();
     assert.deepEqual(errors, []);
   });
 }
@@ -582,11 +690,13 @@ test('create form validates whitespace and the 100 UTF-16 boundary and blocks du
   const gate = new Promise(resolve => { release = resolve; });
   t.after(() => release());
   const creates = [];
+  let created;
   const { page, errors } = await openPage({ handler: async route => {
-    if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+    if (route.request().method() !== 'POST') return fulfillServerRequest(route, created ? [created] : []);
     creates.push(route.request().postDataJSON());
     await gate;
-    return route.fulfill({ status: 201, json: { data: { id: 33, ...creates[0] } } });
+    created = { id: 33, ownerId: 100, ...creates[0] };
+    return route.fulfill({ status: 201, json: { data: created } });
   } });
   await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
   await openCreateModal(page);
@@ -614,6 +724,8 @@ test('create form validates whitespace and the 100 UTF-16 boundary and blocks du
   assert.equal(creates[0].name, name);
   release();
   await dialog.waitFor({ state: 'hidden' });
+  await page.waitForURL(`${origin}/servers/33`);
+  await page.locator('.group-sidebar__identity strong').filter({ hasText: name }).waitFor();
   assert.deepEqual(errors, []);
 });
 
@@ -692,6 +804,7 @@ test('creation waits for icon upload, blocks Enter/form submission, and sends th
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   const creates = [];
+  let created;
   const { page, requests, errors } = await openPage({ handler: async route => {
     const request = route.request();
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/files/upload') {
@@ -701,9 +814,10 @@ test('creation waits for icon upload, blocks Enter/form submission, and sends th
     if (request.method() === 'POST') {
       assert.equal(new URL(request.url()).pathname, '/api/v1/servers');
       creates.push(request.postDataJSON());
-      return route.fulfill({ status: 201, json: { data: { id: 33, ...creates.at(-1) } } });
+      created = { id: 33, ownerId: 100, ...creates.at(-1) };
+      return route.fulfill({ status: 201, json: { data: created } });
     }
-    return fulfillServerRequest(route);
+    return fulfillServerRequest(route, created ? [created] : []);
   } });
   await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
   await openCreateModal(page);
@@ -725,6 +839,8 @@ test('creation waits for icon upload, blocks Enter/form submission, and sends th
   await dialog.waitFor({ state: 'hidden' });
   assert.deepEqual(creates, [{ name: 'Không Gian Của Tôi', iconUrl: uploadedIcon }]);
   assert.equal(requests.filter(request => request.method === 'POST' && request.path === '/api/v1/servers').length, 1);
+  await page.waitForURL(`${origin}/servers/33`);
+  await page.locator('.group-sidebar__identity strong').filter({ hasText: 'Không Gian Của Tôi' }).waitFor();
   assert.deepEqual(errors, []);
 });
 
@@ -878,7 +994,7 @@ test('detail loading, service failure and retry are distinct from a missing grou
   respond();
   await page.getByRole('heading', { name: 'Chưa tải được nhóm' }).waitFor();
   await page.context().unroute(apiPattern);
-  await page.context().route(apiPattern, fulfillServerRequest);
+  await page.context().route(apiPattern, route => fulfillServerRequest(route));
   await page.getByRole('button', { name: 'Thử lại' }).click();
   await page.getByRole('heading', { name: 'Chào mừng đến với Nhóm học tập' }).waitFor();
   await page.goto(`${origin}/servers/999`, { waitUntil: 'domcontentloaded' });

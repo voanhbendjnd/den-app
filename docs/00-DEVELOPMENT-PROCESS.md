@@ -292,6 +292,11 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Tiến độ riêng — Tự mở Server vừa tạo (2026-10-27)
+
+- DONE trong phạm vi FE/API mock: tạo thành công cập nhật danh sách, đóng modal và mở ngay `/servers/{id}`; không chờ GET danh sách. Response form/route cũ chỉ cập nhật danh sách, không chiếm điều hướng của phiên mới.
+- Verification cuối: 85/85 browser, 103/103 Node, build PASS. Luồng mới kiểm trên desktop 1440/mobile 375; backend/DB giữ nguyên, chưa kiểm thử SQL Server thật. Nhánh `fix/server-crud-ui`, chưa commit/push lượt này.
+
 ### Tiến độ riêng — Đồng bộ cú pháp serverApi (2026-10-26)
 
 - DONE: 11 hàm trong `client/src/api/serverApi.js` dùng method shorthand và `return` giống `userApi`/`roomApi`. Giữ tên hàm, tham số, URL, HTTP method, encodeURIComponent và Promise trả về.
@@ -434,6 +439,19 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-27] FEAT-OPEN-CREATED-SERVER — Tạo Server xong mở ngay Server đó
+
+- Người dùng duyệt kế hoạch bằng “triển khai”. `CreateServerModal` tiếp tục gọi `onSuccess` cho mọi POST thành công để cập nhật danh sách. Chỉ session form hiện tại được thông báo thành công, đóng/reset và gọi callback nội bộ `onOpenServer` với ID response.
+- `MainLayout` điều hướng bằng route đã có, không await GET danh sách nền; history dùng push để Back trở về trang trước. Callback kiểm token của route visit và URL thực tế (pathname/search/hash), ngăn request cũ chiếm điều hướng sau khi chuyển trang hoặc Back/Forward. Kiểm URL còn bảo vệ khoảng thời gian browser đã đổi URL nhưng React chưa commit view mới.
+- Tests: thêm 7 browser cases (desktop/mobile, 400/503 và retry, form đã đóng, form còn mở nhưng route đổi, trở lại history entry cũ); cập nhật 8 cases tạo/list/upload/session/validation để xác minh trang Server rồi quay Home kiểm danh sách. Fixture trả đúng DTO/kênh general của Server đã tạo; callback Playwright được bọc để không truyền nhầm Request vào tham số danh sách fixture.
+- Red/green: test auto-open FAIL trước sửa vì vẫn ở Home. Lượt kiểm biên phát hiện race URL Back trước React commit và lỗi callback fixture trong test detail retry; đã sửa guard/fixture và chạy lại toàn bộ thành công.
+- Verification cuối từ `client/`, NODE_PATH Playwright theo docs/02 mục 8.2:
+  - `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs`: PASS **85/85**, 0 failure/skip, không pageerror trong các cases mới.
+  - `npm test`: PASS **103/103**.
+  - `npm run build`: PASS; PRE-EXISTING ISSUE: warning bundle >500 kB và Ant Design có sẵn vẫn còn.
+- Documentation: cập nhật business flow tại docs/01 mục 5, implementation/verification tại docs/02 mục 9.7 và tiến độ/log/handoff tại đây. Đã đối chiếu docs/03–04: không đổi Entity/schema hoặc thiết kế trực quan. Backend/API/Security/WebSocket/dependency giữ nguyên; không chạy lại backend hoặc SQL Server thật trong lượt chỉ sửa FE.
+- Nhánh `fix/server-crud-ui`; sửa đổi lượt này chưa commit/push. Đã review diff, giữ nguyên các công việc trước đó.
 
 ### [2026-10-26] STYLE-SERVER-API — Đồng bộ cách khai báo hàm API frontend
 
@@ -2783,6 +2801,12 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff — Tự mở Server vừa tạo (2026-10-27)
+
+- Tạo thành công trong session form/route hiện tại sẽ đóng modal và mở `/servers/{id}` từ response ngay; trang Group tự tải detail/general. Không đợi danh sách; Back về trang trước khi tạo.
+- `onSuccess` vẫn cập nhật danh sách cho POST cũ thành công. `onOpenServer` chỉ dùng ở session hiện tại, kiểm cả route visit và URL; form cũ hoặc Back/Forward không được kéo người dùng khỏi view mới. Tạo lỗi giữ nguyên form/trang để retry.
+- 85 browser cases, 103 Node cases và build PASS; còn giới hạn API mock/SQL Server thật và warning cũ. Contract mới ở docs/01 mục 5 và docs/02 mục 9.7. Nhánh `fix/server-crud-ui`, chưa commit/push các sửa đổi lượt này.
 
 ### Handoff — Đồng bộ cú pháp serverApi (2026-10-26)
 

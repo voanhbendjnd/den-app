@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Outlet, useNavigate, useLocation, useMatch, Link } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, Typography, Tooltip, Spin } from 'antd';
 import {
@@ -29,6 +29,12 @@ export default function MainLayout() {
     const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const creationRoute = useMemo(() => ({ key: location.key }), [location.key]);
+    const activeCreationRoute = useRef(creationRoute);
+    useLayoutEffect(() => {
+        activeCreationRoute.current = creationRoute;
+        return () => { activeCreationRoute.current = null; };
+    }, [creationRoute]);
     const groupMatch = useMatch('/servers/:serverId');
     const isGroupPage = Boolean(groupMatch);
     const isHomePage = location.pathname === '/';
@@ -697,6 +703,14 @@ export default function MainLayout() {
                 open={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={handleServerCreated}
+                onOpenServer={(id) => {
+                    // A pending create must not take over a newer visit, including Back/Forward.
+                    const currentPath = window.location.pathname + window.location.search + window.location.hash;
+                    const originPath = location.pathname + location.search + location.hash;
+                    if (id != null && activeCreationRoute.current === creationRoute && currentPath === originPath) {
+                        navigate(`/servers/${id}`);
+                    }
+                }}
             />
 
             {/* Join Server Modal */}

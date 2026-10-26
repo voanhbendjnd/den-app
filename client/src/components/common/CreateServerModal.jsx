@@ -59,7 +59,7 @@ const AVATAR_SUGGESTIONS = [
   'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=150&auto=format&fit=crop&q=80',
 ];
 
-export default function CreateServerModal({ open, onClose, onSuccess }) {
+export default function CreateServerModal({ open, onClose, onSuccess, onOpenServer }) {
   const [form] = Form.useForm();
   const fileInputRef = useRef(null);
   const uploadRequestRef = useRef(0);
@@ -193,6 +193,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
       if (session !== createSession.current) return;
       message.success('Khởi tạo không gian Server thành công!');
       handleClose();
+      onOpenServer?.(serverData.id);
     } catch (err) {
       if (session !== createSession.current) return;
       const fieldError = err.response?.data?.fieldErrors?.[0]?.message;
