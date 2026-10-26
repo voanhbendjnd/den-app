@@ -29,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -403,7 +404,16 @@ class ServerServiceTest {
 
         serverService.joinServer(10L);
 
-        verify(serverMemberRepository, times(1)).save(any(ServerMember.class));
+        verify(serverMemberRepository, times(1)).saveAndFlush(any(ServerMember.class));
+    }
+
+    @Test
+    void joinServer_FailWhenServerIdInvalid() {
+        BadRequestAlertException exNull = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(null));
+        assertThat(exNull.getErrorKey()).isEqualTo("idinvalid");
+
+        BadRequestAlertException exNegative = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(-1L));
+        assertThat(exNegative.getErrorKey()).isEqualTo("idinvalid");
     }
 
     @Test
@@ -447,7 +457,34 @@ class ServerServiceTest {
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
 
-        assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+        assertThat(ex.getErrorKey()).isEqualTo("alreadymember");
+        verify(serverMemberRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void joinServer_FailWhenConcurrentDuplicateConstraintViolation() {
+        String email = "test@example.com";
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(email, "password")
+        );
+
+        User mockUser = new User();
+        mockUser.setId(1L);
+        mockUser.setEmail(email);
+
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
+
+        Server server = new Server();
+        server.setId(10L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+        when(serverMemberRepository.saveAndFlush(any(ServerMember.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint ux_server_member"));
+
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+        assertThat(ex.getErrorKey()).isEqualTo("alreadymember");
     }
 
     @Test
