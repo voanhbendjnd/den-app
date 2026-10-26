@@ -618,6 +618,117 @@ class ServerServiceTest {
     }
 
     @Test
+    void joinServer_ThenGetServerMembers_ContainsJoinedUser() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        ServerMember ownerMember = new ServerMember();
+        ownerMember.setId(101L);
+        ownerMember.setServerId(10L);
+        ownerMember.setUserId(1L);
+        ownerMember.setNickname("Owner Nick");
+        ownerMember.setRole("OWNER");
+
+        ServerMember joinedMember = new ServerMember();
+        joinedMember.setId(102L);
+        joinedMember.setServerId(10L);
+        joinedMember.setUserId(2L);
+        joinedMember.setNickname("Joined User");
+        joinedMember.setRole("MEMBER");
+
+        when(serverMemberRepository.findAllByServerId(10L))
+                .thenReturn(java.util.List.of(ownerMember, joinedMember));
+
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setUsername("owner");
+        user1.setName("Owner");
+        user1.setAvatar("https://example.test/owner.png");
+
+        User user2 = new User();
+        user2.setId(2L);
+        user2.setUsername("joined_user");
+        user2.setName("Joined User");
+        user2.setAvatar("https://example.test/joined.png");
+
+        when(userRepository.findAllById(java.util.List.of(1L, 2L)))
+                .thenReturn(java.util.List.of(user1, user2));
+
+        java.util.List<ServerMemberResponseDTO> members = serverService.getServerMembers(10L);
+
+        assertThat(members).hasSize(2);
+        ServerMemberResponseDTO memberDto = members.stream()
+                .filter(m -> Long.valueOf(2L).equals(m.getUserId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(memberDto.getId()).isEqualTo(102L);
+        assertThat(memberDto.getUsername()).isEqualTo("joined_user");
+        assertThat(memberDto.getName()).isEqualTo("Joined User");
+        assertThat(memberDto.getRole()).isEqualTo("MEMBER");
+        assertThat(memberDto.getAvatar()).isEqualTo("https://example.test/joined.png");
+    }
+
+    @Test
+    void joinServerByInviteCode_ThenGetServerMembers_ContainsJoinedUser() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        ServerMember joinedMember = new ServerMember();
+        joinedMember.setId(103L);
+        joinedMember.setServerId(10L);
+        joinedMember.setUserId(3L);
+        joinedMember.setNickname("Invite Joiner");
+        joinedMember.setRole("MEMBER");
+
+        when(serverMemberRepository.findAllByServerId(10L))
+                .thenReturn(java.util.List.of(joinedMember));
+
+        User user3 = new User();
+        user3.setId(3L);
+        user3.setUsername("invite_user");
+        user3.setName("Invite Joiner");
+        user3.setAvatar("https://example.test/invite.png");
+
+        when(userRepository.findAllById(java.util.List.of(3L)))
+                .thenReturn(java.util.List.of(user3));
+
+        java.util.List<ServerMemberResponseDTO> members = serverService.getServerMembers(10L);
+
+        assertThat(members).hasSize(1);
+        ServerMemberResponseDTO dto = members.get(0);
+        assertThat(dto.getUserId()).isEqualTo(3L);
+        assertThat(dto.getUsername()).isEqualTo("invite_user");
+        assertThat(dto.getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void getServerMembers_GracefulHandlingWhenUserEntityMissingInRepository() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        ServerMember orphanMember = new ServerMember();
+        orphanMember.setId(104L);
+        orphanMember.setServerId(10L);
+        orphanMember.setUserId(99L);
+        orphanMember.setNickname("Ghost User");
+        orphanMember.setRole("MEMBER");
+
+        when(serverMemberRepository.findAllByServerId(10L))
+                .thenReturn(java.util.List.of(orphanMember));
+        when(userRepository.findAllById(java.util.List.of(99L)))
+                .thenReturn(java.util.Collections.emptyList());
+
+        java.util.List<ServerMemberResponseDTO> members = serverService.getServerMembers(10L);
+
+        assertThat(members).hasSize(1);
+        ServerMemberResponseDTO dto = members.get(0);
+        assertThat(dto.getUserId()).isEqualTo(99L);
+        assertThat(dto.getNickname()).isEqualTo("Ghost User");
+        assertThat(dto.getUsername()).isNull();
+        assertThat(dto.getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
     void createServerInvite_Success_WhenOwner() {
         Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
