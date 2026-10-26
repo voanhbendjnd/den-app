@@ -1244,4 +1244,58 @@ class ServerSecurityIT {
                 .andExpect(jsonPath("$.data[1].userId").value(joiner.getId()))
                 .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
     }
+    @Test
+    void joinServer_ByInviteCode_NewMemberAppearsInMembersList() throws Exception {
+        addMembership(server.getId());
+
+        String code = "INV_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setServerId(server.getId());
+        invite.setCode(code);
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(reader.getId());
+        invite.setCreatedAt(Instant.now());
+        invite.setExpiresAt(Instant.now().plusSeconds(3600));
+        invites.saveAndFlush(invite);
+
+        User inviteJoiner = new User();
+        inviteJoiner.setEmail("invjoiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        inviteJoiner.setPassword("fixture-" + UUID.randomUUID());
+        inviteJoiner.setName("Invite Joiner");
+        inviteJoiner.setUsername("invitejoiner");
+        inviteJoiner.setAvatar("https://example.test/invitejoiner.png");
+        inviteJoiner.setActivated(true);
+        inviteJoiner.setSessionId(UUID.randomUUID().toString());
+        inviteJoiner = users.saveAndFlush(inviteJoiner);
+        String joinerToken = bearerFor(inviteJoiner);
+
+        // Before joining: cannot access members list (403 Forbidden)
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken)), 403);
+
+        // Join via invite code endpoint
+        mvc.perform(post("/api/v1/servers/join-invite/" + code)
+                .header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.id").value(server.getId()));
+
+        // After joining: joiner can read members list and appears in it
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(inviteJoiner.getId()))
+                .andExpect(jsonPath("$.data[1].username").value("invitejoiner"))
+                .andExpect(jsonPath("$.data[1].name").value("Invite Joiner"))
+                .andExpect(jsonPath("$.data[1].avatar").value("https://example.test/invitejoiner.png"))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+
+        // Owner also sees the invite joiner
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(inviteJoiner.getId()))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+    }
 }
