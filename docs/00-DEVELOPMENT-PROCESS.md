@@ -292,6 +292,11 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Tiến độ riêng — Đồng bộ cú pháp serverApi (2026-10-26)
+
+- DONE: 11 hàm trong `client/src/api/serverApi.js` dùng method shorthand và `return` giống `userApi`/`roomApi`. Giữ tên hàm, tham số, URL, HTTP method, encodeURIComponent và Promise trả về.
+- Verification: từ `client/`, `npm test` PASS 103/103; `npm run build` PASS. Chỉ thay cú pháp, không thêm test hoặc thay contract; các thay đổi của lượt này chưa commit/push.
+
 ### Tiến độ riêng — 5 lỗi Server/kênh và Join bằng ID (2026-10-26)
 
 | Phạm vi | FE | BE | DB | Verification | Trạng thái |
@@ -429,6 +434,12 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-26] STYLE-SERVER-API — Đồng bộ cách khai báo hàm API frontend
+
+- Người dùng duyệt kế hoạch bằng “triẻn khai”. Chuyển 11 arrow functions trong `serverApi.js` thành method shorthand có `return`; giữ nguyên axiosClient dùng chung, tên/tham số hàm, HTTP method, endpoint và encoding mã mời. Không đổi backend, schema, Security hoặc dependency.
+- Không thêm/sửa test vì hành vi không đổi. Từ `client/`: `npm test` PASS **103/103**; `npm run build` PASS. PRE-EXISTING ISSUE: warning bundle >500 kB vẫn còn. Không chạy lại backend/browser suite trong lượt chỉ đổi cú pháp này.
+- Đã đối chiếu docs/01–04: không có thay đổi business/API/DB/thiết kế cần đồng bộ; chỉ cập nhật tiến độ/log/handoff tại đây. Review diff để xác nhận đủ 11 `return` và giữ nguyên request. Nhánh `fix/server-crud-ui`, chưa commit/push các sửa đổi của lượt này.
 
 ### [2026-10-26] FIX-SERVER-SCOPE-AND-DIRECT-JOIN — Sửa đúng 5 lỗi được chọn từ audit Server
 
@@ -2772,6 +2783,10 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff — Đồng bộ cú pháp serverApi (2026-10-26)
+
+- `serverApi.js` dùng `method(args) { return axiosClient...; }` giống `userApi`/`roomApi`. Nơi gọi và backend không cần thay đổi. `npm test` 103/103 và build PASS; chưa commit/push lượt style này.
 
 ### Handoff — 5 lỗi Server/kênh và Join bằng ID (2026-10-26)
 
