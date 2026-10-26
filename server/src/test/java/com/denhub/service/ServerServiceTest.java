@@ -1046,6 +1046,65 @@ class ServerServiceTest {
         assertThat(ex.getReason()).isEqualTo("Bạn đã là thành viên của Server này rồi");
     }
 
+
+    @Test
+    void leaveServer_Success_ServerDisappearsFromUserServers() {
+        prepareDetailUser(); // User id = 1L (member)
+
+        Server server1 = new Server();
+        server1.setId(10L);
+        server1.setName("Server Ten");
+        server1.setOwnerId(2L);
+
+        Server server2 = new Server();
+        server2.setId(20L);
+        server2.setName("Server Twenty");
+        server2.setOwnerId(3L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server1));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+
+        // Before leave: user had server1 and server2
+        when(serverRepository.findAllByUserIdOrOwnerId(1L)).thenReturn(java.util.List.of(server1, server2));
+        java.util.List<ServerResponseDTO> beforeLeave = serverService.getUserServers();
+        assertThat(beforeLeave).hasSize(2);
+        assertThat(beforeLeave.stream().anyMatch(s -> Long.valueOf(10L).equals(s.getId()))).isTrue();
+
+        // Perform leave
+        serverService.leaveServer(10L);
+        verify(serverMemberRepository, times(1)).deleteByServerIdAndUserId(10L, 1L);
+
+        // After leave: user only has server2
+        when(serverRepository.findAllByUserIdOrOwnerId(1L)).thenReturn(java.util.List.of(server2));
+        java.util.List<ServerResponseDTO> afterLeave = serverService.getUserServers();
+        assertThat(afterLeave).hasSize(1);
+        assertThat(afterLeave.stream().anyMatch(s -> Long.valueOf(10L).equals(s.getId()))).isFalse();
+        assertThat(afterLeave.get(0).getId()).isEqualTo(20L);
+    }
+
+    @Test
+    void leaveServer_OwnerCannotLeave_ServerRemainsInOwnerServerList() {
+        prepareDetailUser(); // User id = 1L (owner)
+
+        Server ownedServer = new Server();
+        ownedServer.setId(10L);
+        ownedServer.setName("Owner Server");
+        ownedServer.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(ownedServer));
+        when(serverRepository.findAllByUserIdOrOwnerId(1L)).thenReturn(java.util.List.of(ownedServer));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(10L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).contains("Chủ sở hữu không thể rời khỏi Server");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+
+        java.util.List<ServerResponseDTO> ownerServers = serverService.getUserServers();
+        assertThat(ownerServers).hasSize(1);
+        assertThat(ownerServers.get(0).getId()).isEqualTo(10L);
+    }
+
     @Test
     void leaveServer_Success() {
         prepareDetailUser();
