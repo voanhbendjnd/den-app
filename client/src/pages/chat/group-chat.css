@@ -265,6 +265,10 @@
 .group-member-item__name { font-size: 13px; font-weight: 500; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
 .group-member-item__badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; background: rgba(245, 158, 11, .15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, .3); line-height: 1.2; flex-shrink: 0; }
 .group-member-item__username { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-top: 1px; }
+.group-member-item__remove-btn { opacity: 0; background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 4px 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease; font-size: 13px; flex-shrink: 0; margin-left: auto; }
+.group-member-item:hover .group-member-item__remove-btn, .group-member-item:focus-within .group-member-item__remove-btn { opacity: 1; }
+.group-member-item__remove-btn:hover { background: rgba(239, 68, 68, .15); color: #f87171; }
+.group-member-item__remove-btn:focus-visible { opacity: 1; outline: 2px solid #ef4444; outline-offset: 1px; }
 .message-composer { padding: 16px 24px 18px; flex-shrink: 0; }
 .message-composer__box { display: flex; align-items: flex-end; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, .17); background: var(--color-bg-surface); }
 .message-composer__box:focus-within { border-color: #818cf8; }

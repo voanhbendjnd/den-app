@@ -11,6 +11,7 @@ const serverApi = {
   getMembers: (serverId) => axiosClient.get(`/v1/servers/${serverId}/members`),
   createInvite: (serverId, data) => axiosClient.post(`/v1/servers/${serverId}/invites`, data),
   leave: (serverId) => axiosClient.post(`/v1/servers/${serverId}/leave`),
+  removeMember: (serverId, userId) => axiosClient.delete(`/v1/servers/${serverId}/members/${userId}`),
 };
 
 export default serverApi;

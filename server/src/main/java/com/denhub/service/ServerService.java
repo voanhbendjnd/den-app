@@ -310,6 +310,35 @@ public class ServerService {
         serverMemberRepository.deleteByServerIdAndUserId(serverId, currentUser.getId());
     }
 
+    @Transactional
+    public void removeMember(Long serverId, Long userId) {
+        if (serverId == null || serverId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Server ID không hợp lệ");
+        }
+        if (userId == null || userId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User ID không hợp lệ");
+        }
+
+        User currentUser = getActiveCurrentUser();
+
+        Server server = serverRepository.findByIdForUpdate(serverId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
+
+        if (!currentUser.getId().equals(server.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Chỉ chủ sở hữu Server mới có quyền loại thành viên");
+        }
+
+        if (userId.equals(server.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Không thể loại chủ sở hữu khỏi Server");
+        }
+
+        if (!serverMemberRepository.existsByServerIdAndUserId(serverId, userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thành viên không tồn tại trong Server");
+        }
+
+        serverMemberRepository.deleteByServerIdAndUserId(serverId, userId);
+    }
+
     public ServerResponseDTO joinServerByInviteCode(String rawCode) {
         if (rawCode == null || rawCode.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã mời không được để trống");

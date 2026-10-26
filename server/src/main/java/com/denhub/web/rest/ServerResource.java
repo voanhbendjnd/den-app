@@ -95,6 +95,15 @@ public class ServerResource {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{serverId}/members/{userId}")
+    @Operation(summary = "Loại thành viên khỏi Server", description = "Chỉ chủ sở hữu Server mới có quyền loại thành viên khỏi Server.")
+    public ResponseEntity<Void> removeMember(
+            @PathVariable("serverId") Long serverId,
+            @PathVariable("userId") Long userId) {
+        serverService.removeMember(serverId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{serverId}/invites")
     @ApiMessage("Tạo mã mời thành công")
     @Operation(summary = "Tạo mã mời tham gia Server", description = "Tạo mã mời mới cho Server. Yêu cầu đăng nhập và chỉ Server Owner mới có quyền tạo.")
