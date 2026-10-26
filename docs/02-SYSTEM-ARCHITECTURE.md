@@ -917,3 +917,36 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
    - Khi `LeaveServerModal` nhận tín hiệu thành công từ API:
      - Gọi `handleServerDeleted(serverId)`: cập nhật `setServers(prev => prev.filter(s => String(s.id) !== String(serverId)))`.
      - Điều hướng an toàn về trang chủ: `navigate('/', { replace: true })`.
+
+---
+
+## 19. QUY TẮC CHẶN TOÀN DIỆN THÀNH VIÊN BỊ LOẠI KHỎI SERVER (TASK 3.14)
+
+### 19.1 Endpoints & Quyền hạn
+- **Endpoint loại thành viên**: `DELETE /api/v1/servers/{serverId}/members/{userId}` (trả về `204 No Content`).
+- **Phân quyền thực thi**: Chỉ Chủ sở hữu Server (`server.ownerId == currentUser.id`) mới có quyền gọi API này.
+- **Ràng buộc**: Không được loại chính mình và không được loại Owner (`400 Bad Request`).
+
+### 19.2 Cơ chế thu hồi quyền truy cập toàn diện (Complete Access Revocation)
+Ngay sau khi thành viên bị loại thành công:
+1. **Xóa Membership**:
+   - `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)` xóa triệt để bản ghi khỏi bảng `server_member`.
+2. **Chặn truy vấn Server (`403 Forbidden`)**:
+   - `GET /api/v1/servers/{serverId}`: Phương thức `getServerDetail()` kiểm tra membership. Vì người dùng không còn là Owner hay Member, ném `AccessDeniedException` $\rightarrow$ `403 Forbidden`.
+   - `GET /api/v1/servers/{serverId}/members`: Phương thức `getServerMembers()` ném `AccessDeniedException` $\rightarrow$ `403 Forbidden`.
+3. **Biến mất khỏi danh sách Server (`GET /api/v1/servers`)**:
+   - Query lọc theo `ownerId OR sm.userId` tự động loại bỏ Server khỏi danh sách Server của thành viên bị loại.
+4. **Chặn thao tác Kênh Chat (`400 Bad Request - forbidden`)**:
+   - `GET /api/v1/servers/{serverId}/channels`: `ChannelService.validateServerAccess()` kiểm tra quyền. Không tìm thấy membership $\rightarrow$ ném `BadRequestAlertException("You do not have permission to access channels in this server", "channel", "forbidden")` (HTTP 400).
+   - `POST /api/v1/channels`: Thao tác tạo kênh bị chặn với cùng lỗi HTTP 400.
+5. **Chặn thao tác Tin Nhắn (`400 Bad Request - forbidden`)**:
+   - `POST /api/v1/channels/{channelId}/messages` và `GET /api/v1/channels/{channelId}/messages`: `MessageService` kiểm tra `serverMemberRepository.existsByServerIdAndUserId()`. Nếu không phải thành viên $\rightarrow$ ném HTTP 400 forbidden.
+6. **Chặn gọi rời Server (`400 Bad Request`)**:
+   - `POST /api/v1/servers/{serverId}/leave`: `ServerService.leaveServer()` kiểm tra membership. Không tìm thấy $\rightarrow$ ném `BadRequestAlertException` với thông báo không phải là thành viên của Server.
+
+### 19.3 Cơ chế xử lý an toàn ở Frontend (`client/src/utils/serverMember.js`)
+- `isMemberAllowedAccess(server, currentUser, members)`: Kiểm tra nhanh quyền truy cập ở giao diện trước khi render thông tin nhạy cảm.
+- `getRemovedMemberAccessErrorMessage(err)`: Chuyển đổi các mã lỗi 403, 400, 404, 401 thành thông báo tiếng Việt trực quan ("Bạn không còn là thành viên của Server này hoặc đã bị loại").
+- `filterActiveServersAfterRemoval(serverList, removedServerId)`: Cập nhật state loại bỏ Server ra khỏi sidebar.
+- `resolveRemovalRedirectPath(currentServerId, removedServerId, remainingServers)`: Tự động điều hướng an toàn người dùng sang Server kế tiếp hoặc trang `/servers` để tránh crash UI.
+

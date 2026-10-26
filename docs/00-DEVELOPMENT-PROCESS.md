@@ -413,6 +413,32 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-3.14-BLOCK-REMOVED-MEMBER-ACCESS — Kiểm Tra Thành Viên Bị Loại Không Còn Truy Cập Được Server
+
+- **Mục tiêu:** Xác minh và bảo đảm an toàn phân quyền tuyệt đối: sau khi thành viên bị loại khỏi Server (qua `DELETE /api/v1/servers/{serverId}/members/{userId}`), thành viên đó hoàn toàn mất mọi quyền truy cập vào Server (`GET /api/v1/servers/{id}` trả về `403 Forbidden`), không xem được danh sách thành viên (`GET /api/v1/servers/{id}/members` trả về `403 Forbidden`), Server biến mất khỏi danh sách Server của họ (`GET /api/v1/servers`), bị từ chối truy cập danh sách channel hoặc tạo channel trong Server (`400 Bad Request`), và không thể gọi rời lại (`POST /leave` trả về `400 Bad Request`). Phía Owner và các thành viên còn lại vẫn tiếp tục hoạt động bình thường.
+- **Backend Testing & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - `removeMember_Success_TargetMemberLosesServerAccess`: Xác thực target member sau khi bị loại không còn nằm trong `getUserServers()`, không tồn tại trong `getServerMembers()`, và gọi `getServerDetail()` ném `AccessDeniedException`.
+    - `removeMember_PreservesRemainingMembersAccess`: Xác thực việc loại 1 member không ảnh hưởng đến quyền hạn và dữ liệu của Owner cũng như các member khác còn lại trong Server.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - `removeMember_TargetCannotAccessServerOrMembersAfterRemoval`: Vòng đời tích hợp hoàn chỉnh: Member tham gia Server $\rightarrow$ xem Server & members bình thường $\rightarrow$ Owner loại member $\rightarrow$ Member bị chặn `403 Forbidden` khi gọi `GET /api/v1/servers/{id}` $\rightarrow$ bị chặn `403 Forbidden` khi gọi `GET /api/v1/servers/{id}/members` $\rightarrow$ Server biến mất khỏi `GET /api/v1/servers` của Member $\rightarrow$ Member không thể gọi `POST /leave` (`400 Bad Request`) $\rightarrow$ Owner vẫn có quyền đầy đủ.
+    - `removeMember_TargetCannotAccessOrMutateChannelsAfterRemoval`: Target sau khi bị loại khỏi Server bị chặn truy cập danh sách channels (`GET /api/v1/servers/{id}/channels` $\rightarrow$ `400 Bad Request`) và bị chặn tạo channel mới (`POST /api/v1/channels` $\rightarrow$ `400 Bad Request`).
+- **Frontend State & Utility Tests:**
+  - `client/src/utils/serverMember.js`:
+    - `isMemberAllowedAccess(server, currentUser, members)`: Hàm kiểm tra quyền truy cập Server an toàn ở client side.
+    - `getRemovedMemberAccessErrorMessage(err)`: Map các mã lỗi API (403, 400, 404, 401, timeout, network error) sang thông báo tiếng Việt thân thiện khi người dùng bị loại hoặc cố truy cập Server trái phép.
+    - `filterActiveServersAfterRemoval(serverList, removedServerId)`: Lọc bỏ Server bị loại khỏi danh sách Server đang hiển thị.
+    - `resolveRemovalRedirectPath(currentServerId, removedServerId, remainingServers)`: Điều hướng an toàn người dùng sang Server khả dụng khác hoặc `/servers` khi đang ở trong Server vừa bị loại.
+  - `client/tests/serverAccessAfterRemoval.test.mjs`:
+    - Test suite gồm 7 bài test unit (kiểm thử 100% case cho cả 4 utility functions trên).
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 100% PASS.
+  - Frontend `npm test`: 103/103 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công (3217 modules transformed trong 933ms).
+- **Git:**
+  - Branch: `test/block-removed-member-access`.
+
 ### [2026-10-26] TASK-3.09-SERVER-LIST-AFTER-LEAVE — Kiểm Tra Rời Server Thì Server Biến Mất Khỏi Danh Sách
 
 - **Mục tiêu:** Kiểm tra và bảo đảm tính toàn vẹn dữ liệu khi thành viên rời Server qua endpoint `POST /api/v1/servers/{serverId}/leave` (hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`), Server đó phải lập tức biến mất khỏi danh sách Server của người dùng khi gọi `GET /api/v1/servers`, tước toàn bộ quyền truy cập Server (`403 Forbidden`), nhưng vẫn bảo toàn Server đối với Owner và các thành viên khác.
