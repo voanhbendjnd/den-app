@@ -292,6 +292,14 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Tiến độ riêng — 5 lỗi Server/kênh và Join bằng ID (2026-10-26)
+
+| Phạm vi | FE | BE | DB | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Cô lập kênh/history/pagination/send, leave/kick đúng phiên; Join active và nickname an toàn | IMPLEMENTED | IMPLEMENTED | Giữ mapping hiện có | 234 BE, 78 browser, 103 Node, build PASS | DONE trong phạm vi H2/API mock đã duyệt; SQL Server thật chưa kiểm thử |
+
+- Nhánh `fix/server-crud-ui`, chưa commit/push các sửa đổi của lượt này. Chi tiết tại log FIX-SERVER-SCOPE-AND-DIRECT-JOIN và docs/02 mục 9.6; quy tắc Join cập nhật docs/01 mục 5.
+
 ### Tiến độ riêng — Sửa UI tạo và danh sách Server (2026-10-26)
 
 | Phạm vi | FE | BE / DB | Verification | Trạng thái |
@@ -421,6 +429,20 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-26] FIX-SERVER-SCOPE-AND-DIRECT-JOIN — Sửa đúng 5 lỗi được chọn từ audit Server
+
+- **Approval:** người dùng chọn 5 lỗi, duyệt kế hoạch bằng “triển khai”. Giữ nhánh `fix/server-crud-ui`, không tạo commit hoặc push.
+- **FE:** workspace React key theo Server ID; mỗi lần vào Server có state riêng. Ref phiên và request bảo vệ kênh, thành viên, history/retry, cursor pagination, kết quả gửi và callback cuộn trễ. Chuyển kênh reset dữ liệu trước paint. Leave cũ vẫn cập nhật danh sách Server nhưng không navigate khỏi view mới; kick cũ không cập nhật danh sách/modal của Server mới. Hai modal dùng session, giữ khả năng retry lỗi ở phiên hiện tại.
+- **BE:** Join bằng ID dùng active identity guard, trả 401 cho tài khoản inactive/missing và không ghi membership. Nickname mới strip/fallback `Member`, cắt 20 UTF-16 an toàn với emoji; không sửa User.name. Helper dùng chung nhưng giữ hành vi/fallback của Owner và Invite. Không đổi API thành công, schema, Entity, roles, dependency hoặc WebSocket.
+- **Tests thêm/cập nhật:** 9 service cases mới; fixture Join cũ được đổi thành Authentication đã xác thực/User active, case chưa đăng nhập kiểm 401. Thêm 10 HTTP/JWT/H2 cases kiểm inactive/missing/JWT, nickname null/rỗng/dài/emoji, đọc lại User/membership và từ chối join trùng. Thêm 15 browser cases cho response success/error cũ giữa A/B và A/B/A, chuyển kênh, pagination/send đang chờ, leave/kick sau Back và current failure/retry.
+- **Red/green:** trước sửa, 2 service cases identity và 2 browser cases kênh/kick FAIL đúng lỗi audit. Sau sửa, bộ Server PASS. Lượt mở rộng browser có một fixture dùng trùng ID giữa tin cũ và tin mới khiến assertion gửi tin thất bại; đã dùng ID riêng cho tin mới và chạy lại toàn bộ.
+- **Verification cuối:**
+  - Từ `server/`: `.\gradlew.bat test --tests "com.denhub.service.Server*" --tests "com.denhub.web.rest.Server*" check --no-daemon`: PASS **234/234**, 0 failure/error/skip.
+  - Từ `client/`, NODE_PATH Playwright theo docs/02 mục 8.2: `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs`: PASS **78/78**, 0 failure/skip; không có pageerror trong các cases mới.
+  - `npm test`: PASS **103/103**. `npm run build`: PASS.
+- **Documentation:** cập nhật business rule Join tại docs/01, implementation/API/errors tại docs/02 mục 9.6, tiến độ/log/handoff tại đây. Đã kiểm tra docs/03 (tái sử dụng nickname 20 và mapping hiện tại) và docs/04 (không đổi thiết kế trực quan), không cần sửa hai tài liệu này.
+- **Giới hạn:** chưa truy cập hoặc test SQL Server thật; các test HTTP dùng H2, browser dùng API mock. PRE-EXISTING ISSUE: bundle >500 kB và các warning Ant Design có sẵn. Các lỗi mã mời toàn số, rename rồi xóa general và Unicode blank tại API tạo Server nằm ngoài 5 mục, chưa sửa. Mâu thuẫn tài liệu về quyền kênh/Join bằng ID không được tự chốt trong lượt này.
 
 ### [2026-10-26] FIX-SERVER-CRUD-UI — Sửa lỗi tạo và hiển thị danh sách Server
 
@@ -2750,6 +2772,14 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff — 5 lỗi Server/kênh và Join bằng ID (2026-10-26)
+
+- Đã triển khai đúng kế hoạch duyệt, chưa commit/push; nhánh `fix/server-crud-ui`. Kết quả cuối: 234 BE tests/check, 78 browser cases, 103 Node cases và build PASS.
+- Mỗi Server visit là workspace riêng; dữ liệu kênh/history/modal không tái sử dụng khi đổi Server, kể cả quay lại cùng ID. Trong cùng Server, request kênh/thành viên mới nhất thắng; kênh/history/pagination/send có session guard, kể cả scroll callback/finally.
+- Leave thành công sau khi chuyển trang vẫn loại Server đã rời khỏi danh sách chung. Chỉ phiên gốc đang mở mới được navigate Home; kick cũ không sửa danh sách B. Cleanup chỉ chặn cập nhật UI cũ, không hủy transaction backend.
+- Join bằng ID yêu cầu account active, dùng nickname mặc định `Member` nếu null/blank, tối đa 20 UTF-16 không tách emoji. Giữ User.name và schema; Owner/invite giữ fallback đang có. Contract chính thức: docs/01 mục 5 và docs/02 mục 9.6.
+- SQL Server thật, các lỗi audit ngoài 5 mục và các mâu thuẫn contract lịch sử vẫn cần công việc riêng. Không coi PASS H2/browser mock là bằng chứng đã kiểm thử môi trường triển khai.
 
 ### Handoff — Sửa UI tạo và danh sách Server (2026-10-26)
 

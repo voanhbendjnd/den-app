@@ -138,6 +138,275 @@ async function fulfillServerRequest(route) {
   return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: server } });
 }
 
+const scopedServers = [
+  { id: 101, ownerId: 100, name: 'Scope Alpha', iconUrl: null },
+  { id: 102, ownerId: 100, name: 'Scope Beta', iconUrl: null },
+];
+const scopedChannels = id => [{ id: id * 10, serverId: id, name: id === 101 ? 'alpha-channel' : 'beta-channel', position: 0 }];
+const scopedMessage = (id, content) => ({ id, channelId: id, senderId: 300, content, createdAt: '2026-10-26T12:00:00Z' });
+function deferred(t) {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  t.after(() => resolve());
+  return { promise, resolve };
+}
+async function openScopedChat({ owner = true, handler } = {}) {
+  return openPage({ handler: async route => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (handler && await handler(route, pathname)) return;
+    const data = scopedServers.map(server => ({ ...server, ownerId: owner ? 100 : 200 }));
+    if (pathname === '/api/v1/servers') return route.fulfill({ json: { data } });
+    if (/^\/api\/v1\/servers\/\d+$/.test(pathname)) return route.fulfill({ json: { data: data.find(server => String(server.id) === pathname.split('/').at(-1)) } });
+    if (pathname.endsWith('/channels')) return route.fulfill({ json: { data: scopedChannels(Number(pathname.split('/')[4])) } });
+    if (pathname.endsWith('/members')) return route.fulfill({ json: { data: [
+      { id: 1, userId: 100, nickname: 'UI Test', role: owner ? 'OWNER' : 'MEMBER' },
+      { id: 2, userId: 300, nickname: 'Common Member', role: 'MEMBER' },
+    ] } });
+    if (pathname.includes('/messages')) {
+      const id = Number(pathname.split('/')[3]);
+      return route.fulfill({ json: { data: { items: [scopedMessage(id, id === 1010 ? 'Alpha message' : 'Beta message')], hasMore: false, nextCursor: null } } });
+    }
+    return route.fulfill({ json: { data: [] } });
+  } });
+}
+async function switchScopedServer(page, name) {
+  await page.getByRole('link', { name: `Mở nhóm Scope ${name}`, exact: true }).click();
+  await page.locator('.group-sidebar__identity strong').filter({ hasText: `Scope ${name}` }).waitFor();
+}
+
+for (const oldStatus of [200, 503]) {
+  test(`changing channels ignores old history ${oldStatus} without clearing the new channel loading`, async t => {
+    const oldGate = deferred(t), newGate = deferred(t);
+    const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+      if (pathname === '/api/v1/servers/101/channels') {
+        await route.fulfill({ json: { data: [...scopedChannels(101), { id: 1011, serverId: 101, name: 'second-channel' }] } });
+        return true;
+      }
+      if (pathname !== '/api/channels/1010/messages' && pathname !== '/api/channels/1011/messages') return false;
+      const old = pathname.includes('/1010/');
+      await (old ? oldGate.promise : newGate.promise);
+      await route.fulfill(old && oldStatus === 503
+        ? { status: 503, json: { message: 'Obsolete first channel error' } }
+        : { json: { data: { items: [scopedMessage(old ? 1010 : 1011, old ? 'Obsolete first channel history' : 'Second channel message')], hasMore: false } } });
+      return true;
+    } });
+    await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('status', { name: 'Đang tải lịch sử tin nhắn' }).waitFor();
+    await page.locator('.group-channel-item').filter({ hasText: 'second-channel' }).click();
+    const response = page.waitForResponse(response => response.url().includes('/channels/1010/messages'));
+    oldGate.resolve(); await (await response).finished(); await settleUI(page);
+    assert.equal(await page.getByRole('status', { name: 'Đang tải lịch sử tin nhắn' }).isVisible(), true);
+    assert.equal(await page.getByText('Obsolete first channel history', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Obsolete first channel error', { exact: true }).count(), 0);
+    newGate.resolve();
+    await page.getByText('Second channel message', { exact: true }).waitFor();
+    assert.deepEqual(errors, []);
+  });
+}
+
+test('late pagination cannot append old messages or cursor state to another server', async t => {
+  const gate = deferred(t);
+  const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+    if (pathname !== '/api/channels/1010/messages') return false;
+    const before = new URL(route.request().url()).searchParams.get('before');
+    if (before) await gate.promise;
+    const items = before ? [scopedMessage(9000, 'Obsolete pagination message')]
+      : Array.from({ length: 60 }, (_, index) => ({ ...scopedMessage(6000 + index, `History line ${index}`), channelId: 1010 }));
+    await route.fulfill({ json: { data: { items, hasMore: true, nextCursor: before ? 800 : 900 } } });
+    return true;
+  } });
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('History line 59', { exact: true }).waitFor();
+  const request = page.waitForRequest(request => new URL(request.url()).searchParams.has('before'));
+  await page.getByRole('region', { name: 'Tin nhắn kênh #alpha-channel' }).evaluate(element => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+  await request;
+  await switchScopedServer(page, 'Beta');
+  await page.getByText('Beta message', { exact: true }).waitFor();
+  const response = page.waitForResponse(response => new URL(response.url()).searchParams.has('before'));
+  gate.resolve(); await (await response).finished(); await settleUI(page);
+  assert.equal(await page.getByText('Obsolete pagination message', { exact: true }).count(), 0);
+  assert.equal(await page.getByText('Beta message', { exact: true }).count(), 1);
+  assert.equal(await page.getByRole('status', { name: 'Đang tải thêm tin nhắn cũ' }).count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('late send result cannot enter another server or clear its draft, and the current channel can send', async t => {
+  const gate = deferred(t);
+  const sends = [];
+  const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+    if (route.request().method() !== 'POST' || !pathname.includes('/messages')) return false;
+    sends.push(pathname);
+    if (pathname.includes('/1010/')) await gate.promise;
+    await route.fulfill({ status: 201, json: { data: { ...scopedMessage(pathname.includes('/1010/') ? 1010 : 1020, route.request().postDataJSON().content), id: 90000 + sends.length, senderId: 100 } } });
+    return true;
+  } });
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  const input = page.getByRole('textbox', { name: 'Nội dung tin nhắn' });
+  await page.getByText('Alpha message', { exact: true }).waitFor();
+  const request = page.waitForRequest(request => request.method() === 'POST');
+  await input.fill('Pending Alpha send'); await input.press('Enter'); await request;
+  await switchScopedServer(page, 'Beta');
+  await page.getByText('Beta message', { exact: true }).waitFor();
+  await input.fill('New Beta draft');
+  const response = page.waitForResponse(response => response.request().method() === 'POST');
+  gate.resolve(); await (await response).finished(); await settleUI(page);
+  assert.equal(await input.inputValue(), 'New Beta draft');
+  assert.equal(await page.getByText('Pending Alpha send', { exact: true }).count(), 0);
+  await input.press('Enter');
+  await page.getByText('New Beta draft', { exact: true }).waitFor();
+  assert.deepEqual(sends, ['/api/channels/1010/messages', '/api/channels/1020/messages']);
+  assert.equal(await input.inputValue(), '');
+  assert.deepEqual(errors, []);
+});
+
+for (const action of ['leave', 'remove']) {
+  test(`current ${action} failure keeps its modal usable and retry succeeds`, async () => {
+    let attempts = 0, left = false;
+    const { page, errors } = await openScopedChat({ owner: action === 'remove', handler: async (route, pathname) => {
+      if (pathname === '/api/v1/servers' && left) {
+        await route.fulfill({ json: { data: [{ ...scopedServers[1], ownerId: 200 }] } }); return true;
+      }
+      if (!pathname.endsWith(action === 'leave' ? '/leave' : '/members/300')) return false;
+      attempts++;
+      if (attempts === 2 && action === 'leave') left = true;
+      await route.fulfill(attempts === 1 ? { status: 503, json: { message: 'Temporary failure' } } : { status: 204, body: '' });
+      return true;
+    } });
+    await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+    await page.getByText('Common Member', { exact: true }).waitFor();
+    await page.getByRole('button', { name: action === 'leave' ? 'Rời khỏi Server' : 'Loại Common Member khỏi Server', exact: true }).first().click();
+    const dialog = page.getByRole('dialog');
+    const confirm = dialog.getByRole('button', { name: action === 'leave' ? /Rời Server/ : /Xác nhận loại/ });
+    await confirm.click();
+    await dialog.getByRole('alert').waitFor();
+    assert.equal(await confirm.isEnabled(), true);
+    await confirm.click();
+    await dialog.waitFor({ state: 'hidden' });
+    if (action === 'leave') {
+      await page.waitForURL(`${origin}/`);
+      await page.getByRole('heading', { name: 'Scope Beta', exact: true }).waitFor();
+      assert.equal(await page.getByRole('link', { name: 'Mở nhóm Scope Alpha', exact: true }).count(), 0);
+    } else {
+      assert.equal(new URL(page.url()).pathname, '/servers/101');
+      assert.equal(await page.getByText('Common Member', { exact: true }).count(), 0);
+    }
+    assert.equal(attempts, 2);
+    assert.deepEqual(errors, []);
+  });
+}
+
+for (const status of [200, 503]) {
+  test(`late channel response ${status} from Alpha cannot replace Beta or its messages`, async t => {
+    const gate = deferred(t);
+    const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+      if (pathname !== '/api/v1/servers/101/channels') return false;
+      await gate.promise;
+      await route.fulfill(status === 200 ? { json: { data: scopedChannels(101) } } : { status, json: { message: 'Old channel failure' } });
+      return true;
+    } });
+    await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+    await page.locator('.group-sidebar__identity strong').filter({ hasText: 'Scope Alpha' }).waitFor();
+    await switchScopedServer(page, 'Beta');
+    await page.getByText('Beta message', { exact: true }).waitFor();
+    const response = page.waitForResponse(response => response.url().endsWith('/servers/101/channels'));
+    gate.resolve(); await (await response).finished(); await settleUI(page);
+    assert.equal(await page.getByText('Alpha message', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Old channel failure', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Beta message', { exact: true }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: /alpha-channel/ }).count(), 0);
+    const input = page.getByRole('textbox', { name: 'Nội dung tin nhắn' });
+    assert.match(await input.getAttribute('placeholder'), /beta-channel/);
+    assert.deepEqual(errors, []);
+  });
+
+  test(`late history response ${status} from Alpha cannot replace Beta`, async t => {
+    const gate = deferred(t);
+    const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+      if (pathname !== '/api/channels/1010/messages') return false;
+      await gate.promise;
+      await route.fulfill(status === 200 ? { json: { data: { items: [scopedMessage(1010, 'Obsolete Alpha history')], hasMore: true, nextCursor: 9 } } } : { status, json: { message: 'Obsolete history failure' } });
+      return true;
+    } });
+    await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('status', { name: 'Đang tải lịch sử tin nhắn' }).waitFor();
+    await switchScopedServer(page, 'Beta');
+    await page.getByText('Beta message', { exact: true }).waitFor();
+    const response = page.waitForResponse(response => response.url().includes('/channels/1010/messages'));
+    gate.resolve(); await (await response).finished(); await settleUI(page);
+    assert.equal(await page.getByText('Obsolete Alpha history', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Obsolete history failure', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Beta message', { exact: true }).count(), 1);
+    assert.deepEqual(errors, []);
+  });
+}
+
+test('Alpha to Beta to Alpha ignores the channel response from the first Alpha visit', async t => {
+  const gate = deferred(t);
+  let firstVisit = true;
+  const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+    if (pathname !== '/api/v1/servers/101/channels' || !firstVisit) return false;
+    await gate.promise;
+    await route.fulfill({ json: { data: [{ id: 1019, serverId: 101, name: 'obsolete-channel' }] } });
+    return true;
+  } });
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await page.locator('.group-sidebar__identity strong').filter({ hasText: 'Scope Alpha' }).waitFor();
+  await switchScopedServer(page, 'Beta');
+  firstVisit = false;
+  await switchScopedServer(page, 'Alpha');
+  await page.getByText('Alpha message', { exact: true }).waitFor();
+  const response = page.waitForResponse(response => response.url().endsWith('/servers/101/channels'));
+  gate.resolve(); await (await response).finished(); await settleUI(page);
+  assert.equal(await page.getByRole('button', { name: /obsolete-channel/ }).count(), 0);
+  assert.equal(await page.getByText('Alpha message', { exact: true }).count(), 1);
+  assert.deepEqual(errors, []);
+});
+
+for (const action of ['leave', 'remove']) {
+  for (const status of [204, 503]) {
+    test(`late ${action} response ${status} cannot redirect or mutate Beta`, async t => {
+      const gate = deferred(t);
+      const method = action === 'leave' ? 'POST' : 'DELETE';
+      const suffix = action === 'leave' ? '/leave' : '/members/300';
+      let left = false;
+      const { page, errors } = await openScopedChat({ owner: action === 'remove', handler: async (route, pathname) => {
+        if (pathname === '/api/v1/servers' && left) {
+          await route.fulfill({ json: { data: [{ ...scopedServers[1], ownerId: 200 }] } });
+          return true;
+        }
+        if (route.request().method() !== method || !pathname.endsWith(suffix)) return false;
+        await gate.promise;
+        if (action === 'leave' && status === 204) left = true;
+        await route.fulfill(status === 204 ? { status, body: '' } : { status, json: { message: 'Obsolete action failure' } });
+        return true;
+      } });
+      await page.goto(`${origin}/servers/102`, { waitUntil: 'domcontentloaded' });
+      await page.getByText('Common Member', { exact: true }).waitFor();
+      await switchScopedServer(page, 'Alpha');
+      if (action === 'leave') await page.getByRole('button', { name: 'Rời khỏi Server', exact: true }).first().click();
+      else await page.getByRole('button', { name: 'Loại Common Member khỏi Server', exact: true }).click();
+      const request = page.waitForRequest(request => request.method() === method);
+      await page.getByRole('dialog').getByRole('button', { name: action === 'leave' ? /Rời Server/ : /Xác nhận loại/ }).click();
+      await request;
+      await page.goBack({ waitUntil: 'domcontentloaded' });
+      await page.getByText('Beta message', { exact: true }).waitFor();
+      await page.getByText('Common Member', { exact: true }).waitFor();
+      const response = page.waitForResponse(response => response.request().method() === method);
+      gate.resolve(); await (await response).finished(); await settleUI(page);
+      assert.equal(new URL(page.url()).pathname, '/servers/102');
+      assert.equal(await page.getByText('Common Member', { exact: true }).count(), 1);
+      assert.equal(await page.getByRole('dialog').count(), 0);
+      if (action === 'leave' && status === 204) {
+        assert.equal(await page.getByRole('link', { name: 'Mở nhóm Scope Alpha', exact: true }).count(), 0);
+      }
+      assert.deepEqual(errors, []);
+    });
+  }
+}
+
 async function openComposer() {
   const result = await openPage();
   await result.page.goto(`${origin}/__group-ui-test__`, { waitUntil: 'domcontentloaded' });

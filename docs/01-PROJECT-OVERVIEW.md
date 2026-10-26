@@ -86,7 +86,9 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 | Phân hệ | Vấn đề nghiệp vụ | Trạng thái | Quyết định chuẩn hóa |
 | :--- | :--- | :---: | :--- |
 | **SERVER** | Ai được tạo Server? | `CONFIRMED` | Người dùng đã xác thực, tồn tại và có `activated = true`. Tạo/list/đọc chi tiết từ chối tài khoản không hợp lệ với `401`. |
-| **SERVER** | Nickname Owner tự sinh khi tạo Server? | `CONFIRMED` (2026-10-13) | Lấy tên hiển thị đã bỏ khoảng trắng đầu/cuối; null/rỗng/toàn khoảng trắng dùng `Owner`. Tối đa 20 đơn vị UTF-16, không cắt giữa surrogate pair của emoji; chỉ rút ngắn nickname tự sinh, giữ nguyên `User.name`. Không áp dụng thay đổi này vào Join. |
+| **SERVER** | Nickname Owner tự sinh khi tạo Server? | `CONFIRMED` (2026-10-13) | Lấy tên hiển thị đã bỏ khoảng trắng đầu/cuối; null/rỗng/toàn khoảng trắng dùng `Owner`. Tối đa 20 đơn vị UTF-16, không cắt giữa surrogate pair của emoji; chỉ rút ngắn nickname tự sinh, giữ nguyên `User.name`. Quy tắc này dành cho Owner; Join bằng ID dùng fallback `Member` theo dòng riêng bên dưới. |
+| **SERVER** | Tài khoản tham gia bằng ID hiện có phải thỏa điều kiện gì? | `CONFIRMED` (2026-10-26) | Authentication đã xác thực, không anonymous; User tồn tại và `activated = true`. Thiếu/sai identity hoặc tài khoản inactive trả `401`, không lưu membership. Giữ endpoint Join bằng ID hiện có, không mở rộng quyền hoặc cách tham gia. |
+| **SERVER** | Nickname tự sinh khi tham gia bằng ID? | `CONFIRMED` (2026-10-26) | Bỏ khoảng trắng đầu/cuối theo `String.strip()`; null/rỗng/blank dùng `Member`; tối đa 20 đơn vị UTF-16, không cắt giữa surrogate pair. Chỉ chuẩn hóa nickname mới của membership, giữ nguyên `User.name`. Quy tắc fallback của luồng Join bằng mã mời hiện có giữ nguyên trong lượt sửa này. |
 | **SERVER** | Thành viên tham gia Server bằng cách nào? | `CONFIRMED` | Qua Invite code duy nhất do Owner/Admin tạo. |
 | **SERVER** | Creator có vai trò gì khi tạo Server? | `CONFIRMED` | Creator nhận vai trò `OWNER`. Server tự tạo kênh `#general`. |
 | **SERVER** | Owner có thể rời Server không? | `CONFIRMED` | Không. Owner chỉ có thể chuyển quyền hoặc xóa Server (BR-SRV-01). |
