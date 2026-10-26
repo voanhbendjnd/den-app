@@ -413,6 +413,33 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-2.29-PREVENT-DUPLICATE-SERVER-MEMBERSHIP — Cháº·n NgÆ°á»i DÃ¹ng Tham Gia Server Nhiá»u Láº§n
+
+- **Má»¥c tiÃªu:** Äáº£m báº£o má»t ngÆ°á»i dÃ¹ng khÃ´ng thá» tham gia má»t Server nhiá»u láº§n dáº«n Äáº¿n trÃ¹ng láº·p báº£n ghi trong báº£ng `server_member`, xá»­ lÃ½ triá»t Äá» race condition vÃ  tráº£ vá» mÃ£ lá»i 400 rÃµ rÃ ng.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/ServerService.java`:
+    - `joinServer`:
+      - Validate `serverId != null && serverId > 0` (nÃ©m `BadRequestAlertException` vá»i errorKey `idinvalid`).
+      - Sá»­ dá»¥ng `serverMemberRepository.saveAndFlush(member)` vÃ  bá»c trong `try ... catch (DataIntegrityViolationException ex)` Äá» chuyá»n lá»i trÃ¹ng khÃ³a cÆ¡ sá» dá»¯ liá»u thÃ nh `BadRequestAlertException("User is already a member of this server", "server", "alreadymember")`.
+    - `joinServerByInviteCode`:
+      - Sá»­ dá»¥ng `serverMemberRepository.saveAndFlush(member)` vÃ  bá»c trong `try ... catch (DataIntegrityViolationException ex)` Äá» chuyá»n lá»i trÃ¹ng khÃ³a thÃ nh `ResponseStatusException(HttpStatus.BAD_REQUEST, "Báº¡n ÄÃ£ lÃ  thÃ nh viÃªn cá»§a Server nÃ y rá»i")`.
+- **Tests Added & Updated:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Cáº­p nháº­t mock `saveAndFlush` thay vÃ¬ `save`.
+    - ThÃªm unit test `joinServer_FailWhenServerIdInvalid`: Kiá»m tra tá»« chá»i ID server null hoáº·c Ã¢m.
+    - ThÃªm unit test `joinServer_FailWhenConcurrentDuplicateConstraintViolation`: Giáº£ láº­p nÃ©m `DataIntegrityViolationException` khi flush DB, kiá»m tra báº¯t lá»i vÃ  tráº£ vá» `alreadymember`.
+    - ThÃªm unit test `joinServerByInviteCode_RejectsConcurrentDuplicateConstraintViolation`: Giáº£ láº­p nÃ©m `DataIntegrityViolationException` khi flush DB, kiá»m tra báº¯t lá»i vÃ  tráº£ vá» 400 Bad Request.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - `joinServer_Direct_Success_ThenSecondJoinReturns400_NoDuplicateRows`: NgÆ°á»i dÃ¹ng tham gia thÃ nh cÃ´ng láº§n Äáº§u (204), láº§n gá»i thá»© hai bá» tá»« chá»i 400 (`alreadymember`), sá» lÆ°á»£ng báº£n ghi thÃ nh viÃªn trong DB giá»¯ nguyÃªn ÄÃºng 1 báº£n ghi.
+    - `joinServerByInviteCode_SecondJoinReturns400_NoDuplicateRows`: NgÆ°á»i dÃ¹ng tham gia qua mÃ£ má»i thÃ nh cÃ´ng láº§n Äáº§u (200), láº§n gá»i thá»© hai bá» tá»« chá»i 400, sá» lÆ°á»£ng báº£n ghi thÃ nh viÃªn giá»¯ nguyÃªn ÄÃºng 1 báº£n ghi.
+    - `rejoiningAfterLeave_SucceedsWithSingleRow`: Tham gia -> Rá»i server -> Tham gia láº¡i thÃ nh cÃ´ng vá»i ÄÃºng 1 báº£n ghi duy nháº¥t.
+    - `rejoiningAfterKick_SucceedsWithSingleRow`: Tham gia -> Bá» Owner kick -> Tham gia láº¡i thÃ nh cÃ´ng vá»i ÄÃºng 1 báº£n ghi duy nháº¥t.
+- **Verification:**
+  - Gradle test suite: `ServerServiceTest` (100% PASS), `ServerSecurityIT` (79/79 tests PASS), toÃ n bá» backend suite pass (`BUILD SUCCESSFUL in 35s`).
+  - Frontend test suite: `npm test` 80/80 tests PASS.
+- **Git:**
+  - Branch: `fix/prevent-duplicate-server-membership`.
+
 ### [2026-10-26] TASK-2.24-SERVER-REMOVE-MEMBER-UI — Làm UI Loại Thành Viên, Kết Nối API
 
 - **Mục tiêu:** Xây dựng giao diện cho phép Server Owner thực hiện thao tác loại thành viên khỏi Server và tích hợp trực tiếp với API backend `DELETE /api/v1/servers/{serverId}/members/{userId}`.

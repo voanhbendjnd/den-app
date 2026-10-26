@@ -819,5 +819,26 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 5. **Thành viên tồn tại**: `targetUserId` phải là thành viên hiện tại của Server trong bảng `server_member`. Nếu không $\rightarrow$ `404 Not Found` ("Thành viên không tồn tại trong Server").
 6. **Xóa thành viên**: Thực hiện `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)`.
 
+---
 
+## 16. QUY TẮC CHẶN THAM GIA SERVER NHIỀU LẦN (TASK 2.29)
 
+### 16.1 Phạm vi áp dụng & Endpoints
+- `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp vào Server.
+- `POST /api/v1/servers/join-invite/{code}`: Tham gia Server thông qua mã mời hợp lệ.
+
+### 16.2 Cơ chế bảo vệ chống trùng lặp 2 lớp (Two-layer Duplicate Prevention)
+1. **Lớp 1 — Application Validation & Row Lock**:
+   - Khóa Server bằng pessimistic lock: `serverRepository.findByIdForUpdate(serverId)` để tuần tự hóa các thao tác thay đổi membership của Server.
+   - Kiểm tra thành viên hiện tại qua `serverMemberRepository.existsByServerIdAndUserId(serverId, userId)`:
+     - Nếu đã tồn tại: từ chối ngay với HTTP `400 Bad Request`.
+     - Với `joinServer`: `BadRequestAlertException("User is already a member of this server", "server", "alreadymember")`.
+     - Với `joinServerByInviteCode`: `ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn đã là thành viên của Server này rồi")`.
+2. **Lớp 2 — Database Unique Constraint & Concurrency Guard**:
+   - Bảng `server_member` có ràng buộc duy nhất `ux_server_member(server_id, user_id)`.
+   - Khi lưu bản ghi mới, gọi `serverMemberRepository.saveAndFlush(member)` bên trong khối `try ... catch (DataIntegrityViolationException ex)`.
+   - Nếu xảy ra tranh chấp dữ liệu đồng thời (race condition) vượt qua lớp 1, lỗi vi phạm unique constraint từ database sẽ được bắt và chuyển đổi thành HTTP `400 Bad Request` tiêu chuẩn, tuyệt đối không để lộ lỗi `500 Internal Server Error`.
+
+### 16.3 Cho phép tham gia lại sau khi rời hoặc bị loại (Rejoin Support)
+- Do cơ chế thành viên sử dụng hard-delete (`deleteByServerIdAndUserId`) khi rời nhóm (`leaveServer`) hoặc bị Server Owner loại (`removeMember`), toàn bộ bản ghi membership của người dùng đó được xóa hoàn toàn khỏi bảng `server_member`.
+- Khi người dùng nhận được lời mời hợp lệ hoặc tham gia lại, hệ thống cho phép tạo lại bản ghi thành viên mới duy nhất (1 bản ghi) và không bị xung đột khóa.
