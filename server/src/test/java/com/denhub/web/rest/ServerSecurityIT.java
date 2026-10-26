@@ -1298,4 +1298,53 @@ class ServerSecurityIT {
                 .andExpect(jsonPath("$.data[1].userId").value(inviteJoiner.getId()))
                 .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
     }
+    @Test
+    void leaveServer_ThenServerDisappearsFromUserServerList() throws Exception {
+        addMembership(server.getId());
+
+        User memberUser = new User();
+        memberUser.setEmail("leaver-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        memberUser.setPassword("fixture-" + UUID.randomUUID());
+        memberUser.setName("Leaver Member");
+        memberUser.setActivated(true);
+        memberUser.setSessionId(UUID.randomUUID().toString());
+        memberUser = users.saveAndFlush(memberUser);
+        String memberToken = bearerFor(memberUser);
+
+        // Member joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // 1. Verify server appears in member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(server.getId()))
+                .andExpect(jsonPath("$.data[0].name").value("Detail server"));
+
+        // 2. Member calls leave endpoint
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // 3. Verify server disappears from member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // 4. Verify member is now forbidden from accessing server detail
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, memberToken)), 403);
+
+        // 5. Verify server still exists and appears in owner's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(server.getId()));
+    }
 }
