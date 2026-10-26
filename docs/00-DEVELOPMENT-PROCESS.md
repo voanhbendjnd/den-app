@@ -413,6 +413,33 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-2.34-SERVER-MEMBER-REMOVAL-AUTHORIZATION — Kiểm Tra & Củng Cố Phân Quyền Loại Thành Viên
+
+- **Mục tiêu:** Kiểm tra và bảo đảm tuyệt đối chỉ người có quyền (Server Owner hợp pháp) mới được phép loại thành viên khỏi Server qua endpoint `DELETE /api/v1/servers/{serverId}/members/{userId}`.
+- **Backend Authorization Hardening & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Thêm `removeMember_FailWhenUserDeactivated`: Caller có tài khoản `activated = false` bị từ chối 401 Unauthorized (`Phiên đăng nhập không hợp lệ`).
+    - Thêm `removeMember_FailWhenCallerHasAdminAuthorityButNotServerOwner`: Caller có authority `ROLE_ADMIN` toàn cục nhưng không phải `server.ownerId` vẫn bị từ chối 403 Forbidden.
+    - Thêm `removeMember_FailWhenTargetMatchesPrincipal_ReturnsBadRequest`: Owner tự loại mình bị từ chối 400 Bad Request.
+    - Xác nhận `serverMemberRepository.deleteByServerIdAndUserId` không bao giờ được gọi khi có vi phạm authorization.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - Bổ sung helper `bearerFor(User user, List<String> authorities)`.
+    - Thêm `deactivatedUser_CannotRemoveMember_Returns401`: JWT token của tài khoản đã bị vô hiệu hóa bị chặn 401; dữ liệu thành viên giữ nguyên.
+    - Thêm `globalAdminAuthority_CannotRemoveMemberWhenNotServerOwner_Returns403`: JWT chứa `ROLE_ADMIN` không vượt được quyền Server Owner (403).
+    - Thêm `tamperedCallerPayload_DoesNotBypassAuthorization`: Client truyền query param hoặc body giả mạo `callerId`, `isOwner=true`, `role=OWNER` hoàn toàn không thể qua mặt SecurityContext (403).
+- **Frontend Authorization Hardening & Verification:**
+  - `client/src/utils/serverMember.js`: Củng cố `canRemoveMember` kiểm tra chặt chẽ `server.ownerId`, `currentUser.id`, và `targetMember.userId ?? targetMember.id`.
+  - `client/tests/serverRemoveMember.test.mjs`:
+    - Thêm test từ chối caller mang field giả mạo `isOwner: true`, `role: 'OWNER'`, `authorities: ['ROLE_ADMIN']`.
+    - Thêm test từ chối dữ liệu server, user, hoặc member thiếu ID.
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 82/82 tests PASS.
+  - Frontend `npm test`: 82/82 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công trong 898ms.
+- **Git:**
+  - Branch: `fix/server-member-removal-authorization`.
+
 ### [2026-10-26] TASK-2.29-PREVENT-DUPLICATE-SERVER-MEMBERSHIP — Cháº·n NgÆ°á»i DÃ¹ng Tham Gia Server Nhiá»u Láº§n
 
 - **Má»¥c tiÃªu:** Äáº£m báº£o má»t ngÆ°á»i dÃ¹ng khÃ´ng thá» tham gia má»t Server nhiá»u láº§n dáº«n Äáº¿n trÃ¹ng láº·p báº£n ghi trong báº£ng `server_member`, xá»­ lÃ½ triá»t Äá» race condition vÃ  tráº£ vá» mÃ£ lá»i 400 rÃµ rÃ ng.
