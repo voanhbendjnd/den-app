@@ -413,6 +413,30 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-3.09-SERVER-LIST-AFTER-LEAVE — Kiểm Tra Rời Server Thì Server Biến Mất Khỏi Danh Sách
+
+- **Mục tiêu:** Kiểm tra và bảo đảm tính toàn vẹn dữ liệu khi thành viên rời Server qua endpoint `POST /api/v1/servers/{serverId}/leave` (hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`), Server đó phải lập tức biến mất khỏi danh sách Server của người dùng khi gọi `GET /api/v1/servers`, tước toàn bộ quyền truy cập Server (`403 Forbidden`), nhưng vẫn bảo toàn Server đối với Owner và các thành viên khác.
+- **Backend Testing & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Thêm `leaveServer_Success_ServerDisappearsFromUserServers`: Xác nhận khi member rời Server 10L, bản ghi `server_member` bị xóa qua `deleteByServerIdAndUserId(10L, 1L)`, và `getUserServers()` không còn chứa Server 10L.
+    - Thêm `leaveServer_OwnerCannotLeave_ServerRemainsInOwnerServerList`: Xác nhận Owner không được phép tự rời Server của mình (bị từ chối 400 Bad Request, giữ nguyên bản ghi thành viên và Server vẫn nằm trong danh sách của Owner).
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - Thêm `leaveServer_ThenServerDisappearsFromUserServerList`: Vòng đời hoàn chỉnh: Member tham gia Server $\rightarrow$ Server xuất hiện trong `GET /api/v1/servers` $\rightarrow$ Gọi `POST /api/v1/servers/{id}/leave` (`204 No Content`) $\rightarrow$ Server biến mất khỏi `GET /api/v1/servers` của Member $\rightarrow$ Member bị chặn `403 Forbidden` khi truy cập chi tiết $\rightarrow$ Owner vẫn thấy Server tồn tại bình thường.
+    - Thêm `leaveServer_ByMemberMeAlias_ThenServerDisappearsFromUserServerList`: Kiểm tra tương tự đối với endpoint alias `DELETE /api/v1/servers/{id}/members/me` phản hồi `204 No Content` và Server biến mất khỏi `GET /api/v1/servers`.
+- **Frontend State & Utility Tests:**
+  - `client/src/utils/serverLeave.js`:
+    - Thêm `removeServerFromList(servers, serverIdToRemove)`: Lọc bỏ an toàn Server vừa rời khỏi state mảng `servers`, hỗ trợ cả ID dạng số và dạng chuỗi.
+    - Thêm `isServerInList(servers, serverId)`: Kiểm tra sự tồn tại của Server trong danh sách.
+  - `client/tests/serverListAfterLeave.test.mjs`:
+    - Test suite gồm 6 bài test unit kiểm thử độc lập các hàm lọc danh sách Server, bảo toàn thứ tự, xử lý an toàn dữ liệu null/undefined và kiểm tra quy tắc BR-SRV-01.
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 86/86 tests PASS.
+  - Frontend `npm test`: 96/96 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công (3217 modules transformed trong 923ms).
+- **Git:**
+  - Branch: `test/server-list-after-leave`.
+
 ### [2026-10-26] TASK-3.04-SERVER-MEMBER-LIST-AFTER-JOIN — Kiểm Tra Người Tham Gia Server Xuất Hiện Trong Danh Sách Thành Viên
 
 - **Mục tiêu:** Kiểm tra và bảo đảm tính toàn vẹn dữ liệu thành viên khi người dùng tham gia Server (qua cả 2 luồng: API tham gia trực tiếp và tham gia qua mã mời), đảm bảo người dùng mới xuất hiện chính xác trong danh sách thành viên ở cả Backend API (`GET /api/v1/servers/{serverId}/members`) và phía Frontend.

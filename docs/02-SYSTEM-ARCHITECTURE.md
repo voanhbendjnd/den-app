@@ -892,3 +892,28 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
      - `mergeNewMemberIntoList`: Hợp nhất an toàn thành viên mới vào state, ngăn chặn trùng lặp và bảo toàn vai trò `OWNER`/`MEMBER`.
      - `getMemberCountDisplay`: Hiển thị số lượng chuẩn `Thành viên (N)`.
      - `formatMemberDisplayName`: Ưu tiên `nickname` > `name` > `username` > fallback `Thành viên`.
+
+---
+
+## 18. QUY TẮC RỜI SERVER VÀ BIẾN MẤT KHỎI DANH SÁCH (TASK 3.09)
+
+### 18.1 Endpoints & Quyền hạn
+- **Endpoint rời Server chính thức**: `POST /api/v1/servers/{serverId}/leave` (trả về `204 No Content`).
+- **Endpoint alias**: `DELETE /api/v1/servers/{serverId}/members/me` (trả về `204 No Content`).
+- **Quyền hạn**: Chỉ dành cho thành viên thông thường (`MEMBER` / `ADMIN`).
+- **Quy tắc bảo vệ Owner (BR-SRV-01)**: Chủ sở hữu (`currentUser.id == server.ownerId`) bị cấm tuyệt đối không được tự rời Server $\rightarrow$ `400 Bad Request` ("Chủ sở hữu không thể rời khỏi Server. Bạn chỉ có thể chuyển quyền sở hữu hoặc xóa Server").
+
+### 18.2 Cơ chế xóa thành viên và biến mất khỏi danh sách Server
+1. **Xóa bản ghi membership**:
+   - Khi thành viên rời Server, `serverMemberRepository.deleteByServerIdAndUserId(serverId, currentUser.getId())` được thực thi.
+2. **Biến mất khỏi `GET /api/v1/servers`**:
+   - Truy vấn danh sách Server của user:
+     `SELECT DISTINCT s FROM Server s WHERE s.ownerId = :userId OR s.id IN (SELECT sm.serverId FROM ServerMember sm WHERE sm.userId = :userId) ORDER BY s.id DESC`.
+   - Do bản ghi membership đã bị xóa và người dùng không phải là Owner, Server lập tức biến mất khỏi danh sách Server trả về.
+3. **Thu hồi quyền truy cập (Access Revocation)**:
+   - Các API chi tiết Server (`GET /api/v1/servers/{serverId}`) và danh sách thành viên (`GET /api/v1/servers/{serverId}/members`) đều kiểm tra quyền `existsByServerIdAndUserId`.
+   - Do đó, ngay sau khi rời Server, người dùng bị chặn toàn bộ với mã lỗi `403 Forbidden`.
+4. **Phía Frontend**:
+   - Khi `LeaveServerModal` nhận tín hiệu thành công từ API:
+     - Gọi `handleServerDeleted(serverId)`: cập nhật `setServers(prev => prev.filter(s => String(s.id) !== String(serverId)))`.
+     - Điều hướng an toàn về trang chủ: `navigate('/', { replace: true })`.
