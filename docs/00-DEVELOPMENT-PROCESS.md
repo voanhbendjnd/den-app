@@ -3143,3 +3143,21 @@ Mô tả luồng từ gõ chữ đến React state, Send, Axios, Backend lưu, D
 Giải thích bằng tiếng Việt dễ hiểu, giữ thuật ngữ kỹ thuật; comment code bằng tiếng Anh khi cần. Báo: Implemented, Tests Added/Updated, Verification (lệnh và kết quả thật), Documentation, Remaining Issues, Git Status và Push. Không dùng kết quả test của log cũ để nhận PASS cho phiên hiện tại.
 
 Luôn ghi: `Not pushed — AI agents are not allowed to push DenHub.`
+
+---
+
+## 21. Cập nhật ngày 2026-10-26: Hoàn thiện tính năng Social Login (Google & GitHub)
+
+- **Backend:**
+  - Endpoint `POST /api/social-login` (nhận `SocialLoginVM`: `accessToken`, `type`).
+  - Mở quyền truy cập `permitAll()` trong `SecurityConfiguration.java` và bổ sung vào `publicEndpoints`.
+  - Khắc phục lỗi bảo mật: cấu hình cookie `SameSite="Strict"`, ẩn `refreshToken` trong response body (`res.setRefreshToken(null)`), bổ sung `@ApiMessage`.
+  - Khắc phục lỗi Crash DB 500: gán mật khẩu ngẫu nhiên mã hóa `passwordEncoder.encode(UUID.randomUUID().toString())` đáp ứng ràng buộc `@NotNull password_hash`.
+  - Khắc phục lỗi NullPointerException: bóc tách chính xác các trường từ GitHub API (`login`, `avatar_url`, xử lý an toàn email private qua `/user/emails`).
+  - Viết bộ kiểm thử toàn diện: `AccountResourceIT` (MockMvc test cho social-login) và `UserServiceTest` (Unit test cho `processLogin` và `loginWithSocialMedia`). Toàn bộ test PASS 100%.
+- **Frontend:**
+  - Tích hợp hàm `socialLogin` trong `client/src/api/authApi.js`.
+  - Cập nhật `AuthContext.jsx` hàm `loginWithSocial` lưu Access Token và chuẩn hóa User context.
+  - Thiết kế giao diện Đăng nhập (`LoginPage.jsx`) và Đăng ký (`RegisterPage.jsx`) chuẩn Cyberpunk / Discord Glassmorphism: Divider phân cách, lưới nút đăng nhập Google & GitHub đồng bộ, Modal xác thực GitHub Token cho nhà phát triển và người dùng.
+  - Build frontend `npm run build` PASS thành công 100%.
+

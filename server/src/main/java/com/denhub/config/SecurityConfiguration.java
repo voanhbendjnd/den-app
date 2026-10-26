@@ -99,6 +99,7 @@ public class SecurityConfiguration {
                 "/api/v1/auth/login",
                 "/api/auth/google",
                 "/api/login/google",
+                "/api/social-login",
                 "/api/refresh",
                 "/refresh",
                 "/account/activate/**",
@@ -113,7 +114,7 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(
                         auth -> auth
                                 .requestMatchers(HttpMethod.POST, "/api/register", "/api/v1/register", "/api/auth/register", "/api/v1/auth/register").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/login", "/api/v1/login", "/api/auth/login", "/api/v1/auth/login", "/api/auth/google", "/api/login/google").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/login", "/api/v1/login", "/api/auth/login", "/api/v1/auth/login", "/api/auth/google", "/api/login/google", "/api/social-login").permitAll()
                                 .requestMatchers(whiteList).permitAll()
                                 .anyRequest().authenticated()
                 )

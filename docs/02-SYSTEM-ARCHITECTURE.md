@@ -204,6 +204,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `POST /api/register` & `POST /api/auth/register`: Đăng ký tài khoản mới (`RegisterReqDTO`: email, password, name, username), lưu người dùng, trả `UserDTO` bọc trong `RestResponse<UserDTO>` (201 Created).
 - `POST /api/login` & `POST /api/auth/login`: Đăng nhập, nhận Access Token JWT và cookie Refresh Token (`ResLoginDTO`).
 - `POST /api/auth/google` & `POST /api/login/google`: Đăng nhập hoặc đăng ký tài khoản qua Google OAuth / Google Identity Services (`GoogleLoginReqDTO`: credential, email, name, avatar, googleId), trả về `ResLoginDTO` (200 OK).
+- `POST /api/social-login`: Đăng nhập hoặc đăng ký tài khoản thông qua mạng xã hội (`SocialLoginVM`: `accessToken`, `type` ["GOOGLE", "GITHUB"]), cấp Access Token JWT và cookie Refresh Token HttpOnly (`ResLoginDTO`, 200 OK).
 - `POST /api/auth/logout`: Đăng xuất, hủy refresh token
 - `GET /api/account` & `GET /api/users/me`: Thông tin người dùng hiện tại
 - `PATCH /api/users/me`: Cập nhật display name, avatar

@@ -9,8 +9,12 @@ import com.denhub.domain.User;
 import com.denhub.repository.AuthorityRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.AuthoritiesConstants;
+import com.denhub.service.dto.ResLoginDTO;
 import com.denhub.service.dto.UserProfileResponseDTO;
+import com.denhub.service.errors.BadRequestResourceException;
 import com.denhub.web.rest.errors.BadRequestAlertException;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +44,9 @@ class UserServiceTest {
 
     @Mock
     private AuthorityRepository authorityRepository;
+
+    @Mock
+    private AuthService authService;
 
     @InjectMocks
     private UserService userService;
@@ -108,5 +115,57 @@ class UserServiceTest {
 
         assertThat(ex.getEntityName()).isEqualTo("userProfile");
         assertThat(ex.getErrorKey()).isEqualTo("usernotfound");
+    }
+
+    @Test
+    void processLogin_NewUser_GeneratesPasswordAndSavesUser() {
+        String email = "newuser@example.com";
+        when(userRepository.findOneWithAuthoritiesByEmail("newuser@example.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(any())).thenReturn("hashed_random_pwd");
+
+        Authority userAuth = new Authority();
+        userAuth.setName(com.denhub.security.AuthoritiesConstants.USER);
+        when(authorityRepository.findById(com.denhub.security.AuthoritiesConstants.USER)).thenReturn(Optional.of(userAuth));
+
+        User savedUser = new User();
+        savedUser.setId(201L);
+        savedUser.setEmail(email);
+        savedUser.setName("New User");
+        savedUser.setPassword("hashed_random_pwd");
+        savedUser.setActivated(true);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+        ResLoginDTO expectedRes = new ResLoginDTO();
+        expectedRes.setAccessToken("dummy-jwt-access-token");
+        when(authService.generateResLoginDTO(savedUser)).thenReturn(expectedRes);
+
+        ResLoginDTO res = userService.processLogin(email, "https://avatar.png", "New User", "newuser", "GITHUB");
+
+        assertThat(res).isNotNull();
+        assertThat(res.getAccessToken()).isEqualTo("dummy-jwt-access-token");
+        verify(passwordEncoder).encode(any());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void processLogin_ExistingUser_ReturnsExistingUserToken() {
+        String email = TEST_EMAIL;
+        when(userRepository.findOneWithAuthoritiesByEmail(email)).thenReturn(Optional.of(mockUser));
+
+        ResLoginDTO expectedRes = new ResLoginDTO();
+        expectedRes.setAccessToken("existing-user-jwt");
+        when(authService.generateResLoginDTO(mockUser)).thenReturn(expectedRes);
+
+        ResLoginDTO res = userService.processLogin(email, null, null, null, "GOOGLE");
+
+        assertThat(res).isNotNull();
+        assertThat(res.getAccessToken()).isEqualTo("existing-user-jwt");
+    }
+
+    @Test
+    void loginWithSocialMedia_UnsupportedType_ThrowsBadRequest() {
+        assertThrows(BadRequestResourceException.class, () ->
+                userService.loginWithSocialMedia("dummy-token", "FACEBOOK")
+        );
     }
 }

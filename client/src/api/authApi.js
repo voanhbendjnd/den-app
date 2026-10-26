@@ -13,6 +13,10 @@ const authApi = {
     return axiosClient.post('/auth/google', data);
   },
 
+  socialLogin(data) {
+    return axiosClient.post('/social-login', data);
+  },
+
   getProfile() {
     return axiosClient.get('/v1/users/profile');
   },

@@ -1,5 +1,6 @@
 package com.denhub.web.rest;
 
+import com.denhub.web.rest.vm.SocialLoginVM;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
@@ -68,6 +69,24 @@ public class AccountResource {
     public ResponseEntity<UserDTO> registerAccount(@Valid @RequestBody RegisterReqDTO req) {
         User user = userService.registerUser(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(user));
+    }
+    @PostMapping("/social-login")
+    @ApiMessage("Đăng nhập bằng mạng xã hội thành công")
+    @Operation(summary = "Đăng nhập bằng mạng xã hội", description = "Đăng nhập hoặc đăng ký tài khoản thông qua mạng xã hội (Google, GitHub).")
+    public ResponseEntity<ResLoginDTO> socialLogin(@RequestBody @Valid SocialLoginVM req) {
+        if ((req.getAccessToken() == null || req.getAccessToken().isBlank()) && (req.getCode() == null || req.getCode().isBlank())) {
+            throw new AccountResourceException("accessToken hoặc code là bắt buộc");
+        }
+        var res = userService.loginWithSocialMedia(req.getAccessToken(), req.getCode(), req.getType());
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", res.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(refreshTokenExpiration)
+                .sameSite("Strict")
+                .build();
+        res.setRefreshToken(null);
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(res);
     }
 
     @PostMapping({"/auth/google", "/login/google"})
