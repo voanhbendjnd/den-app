@@ -413,6 +413,83 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-3.14-BLOCK-REMOVED-MEMBER-ACCESS — Kiểm Tra Thành Viên Bị Loại Không Còn Truy Cập Được Server
+
+- **Mục tiêu:** Xác minh và bảo đảm an toàn phân quyền tuyệt đối: sau khi thành viên bị loại khỏi Server (qua `DELETE /api/v1/servers/{serverId}/members/{userId}`), thành viên đó hoàn toàn mất mọi quyền truy cập vào Server (`GET /api/v1/servers/{id}` trả về `403 Forbidden`), không xem được danh sách thành viên (`GET /api/v1/servers/{id}/members` trả về `403 Forbidden`), Server biến mất khỏi danh sách Server của họ (`GET /api/v1/servers`), bị từ chối truy cập danh sách channel hoặc tạo channel trong Server (`400 Bad Request`), và không thể gọi rời lại (`POST /leave` trả về `400 Bad Request`). Phía Owner và các thành viên còn lại vẫn tiếp tục hoạt động bình thường.
+- **Backend Testing & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - `removeMember_Success_TargetMemberLosesServerAccess`: Xác thực target member sau khi bị loại không còn nằm trong `getUserServers()`, không tồn tại trong `getServerMembers()`, và gọi `getServerDetail()` ném `AccessDeniedException`.
+    - `removeMember_PreservesRemainingMembersAccess`: Xác thực việc loại 1 member không ảnh hưởng đến quyền hạn và dữ liệu của Owner cũng như các member khác còn lại trong Server.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - `removeMember_TargetCannotAccessServerOrMembersAfterRemoval`: Vòng đời tích hợp hoàn chỉnh: Member tham gia Server $\rightarrow$ xem Server & members bình thường $\rightarrow$ Owner loại member $\rightarrow$ Member bị chặn `403 Forbidden` khi gọi `GET /api/v1/servers/{id}` $\rightarrow$ bị chặn `403 Forbidden` khi gọi `GET /api/v1/servers/{id}/members` $\rightarrow$ Server biến mất khỏi `GET /api/v1/servers` của Member $\rightarrow$ Member không thể gọi `POST /leave` (`400 Bad Request`) $\rightarrow$ Owner vẫn có quyền đầy đủ.
+    - `removeMember_TargetCannotAccessOrMutateChannelsAfterRemoval`: Target sau khi bị loại khỏi Server bị chặn truy cập danh sách channels (`GET /api/v1/servers/{id}/channels` $\rightarrow$ `400 Bad Request`) và bị chặn tạo channel mới (`POST /api/v1/channels` $\rightarrow$ `400 Bad Request`).
+- **Frontend State & Utility Tests:**
+  - `client/src/utils/serverMember.js`:
+    - `isMemberAllowedAccess(server, currentUser, members)`: Hàm kiểm tra quyền truy cập Server an toàn ở client side.
+    - `getRemovedMemberAccessErrorMessage(err)`: Map các mã lỗi API (403, 400, 404, 401, timeout, network error) sang thông báo tiếng Việt thân thiện khi người dùng bị loại hoặc cố truy cập Server trái phép.
+    - `filterActiveServersAfterRemoval(serverList, removedServerId)`: Lọc bỏ Server bị loại khỏi danh sách Server đang hiển thị.
+    - `resolveRemovalRedirectPath(currentServerId, removedServerId, remainingServers)`: Điều hướng an toàn người dùng sang Server khả dụng khác hoặc `/servers` khi đang ở trong Server vừa bị loại.
+  - `client/tests/serverAccessAfterRemoval.test.mjs`:
+    - Test suite gồm 7 bài test unit (kiểm thử 100% case cho cả 4 utility functions trên).
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 100% PASS.
+  - Frontend `npm test`: 103/103 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công (3217 modules transformed trong 933ms).
+- **Git:**
+  - Branch: `test/block-removed-member-access`.
+
+### [2026-10-26] TASK-3.09-SERVER-LIST-AFTER-LEAVE — Kiểm Tra Rời Server Thì Server Biến Mất Khỏi Danh Sách
+
+- **Mục tiêu:** Kiểm tra và bảo đảm tính toàn vẹn dữ liệu khi thành viên rời Server qua endpoint `POST /api/v1/servers/{serverId}/leave` (hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`), Server đó phải lập tức biến mất khỏi danh sách Server của người dùng khi gọi `GET /api/v1/servers`, tước toàn bộ quyền truy cập Server (`403 Forbidden`), nhưng vẫn bảo toàn Server đối với Owner và các thành viên khác.
+- **Backend Testing & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Thêm `leaveServer_Success_ServerDisappearsFromUserServers`: Xác nhận khi member rời Server 10L, bản ghi `server_member` bị xóa qua `deleteByServerIdAndUserId(10L, 1L)`, và `getUserServers()` không còn chứa Server 10L.
+    - Thêm `leaveServer_OwnerCannotLeave_ServerRemainsInOwnerServerList`: Xác nhận Owner không được phép tự rời Server của mình (bị từ chối 400 Bad Request, giữ nguyên bản ghi thành viên và Server vẫn nằm trong danh sách của Owner).
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - Thêm `leaveServer_ThenServerDisappearsFromUserServerList`: Vòng đời hoàn chỉnh: Member tham gia Server $\rightarrow$ Server xuất hiện trong `GET /api/v1/servers` $\rightarrow$ Gọi `POST /api/v1/servers/{id}/leave` (`204 No Content`) $\rightarrow$ Server biến mất khỏi `GET /api/v1/servers` của Member $\rightarrow$ Member bị chặn `403 Forbidden` khi truy cập chi tiết $\rightarrow$ Owner vẫn thấy Server tồn tại bình thường.
+    - Thêm `leaveServer_ByMemberMeAlias_ThenServerDisappearsFromUserServerList`: Kiểm tra tương tự đối với endpoint alias `DELETE /api/v1/servers/{id}/members/me` phản hồi `204 No Content` và Server biến mất khỏi `GET /api/v1/servers`.
+- **Frontend State & Utility Tests:**
+  - `client/src/utils/serverLeave.js`:
+    - Thêm `removeServerFromList(servers, serverIdToRemove)`: Lọc bỏ an toàn Server vừa rời khỏi state mảng `servers`, hỗ trợ cả ID dạng số và dạng chuỗi.
+    - Thêm `isServerInList(servers, serverId)`: Kiểm tra sự tồn tại của Server trong danh sách.
+  - `client/tests/serverListAfterLeave.test.mjs`:
+    - Test suite gồm 6 bài test unit kiểm thử độc lập các hàm lọc danh sách Server, bảo toàn thứ tự, xử lý an toàn dữ liệu null/undefined và kiểm tra quy tắc BR-SRV-01.
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 86/86 tests PASS.
+  - Frontend `npm test`: 96/96 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công (3217 modules transformed trong 923ms).
+- **Git:**
+  - Branch: `test/server-list-after-leave`.
+
+### [2026-10-26] TASK-3.04-SERVER-MEMBER-LIST-AFTER-JOIN — Kiểm Tra Người Tham Gia Server Xuất Hiện Trong Danh Sách Thành Viên
+
+- **Mục tiêu:** Kiểm tra và bảo đảm tính toàn vẹn dữ liệu thành viên khi người dùng tham gia Server (qua cả 2 luồng: API tham gia trực tiếp và tham gia qua mã mời), đảm bảo người dùng mới xuất hiện chính xác trong danh sách thành viên ở cả Backend API (`GET /api/v1/servers/{serverId}/members`) và phía Frontend.
+- **Backend Testing & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Thêm `joinServer_ThenGetServerMembers_ContainsJoinedUser`: Xác nhận `getServerMembers` phản ánh đầy đủ `userId`, `username`, `name`, `nickname`, `role = "MEMBER"`, và `avatar` của thành viên vừa tham gia.
+    - Thêm `joinServerByInviteCode_ThenGetServerMembers_ContainsJoinedUser`: Xác nhận thành viên tham gia qua mã mời xuất hiện với vai trò `MEMBER`.
+    - Thêm `getServerMembers_GracefulHandlingWhenUserEntityMissingInRepository`: Xử lý an toàn không gây NPE khi bản ghi User bị thiếu trong repository.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - Thêm `joinServer_Directly_NewMemberAppearsInMembersList`: Vòng đời hoàn chỉnh từ khi là outsider (bị từ chối 403), join trực tiếp qua `POST /api/v1/servers/{id}/join` (204), đọc danh sách thành viên (200), xuất hiện đầy đủ thông tin thành viên mới; Owner cũng đọc được danh sách cập nhật.
+    - Thêm `joinServer_ByInviteCode_NewMemberAppearsInMembersList`: Tạo mã mời, tham gia qua `POST /api/v1/servers/join-invite/{code}` (200), xác minh người mới xuất hiện trong danh sách thành viên với vai trò `MEMBER`.
+- **Frontend State & Utility Tests:**
+  - `client/src/utils/serverMember.js`:
+    - Thêm helper `findMemberByUserId`: Tìm kiếm thành viên an toàn theo ID (number hoặc string).
+    - Thêm helper `mergeNewMemberIntoList`: Gộp thành viên mới vào danh sách an toàn, ngăn chặn trùng lặp và đồng bộ vai trò `OWNER`/`MEMBER`.
+    - Thêm helper `getMemberCountDisplay`: Định dạng chuỗi hiển thị số lượng thành viên `Thành viên (N)`.
+    - Thêm helper `formatMemberDisplayName`: Chuẩn hóa tên hiển thị theo thứ tự ưu tiên nickname > name > username > fallback.
+  - `client/tests/serverMemberListAfterJoin.test.mjs`:
+    - Test suite gồm 8 bài test unit kiểm thử toàn diện các hàm tiện ích quản lý danh sách thành viên sau khi tham gia.
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 84/84 tests PASS.
+  - Frontend `npm test`: 90/90 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công (3217 modules transformed trong 814ms).
+- **Git:**
+  - Branch: `test/server-member-list-after-join`.
+
 ### [2026-10-26] TASK-2.34-SERVER-MEMBER-REMOVAL-AUTHORIZATION — Kiểm Tra & Củng Cố Phân Quyền Loại Thành Viên
 
 - **Mục tiêu:** Kiểm tra và bảo đảm tuyệt đối chỉ người có quyền (Server Owner hợp pháp) mới được phép loại thành viên khỏi Server qua endpoint `DELETE /api/v1/servers/{serverId}/members/{userId}`.

@@ -1200,4 +1200,282 @@ class ServerSecurityIT {
 
         assertTrue(members.existsByServerIdAndUserId(server.getId(), targetUser.getId()));
     }
+    @Test
+    void joinServer_Directly_NewMemberAppearsInMembersList() throws Exception {
+        addMembership(server.getId());
+
+        User joiner = new User();
+        joiner.setEmail("joiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("Direct Joiner");
+        joiner.setUsername("directjoiner");
+        joiner.setAvatar("https://example.test/direct.png");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+        String joinerToken = bearerFor(joiner);
+
+        // Before joining: outsider cannot read members list (403 Forbidden)
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken)), 403);
+
+        // Joiner performs direct join
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isNoContent());
+
+        // After joining: joiner can read members list and appears as MEMBER
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()))
+                .andExpect(jsonPath("$.data[0].role").value("OWNER"))
+                .andExpect(jsonPath("$.data[1].userId").value(joiner.getId()))
+                .andExpect(jsonPath("$.data[1].username").value("directjoiner"))
+                .andExpect(jsonPath("$.data[1].name").value("Direct Joiner"))
+                .andExpect(jsonPath("$.data[1].avatar").value("https://example.test/direct.png"))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+
+        // Owner also sees the newly joined member
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(joiner.getId()))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+    }
+    @Test
+    void joinServer_ByInviteCode_NewMemberAppearsInMembersList() throws Exception {
+        addMembership(server.getId());
+
+        String code = "INV_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setServerId(server.getId());
+        invite.setCode(code);
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(reader.getId());
+        invite.setCreatedAt(Instant.now());
+        invite.setExpiresAt(Instant.now().plusSeconds(3600));
+        invites.saveAndFlush(invite);
+
+        User inviteJoiner = new User();
+        inviteJoiner.setEmail("invjoiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        inviteJoiner.setPassword("fixture-" + UUID.randomUUID());
+        inviteJoiner.setName("Invite Joiner");
+        inviteJoiner.setUsername("invitejoiner");
+        inviteJoiner.setAvatar("https://example.test/invitejoiner.png");
+        inviteJoiner.setActivated(true);
+        inviteJoiner.setSessionId(UUID.randomUUID().toString());
+        inviteJoiner = users.saveAndFlush(inviteJoiner);
+        String joinerToken = bearerFor(inviteJoiner);
+
+        // Before joining: cannot access members list (403 Forbidden)
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken)), 403);
+
+        // Join via invite code endpoint
+        mvc.perform(post("/api/v1/servers/join-invite/" + code)
+                .header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.id").value(server.getId()));
+
+        // After joining: joiner can read members list and appears in it
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(inviteJoiner.getId()))
+                .andExpect(jsonPath("$.data[1].username").value("invitejoiner"))
+                .andExpect(jsonPath("$.data[1].name").value("Invite Joiner"))
+                .andExpect(jsonPath("$.data[1].avatar").value("https://example.test/invitejoiner.png"))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+
+        // Owner also sees the invite joiner
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(inviteJoiner.getId()))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+    }
+    @Test
+    void leaveServer_ThenServerDisappearsFromUserServerList() throws Exception {
+        addMembership(server.getId());
+
+        User memberUser = new User();
+        memberUser.setEmail("leaver-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        memberUser.setPassword("fixture-" + UUID.randomUUID());
+        memberUser.setName("Leaver Member");
+        memberUser.setActivated(true);
+        memberUser.setSessionId(UUID.randomUUID().toString());
+        memberUser = users.saveAndFlush(memberUser);
+        String memberToken = bearerFor(memberUser);
+
+        // Member joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // 1. Verify server appears in member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(server.getId()))
+                .andExpect(jsonPath("$.data[0].name").value("Detail server"));
+
+        // 2. Member calls leave endpoint
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // 3. Verify server disappears from member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // 4. Verify member is now forbidden from accessing server detail
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, memberToken)), 403);
+
+        // 5. Verify server still exists and appears in owner's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(server.getId()));
+    }
+    @Test
+    void leaveServer_ByMemberMeAlias_ThenServerDisappearsFromUserServerList() throws Exception {
+        addMembership(server.getId());
+
+        User memberUser = new User();
+        memberUser.setEmail("alias-leaver-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        memberUser.setPassword("fixture-" + UUID.randomUUID());
+        memberUser.setName("Alias Leaver Member");
+        memberUser.setActivated(true);
+        memberUser.setSessionId(UUID.randomUUID().toString());
+        memberUser = users.saveAndFlush(memberUser);
+        String memberToken = bearerFor(memberUser);
+
+        // Member joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // Verify server is present in member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+
+        // Member leaves using alias endpoint DELETE /api/v1/servers/{serverId}/members/me
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/me")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // Verify server disappears from member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // Member is now forbidden from accessing server detail
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, memberToken)), 403);
+    }
+    @Test
+    void removeMember_FullLifecycle_TargetMemberCompletelyBlockedFromAllServerEndpoints() throws Exception {
+        addMembership(server.getId());
+
+        User targetMember = new User();
+        targetMember.setEmail("kicked-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        targetMember.setPassword("fixture-" + UUID.randomUUID());
+        targetMember.setName("Kicked Member");
+        targetMember.setUsername("kickedmember");
+        targetMember.setActivated(true);
+        targetMember.setSessionId(UUID.randomUUID().toString());
+        targetMember = users.saveAndFlush(targetMember);
+        String targetToken = bearerFor(targetMember);
+
+        // 1. Target joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isNoContent());
+
+        // Target initially has access
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk());
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+
+        // 2. Owner removes target member
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+
+        // 3. Target is now blocked from detail (403 Forbidden)
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, targetToken)), 403);
+
+        // 4. Target is blocked from members list (403 Forbidden)
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, targetToken)), 403);
+
+        // 5. Server disappears from target's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // 6. Target cannot call leave because they are no longer a member (400 Bad Request)
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
+
+        // 7. Owner still has full access and target is gone from members list
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk());
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()));
+    }
+    @Test
+    void removeMember_TargetCannotAccessOrMutateChannelsAfterRemoval() throws Exception {
+        addMembership(server.getId());
+
+        User targetMember = new User();
+        targetMember.setEmail("channel-kicked-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        targetMember.setPassword("fixture-" + UUID.randomUUID());
+        targetMember.setName("ChanKicked");
+        targetMember.setActivated(true);
+        targetMember.setSessionId(UUID.randomUUID().toString());
+        targetMember = users.saveAndFlush(targetMember);
+        String targetToken = bearerFor(targetMember);
+
+        // Target joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isNoContent());
+
+        // Target can read channels before being removed
+        mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk());
+
+        // Owner removes target member
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+
+        // Target attempts to read channels -> 400 Bad Request (channel forbidden)
+        problem(mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
+
+        // Target attempts to create a channel in this server -> 400 Bad Request (channel forbidden)
+        problem(mvc.perform(post("/api/v1/channels")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"hacked-channel\",\"serverId\":" + server.getId() + "}")
+                .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
+    }
 }

@@ -860,3 +860,93 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 ### 16.3 Cho phép tham gia lại sau khi rời hoặc bị loại (Rejoin Support)
 - Do cơ chế thành viên sử dụng hard-delete (`deleteByServerIdAndUserId`) khi rời nhóm (`leaveServer`) hoặc bị Server Owner loại (`removeMember`), toàn bộ bản ghi membership của người dùng đó được xóa hoàn toàn khỏi bảng `server_member`.
 - Khi người dùng nhận được lời mời hợp lệ hoặc tham gia lại, hệ thống cho phép tạo lại bản ghi thành viên mới duy nhất (1 bản ghi) và không bị xung đột khóa.
+
+---
+
+## 17. QUY TẮC XÁC MINH DANH SÁCH THÀNH VIÊN SAU KHI THAM GIA (TASK 3.04)
+
+### 17.1 Endpoints & Luồng dữ liệu thành viên
+- **Tham gia Server**:
+  - `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp (`204 No Content`).
+  - `POST /api/v1/servers/join-invite/{code}`: Tham gia bằng mã mời (`200 OK`, trả về `ServerResponseDTO`).
+- **Danh sách thành viên**:
+  - `GET /api/v1/servers/{serverId}/members`: Lấy danh sách thành viên của Server (`200 OK`, `ResFormatResponse<List<ServerMemberResponseDTO>>`).
+
+### 17.2 Quy tắc tính toàn vẹn dữ liệu thành viên (Data Integrity & Lifecycle)
+1. **Trước khi tham gia (Pre-join Guard)**:
+   - Outsider (người dùng chưa tham gia Server) tuyệt đối không được phép xem danh sách thành viên $\rightarrow$ `403 Forbidden` ("Bạn không có quyền xem danh sách thành viên của Server này").
+2. **Sau khi tham gia (Post-join Visibility)**:
+   - Ngay sau khi lệnh tham gia (trực tiếp hoặc qua invite code) thành công, quyền thành viên được kích hoạt ngay lập tức.
+   - Thành viên mới gọi `GET /api/v1/servers/{serverId}/members` $\rightarrow$ `200 OK`.
+   - Bản ghi của thành viên mới xuất hiện đầy đủ trong danh sách với các trường:
+     - `userId`: ID định danh người dùng.
+     - `username`: Tên đăng nhập.
+     - `name`: Tên đầy đủ.
+     - `nickname`: Tên hiển thị trong Server (mặc định lấy từ User.name).
+     - `avatar`: URL ảnh đại diện.
+     - `role`: `"MEMBER"` (chỉ `server.ownerId` mới có vai trò `"OWNER"`).
+   - Server Owner và các thành viên khác khi tải lại danh sách thành viên đều thấy thành viên mới.
+3. **Phía Frontend (UI State Management)**:
+   - `client/src/utils/serverMember.js` cung cấp các hàm hỗ trợ:
+     - `findMemberByUserId`: Tra cứu thành viên theo ID.
+     - `mergeNewMemberIntoList`: Hợp nhất an toàn thành viên mới vào state, ngăn chặn trùng lặp và bảo toàn vai trò `OWNER`/`MEMBER`.
+     - `getMemberCountDisplay`: Hiển thị số lượng chuẩn `Thành viên (N)`.
+     - `formatMemberDisplayName`: Ưu tiên `nickname` > `name` > `username` > fallback `Thành viên`.
+
+---
+
+## 18. QUY TẮC RỜI SERVER VÀ BIẾN MẤT KHỎI DANH SÁCH (TASK 3.09)
+
+### 18.1 Endpoints & Quyền hạn
+- **Endpoint rời Server chính thức**: `POST /api/v1/servers/{serverId}/leave` (trả về `204 No Content`).
+- **Endpoint alias**: `DELETE /api/v1/servers/{serverId}/members/me` (trả về `204 No Content`).
+- **Quyền hạn**: Chỉ dành cho thành viên thông thường (`MEMBER` / `ADMIN`).
+- **Quy tắc bảo vệ Owner (BR-SRV-01)**: Chủ sở hữu (`currentUser.id == server.ownerId`) bị cấm tuyệt đối không được tự rời Server $\rightarrow$ `400 Bad Request` ("Chủ sở hữu không thể rời khỏi Server. Bạn chỉ có thể chuyển quyền sở hữu hoặc xóa Server").
+
+### 18.2 Cơ chế xóa thành viên và biến mất khỏi danh sách Server
+1. **Xóa bản ghi membership**:
+   - Khi thành viên rời Server, `serverMemberRepository.deleteByServerIdAndUserId(serverId, currentUser.getId())` được thực thi.
+2. **Biến mất khỏi `GET /api/v1/servers`**:
+   - Truy vấn danh sách Server của user:
+     `SELECT DISTINCT s FROM Server s WHERE s.ownerId = :userId OR s.id IN (SELECT sm.serverId FROM ServerMember sm WHERE sm.userId = :userId) ORDER BY s.id DESC`.
+   - Do bản ghi membership đã bị xóa và người dùng không phải là Owner, Server lập tức biến mất khỏi danh sách Server trả về.
+3. **Thu hồi quyền truy cập (Access Revocation)**:
+   - Các API chi tiết Server (`GET /api/v1/servers/{serverId}`) và danh sách thành viên (`GET /api/v1/servers/{serverId}/members`) đều kiểm tra quyền `existsByServerIdAndUserId`.
+   - Do đó, ngay sau khi rời Server, người dùng bị chặn toàn bộ với mã lỗi `403 Forbidden`.
+4. **Phía Frontend**:
+   - Khi `LeaveServerModal` nhận tín hiệu thành công từ API:
+     - Gọi `handleServerDeleted(serverId)`: cập nhật `setServers(prev => prev.filter(s => String(s.id) !== String(serverId)))`.
+     - Điều hướng an toàn về trang chủ: `navigate('/', { replace: true })`.
+
+---
+
+## 19. QUY TẮC CHẶN TOÀN DIỆN THÀNH VIÊN BỊ LOẠI KHỎI SERVER (TASK 3.14)
+
+### 19.1 Endpoints & Quyền hạn
+- **Endpoint loại thành viên**: `DELETE /api/v1/servers/{serverId}/members/{userId}` (trả về `204 No Content`).
+- **Phân quyền thực thi**: Chỉ Chủ sở hữu Server (`server.ownerId == currentUser.id`) mới có quyền gọi API này.
+- **Ràng buộc**: Không được loại chính mình và không được loại Owner (`400 Bad Request`).
+
+### 19.2 Cơ chế thu hồi quyền truy cập toàn diện (Complete Access Revocation)
+Ngay sau khi thành viên bị loại thành công:
+1. **Xóa Membership**:
+   - `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)` xóa triệt để bản ghi khỏi bảng `server_member`.
+2. **Chặn truy vấn Server (`403 Forbidden`)**:
+   - `GET /api/v1/servers/{serverId}`: Phương thức `getServerDetail()` kiểm tra membership. Vì người dùng không còn là Owner hay Member, ném `AccessDeniedException` $\rightarrow$ `403 Forbidden`.
+   - `GET /api/v1/servers/{serverId}/members`: Phương thức `getServerMembers()` ném `AccessDeniedException` $\rightarrow$ `403 Forbidden`.
+3. **Biến mất khỏi danh sách Server (`GET /api/v1/servers`)**:
+   - Query lọc theo `ownerId OR sm.userId` tự động loại bỏ Server khỏi danh sách Server của thành viên bị loại.
+4. **Chặn thao tác Kênh Chat (`400 Bad Request - forbidden`)**:
+   - `GET /api/v1/servers/{serverId}/channels`: `ChannelService.validateServerAccess()` kiểm tra quyền. Không tìm thấy membership $\rightarrow$ ném `BadRequestAlertException("You do not have permission to access channels in this server", "channel", "forbidden")` (HTTP 400).
+   - `POST /api/v1/channels`: Thao tác tạo kênh bị chặn với cùng lỗi HTTP 400.
+5. **Chặn thao tác Tin Nhắn (`400 Bad Request - forbidden`)**:
+   - `POST /api/v1/channels/{channelId}/messages` và `GET /api/v1/channels/{channelId}/messages`: `MessageService` kiểm tra `serverMemberRepository.existsByServerIdAndUserId()`. Nếu không phải thành viên $\rightarrow$ ném HTTP 400 forbidden.
+6. **Chặn gọi rời Server (`400 Bad Request`)**:
+   - `POST /api/v1/servers/{serverId}/leave`: `ServerService.leaveServer()` kiểm tra membership. Không tìm thấy $\rightarrow$ ném `BadRequestAlertException` với thông báo không phải là thành viên của Server.
+
+### 19.3 Cơ chế xử lý an toàn ở Frontend (`client/src/utils/serverMember.js`)
+- `isMemberAllowedAccess(server, currentUser, members)`: Kiểm tra nhanh quyền truy cập ở giao diện trước khi render thông tin nhạy cảm.
+- `getRemovedMemberAccessErrorMessage(err)`: Chuyển đổi các mã lỗi 403, 400, 404, 401 thành thông báo tiếng Việt trực quan ("Bạn không còn là thành viên của Server này hoặc đã bị loại").
+- `filterActiveServersAfterRemoval(serverList, removedServerId)`: Cập nhật state loại bỏ Server ra khỏi sidebar.
+- `resolveRemovalRedirectPath(currentServerId, removedServerId, remainingServers)`: Tự động điều hướng an toàn người dùng sang Server kế tiếp hoặc trang `/servers` để tránh crash UI.
+

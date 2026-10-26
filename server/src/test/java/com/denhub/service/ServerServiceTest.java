@@ -618,6 +618,117 @@ class ServerServiceTest {
     }
 
     @Test
+    void joinServer_ThenGetServerMembers_ContainsJoinedUser() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        ServerMember ownerMember = new ServerMember();
+        ownerMember.setId(101L);
+        ownerMember.setServerId(10L);
+        ownerMember.setUserId(1L);
+        ownerMember.setNickname("Owner Nick");
+        ownerMember.setRole("OWNER");
+
+        ServerMember joinedMember = new ServerMember();
+        joinedMember.setId(102L);
+        joinedMember.setServerId(10L);
+        joinedMember.setUserId(2L);
+        joinedMember.setNickname("Joined User");
+        joinedMember.setRole("MEMBER");
+
+        when(serverMemberRepository.findAllByServerId(10L))
+                .thenReturn(java.util.List.of(ownerMember, joinedMember));
+
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setUsername("owner");
+        user1.setName("Owner");
+        user1.setAvatar("https://example.test/owner.png");
+
+        User user2 = new User();
+        user2.setId(2L);
+        user2.setUsername("joined_user");
+        user2.setName("Joined User");
+        user2.setAvatar("https://example.test/joined.png");
+
+        when(userRepository.findAllById(java.util.List.of(1L, 2L)))
+                .thenReturn(java.util.List.of(user1, user2));
+
+        java.util.List<ServerMemberResponseDTO> members = serverService.getServerMembers(10L);
+
+        assertThat(members).hasSize(2);
+        ServerMemberResponseDTO memberDto = members.stream()
+                .filter(m -> Long.valueOf(2L).equals(m.getUserId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(memberDto.getId()).isEqualTo(102L);
+        assertThat(memberDto.getUsername()).isEqualTo("joined_user");
+        assertThat(memberDto.getName()).isEqualTo("Joined User");
+        assertThat(memberDto.getRole()).isEqualTo("MEMBER");
+        assertThat(memberDto.getAvatar()).isEqualTo("https://example.test/joined.png");
+    }
+
+    @Test
+    void joinServerByInviteCode_ThenGetServerMembers_ContainsJoinedUser() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        ServerMember joinedMember = new ServerMember();
+        joinedMember.setId(103L);
+        joinedMember.setServerId(10L);
+        joinedMember.setUserId(3L);
+        joinedMember.setNickname("Invite Joiner");
+        joinedMember.setRole("MEMBER");
+
+        when(serverMemberRepository.findAllByServerId(10L))
+                .thenReturn(java.util.List.of(joinedMember));
+
+        User user3 = new User();
+        user3.setId(3L);
+        user3.setUsername("invite_user");
+        user3.setName("Invite Joiner");
+        user3.setAvatar("https://example.test/invite.png");
+
+        when(userRepository.findAllById(java.util.List.of(3L)))
+                .thenReturn(java.util.List.of(user3));
+
+        java.util.List<ServerMemberResponseDTO> members = serverService.getServerMembers(10L);
+
+        assertThat(members).hasSize(1);
+        ServerMemberResponseDTO dto = members.get(0);
+        assertThat(dto.getUserId()).isEqualTo(3L);
+        assertThat(dto.getUsername()).isEqualTo("invite_user");
+        assertThat(dto.getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void getServerMembers_GracefulHandlingWhenUserEntityMissingInRepository() {
+        Server server = prepareDetailRequest();
+        server.setOwnerId(1L);
+
+        ServerMember orphanMember = new ServerMember();
+        orphanMember.setId(104L);
+        orphanMember.setServerId(10L);
+        orphanMember.setUserId(99L);
+        orphanMember.setNickname("Ghost User");
+        orphanMember.setRole("MEMBER");
+
+        when(serverMemberRepository.findAllByServerId(10L))
+                .thenReturn(java.util.List.of(orphanMember));
+        when(userRepository.findAllById(java.util.List.of(99L)))
+                .thenReturn(java.util.Collections.emptyList());
+
+        java.util.List<ServerMemberResponseDTO> members = serverService.getServerMembers(10L);
+
+        assertThat(members).hasSize(1);
+        ServerMemberResponseDTO dto = members.get(0);
+        assertThat(dto.getUserId()).isEqualTo(99L);
+        assertThat(dto.getNickname()).isEqualTo("Ghost User");
+        assertThat(dto.getUsername()).isNull();
+        assertThat(dto.getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
     void createServerInvite_Success_WhenOwner() {
         Server server = prepareDetailRequest(true);
         server.setOwnerId(1L);
@@ -935,6 +1046,65 @@ class ServerServiceTest {
         assertThat(ex.getReason()).isEqualTo("Bạn đã là thành viên của Server này rồi");
     }
 
+
+    @Test
+    void leaveServer_Success_ServerDisappearsFromUserServers() {
+        prepareDetailUser(); // User id = 1L (member)
+
+        Server server1 = new Server();
+        server1.setId(10L);
+        server1.setName("Server Ten");
+        server1.setOwnerId(2L);
+
+        Server server2 = new Server();
+        server2.setId(20L);
+        server2.setName("Server Twenty");
+        server2.setOwnerId(3L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server1));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
+
+        // Before leave: user had server1 and server2
+        when(serverRepository.findAllByUserIdOrOwnerId(1L)).thenReturn(java.util.List.of(server1, server2));
+        java.util.List<ServerResponseDTO> beforeLeave = serverService.getUserServers();
+        assertThat(beforeLeave).hasSize(2);
+        assertThat(beforeLeave.stream().anyMatch(s -> Long.valueOf(10L).equals(s.getId()))).isTrue();
+
+        // Perform leave
+        serverService.leaveServer(10L);
+        verify(serverMemberRepository, times(1)).deleteByServerIdAndUserId(10L, 1L);
+
+        // After leave: user only has server2
+        when(serverRepository.findAllByUserIdOrOwnerId(1L)).thenReturn(java.util.List.of(server2));
+        java.util.List<ServerResponseDTO> afterLeave = serverService.getUserServers();
+        assertThat(afterLeave).hasSize(1);
+        assertThat(afterLeave.stream().anyMatch(s -> Long.valueOf(10L).equals(s.getId()))).isFalse();
+        assertThat(afterLeave.get(0).getId()).isEqualTo(20L);
+    }
+
+    @Test
+    void leaveServer_OwnerCannotLeave_ServerRemainsInOwnerServerList() {
+        prepareDetailUser(); // User id = 1L (owner)
+
+        Server ownedServer = new Server();
+        ownedServer.setId(10L);
+        ownedServer.setName("Owner Server");
+        ownedServer.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(ownedServer));
+        when(serverRepository.findAllByUserIdOrOwnerId(1L)).thenReturn(java.util.List.of(ownedServer));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.leaveServer(10L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).contains("Chủ sở hữu không thể rời khỏi Server");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+
+        java.util.List<ServerResponseDTO> ownerServers = serverService.getUserServers();
+        assertThat(ownerServers).hasSize(1);
+        assertThat(ownerServers.get(0).getId()).isEqualTo(10L);
+    }
+
     @Test
     void leaveServer_Success() {
         prepareDetailUser();
@@ -1017,6 +1187,76 @@ class ServerServiceTest {
         ResponseStatusException ex3 = assertThrows(ResponseStatusException.class,
                 () -> serverService.leaveServer(-1L));
         assertThat(ex3.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+
+    @Test
+    void removeMember_ThenTargetMemberBlockedFromAccessingServer() {
+        prepareDetailUser(); // User id = 1L (Owner)
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(true);
+
+        serverService.removeMember(10L, 2L);
+        verify(serverMemberRepository).deleteByServerIdAndUserId(10L, 2L);
+
+        // Target (User 2) is now removed. Target attempts to access Server 10
+        String targetEmail = "target_kicked@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(targetEmail, null, java.util.List.of()));
+        User targetUser = new User();
+        targetUser.setId(2L);
+        targetUser.setActivated(true);
+        when(userRepository.findOneByEmail(targetEmail)).thenReturn(Optional.of(targetUser));
+
+        when(serverRepository.findById(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(false);
+
+        ResponseStatusException exDetail = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerDetail(10L));
+        assertThat(exDetail.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        ResponseStatusException exMembers = assertThrows(ResponseStatusException.class,
+                () -> serverService.getServerMembers(10L));
+        assertThat(exMembers.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        when(serverRepository.findAllByUserIdOrOwnerId(2L)).thenReturn(java.util.Collections.emptyList());
+        java.util.List<ServerResponseDTO> userServers = serverService.getUserServers();
+        assertThat(userServers).isEmpty();
+    }
+
+    @Test
+    void removeMember_TargetCannotPerformAdministrativeActions() {
+        prepareDetailUser(); // User id = 1L (Owner)
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 2L)).thenReturn(true);
+
+        serverService.removeMember(10L, 2L);
+
+        String targetEmail = "target_admin_fail@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(targetEmail, null, java.util.List.of()));
+        User targetUser = new User();
+        targetUser.setId(2L);
+        targetUser.setActivated(true);
+        when(userRepository.findOneByEmail(targetEmail)).thenReturn(Optional.of(targetUser));
+
+        ResponseStatusException exInvite = assertThrows(ResponseStatusException.class,
+                () -> serverService.createServerInvite(10L, null));
+        assertThat(exInvite.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        ResponseStatusException exRemove = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 3L));
+        assertThat(exRemove.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
