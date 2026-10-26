@@ -536,9 +536,13 @@ class ServerSecurityIT {
     }
 
     private String bearerFor(User user) {
+        return bearerFor(user, List.of("ROLE_USER"));
+    }
+
+    private String bearerFor(User user, List<String> authorities) {
         JwtClaimsSet claims = JwtClaimsSet.builder().subject(user.getEmail())
                 .issuedAt(Instant.now().minusSeconds(1200)).expiresAt(Instant.now().plusSeconds(600))
-                .claim("sessionId", user.getSessionId()).claim("authorities", List.of("ROLE_USER")).build();
+                .claim("sessionId", user.getSessionId()).claim("authorities", authorities).build();
         return "Bearer " + encoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(SecurityUtils.JWT_ALGORITHM).build(), claims)).getTokenValue();
     }
@@ -1094,5 +1098,106 @@ class ServerSecurityIT {
                 .filter(m -> m.getUserId().equals(joiner.getId()))
                 .count();
         assertEquals(1, count);
+    }
+
+    @Test
+    void deactivatedUser_CannotRemoveMember_Returns401() throws Exception {
+        User rawTarget = new User();
+        rawTarget.setEmail("target-deact-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawTarget.setPassword("fixture-" + UUID.randomUUID());
+        rawTarget.setName("Target Deact");
+        rawTarget.setActivated(true);
+        rawTarget.setSessionId(UUID.randomUUID().toString());
+        User target = users.saveAndFlush(rawTarget);
+
+        ServerMember sm = new ServerMember();
+        sm.setServerId(server.getId());
+        sm.setUserId(target.getId());
+        sm.setNickname("Target Deact");
+        members.saveAndFlush(sm);
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), target.getId()));
+
+        String ownerToken = bearer();
+        reader.setActivated(false);
+        users.saveAndFlush(reader);
+
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + target.getId())
+                .header(HttpHeaders.AUTHORIZATION, ownerToken)), 401);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), target.getId()));
+    }
+
+    @Test
+    void globalAdminAuthority_CannotRemoveMemberWhenNotServerOwner_Returns403() throws Exception {
+        User rawTarget = new User();
+        rawTarget.setEmail("target-adminauth-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawTarget.setPassword("fixture-" + UUID.randomUUID());
+        rawTarget.setName("Target AdminAuth");
+        rawTarget.setActivated(true);
+        rawTarget.setSessionId(UUID.randomUUID().toString());
+        User target = users.saveAndFlush(rawTarget);
+
+        ServerMember sm = new ServerMember();
+        sm.setServerId(server.getId());
+        sm.setUserId(target.getId());
+        sm.setNickname("Target AdminAuth");
+        members.saveAndFlush(sm);
+
+        User rawAdmin = new User();
+        rawAdmin.setEmail("admin-outsider-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawAdmin.setPassword("fixture-" + UUID.randomUUID());
+        rawAdmin.setName("Global Admin");
+        rawAdmin.setActivated(true);
+        rawAdmin.setSessionId(UUID.randomUUID().toString());
+        User adminUser = users.saveAndFlush(rawAdmin);
+
+        String adminToken = bearerFor(adminUser, List.of("ROLE_ADMIN"));
+
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + target.getId())
+                .header(HttpHeaders.AUTHORIZATION, adminToken)), 403);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), target.getId()));
+    }
+
+    @Test
+    void tamperedCallerPayload_DoesNotBypassAuthorization() throws Exception {
+        User rawMember = new User();
+        rawMember.setEmail("tamper-mem-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawMember.setPassword("fixture-" + UUID.randomUUID());
+        rawMember.setName("Tamper Member");
+        rawMember.setActivated(true);
+        rawMember.setSessionId(UUID.randomUUID().toString());
+        User memberUser = users.saveAndFlush(rawMember);
+
+        User rawTarget = new User();
+        rawTarget.setEmail("tamper-target-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawTarget.setPassword("fixture-" + UUID.randomUUID());
+        rawTarget.setName("Tamper Target");
+        rawTarget.setActivated(true);
+        rawTarget.setSessionId(UUID.randomUUID().toString());
+        User targetUser = users.saveAndFlush(rawTarget);
+
+        ServerMember sm1 = new ServerMember();
+        sm1.setServerId(server.getId());
+        sm1.setUserId(memberUser.getId());
+        sm1.setNickname("Tamper Member");
+        members.saveAndFlush(sm1);
+
+        ServerMember sm2 = new ServerMember();
+        sm2.setServerId(server.getId());
+        sm2.setUserId(targetUser.getId());
+        sm2.setNickname("Tamper Target");
+        members.saveAndFlush(sm2);
+
+        // Attempt removal passing fake query params and JSON body claiming owner privilege
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetUser.getId())
+                .param("isOwner", "true")
+                .param("role", "OWNER")
+                .param("callerId", String.valueOf(reader.getId()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ownerId\":" + reader.getId() + ",\"role\":\"OWNER\"}")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(memberUser))), 403);
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), targetUser.getId()));
     }
 }
