@@ -1136,4 +1136,64 @@ class ServerServiceTest {
         assertThat(ex.getReason()).contains("Thành viên không tồn tại trong Server");
         verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
     }
+
+    @Test
+    void removeMember_FailWhenUserDeactivated() {
+        String email = "deactivated@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(email, null, java.util.List.of()));
+        User inactiveUser = new User();
+        inactiveUser.setId(1L);
+        inactiveUser.setActivated(false);
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(inactiveUser));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 2L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ex.getReason()).contains("Phiên đăng nhập không hợp lệ");
+        verifyNoInteractions(serverRepository, serverMemberRepository);
+    }
+
+    @Test
+    void removeMember_FailWhenCallerHasAdminAuthorityButNotServerOwner() {
+        String email = "admin@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        email,
+                        null,
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))));
+        User adminUser = new User();
+        adminUser.setId(888L);
+        adminUser.setActivated(true);
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(adminUser));
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L); // Actual owner is 1L, not 888L
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 2L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).contains("Chỉ chủ sở hữu Server mới có quyền loại thành viên");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+    }
+
+    @Test
+    void removeMember_FailWhenTargetMatchesPrincipal_ReturnsBadRequest() {
+        prepareDetailUser(); // User id = 1L
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 1L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).contains("Không thể loại chủ sở hữu khỏi Server");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+    }
 }
