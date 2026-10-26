@@ -109,3 +109,69 @@ export function getRemoveMemberErrorMessage(err, targetName = 'thành viên') {
 
   return `Không thể loại ${targetName}. Vui lòng thử lại sau!`;
 }
+
+/**
+ * Finds a member in a members list by user ID.
+ *
+ * @param {Array<Object>} members
+ * @param {string | number} userId
+ * @returns {Object | null}
+ */
+export function findMemberByUserId(members, userId) {
+  if (!Array.isArray(members) || userId === null || userId === undefined) {
+    return null;
+  }
+  return members.find((m) => String(m.userId ?? m.id) === String(userId)) || null;
+}
+
+/**
+ * Safely merges a newly joined member into the current members list,
+ * avoiding duplicate entries and preserving role consistency.
+ *
+ * @param {Array<Object>} currentMembers
+ * @param {Object} newMember
+ * @param {Object} [server] Optional server object to verify owner role
+ * @returns {Array<Object>}
+ */
+export function mergeNewMemberIntoList(currentMembers, newMember, server = null) {
+  if (!newMember) {
+    return Array.isArray(currentMembers) ? [...currentMembers] : [];
+  }
+  const list = Array.isArray(currentMembers) ? [...currentMembers] : [];
+  const targetId = String(newMember.userId ?? newMember.id ?? '');
+  if (!targetId) {
+    return list;
+  }
+  const exists = list.some((m) => String(m.userId ?? m.id) === targetId);
+  if (exists) {
+    return list;
+  }
+  const isOwner = Boolean(server?.ownerId && String(server.ownerId) === targetId);
+  const normalizedMember = {
+    ...newMember,
+    role: isOwner ? 'OWNER' : (newMember.role || 'MEMBER'),
+  };
+  return [...list, normalizedMember];
+}
+
+/**
+ * Formats the count of members for UI display.
+ *
+ * @param {Array<Object>} members
+ * @returns {string}
+ */
+export function getMemberCountDisplay(members) {
+  const count = Array.isArray(members) ? members.length : 0;
+  return `Thành viên (${count})`;
+}
+
+/**
+ * Formats a member's display name following priority: nickname > name > username > fallback.
+ *
+ * @param {Object} member
+ * @returns {string}
+ */
+export function formatMemberDisplayName(member) {
+  if (!member) return 'Thành viên';
+  return member.nickname || member.name || member.username || 'Thành viên';
+}
