@@ -948,4 +948,151 @@ class ServerSecurityIT {
     void missingJwt_RemoveMemberReturns401() throws Exception {
         problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/10")), 401);
     }
+
+    @Test
+    void joinServer_Direct_Success_ThenSecondJoinReturns400_NoDuplicateRows() throws Exception {
+        User rawJoiner = new User();
+        rawJoiner.setEmail("directjoin-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawJoiner.setPassword("fixture-" + UUID.randomUUID());
+        rawJoiner.setName("Direct Joiner");
+        rawJoiner.setActivated(true);
+        rawJoiner.setSessionId(UUID.randomUUID().toString());
+        User joiner = users.saveAndFlush(rawJoiner);
+
+        // First join succeeds
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isNoContent());
+
+        long count = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .count();
+        assertEquals(1, count);
+
+        // Second join fails with 400
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner))), 400);
+
+        long countAfter = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .count();
+        assertEquals(1, countAfter);
+    }
+
+    @Test
+    void joinServerByInviteCode_SecondJoinReturns400_NoDuplicateRows() throws Exception {
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("repeatInvite1");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        invites.saveAndFlush(inv);
+
+        User rawJoiner = new User();
+        rawJoiner.setEmail("repeatjoin-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawJoiner.setPassword("fixture-" + UUID.randomUUID());
+        rawJoiner.setName("Repeat Joiner");
+        rawJoiner.setActivated(true);
+        rawJoiner.setSessionId(UUID.randomUUID().toString());
+        User joiner = users.saveAndFlush(rawJoiner);
+
+        // First join succeeds
+        mvc.perform(post("/api/v1/servers/join-invite/repeatInvite1")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isOk());
+
+        long count = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .count();
+        assertEquals(1, count);
+
+        // Second join fails with 400
+        problem(mvc.perform(post("/api/v1/servers/join-invite/repeatInvite1")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner))), 400);
+
+        long countAfter = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .count();
+        assertEquals(1, countAfter);
+    }
+
+    @Test
+    void rejoiningAfterLeave_SucceedsWithSingleRow() throws Exception {
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("rejoinLeave1");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        invites.saveAndFlush(inv);
+
+        User rawJoiner = new User();
+        rawJoiner.setEmail("rejoinleave-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawJoiner.setPassword("fixture-" + UUID.randomUUID());
+        rawJoiner.setName("Rejoin Leave");
+        rawJoiner.setActivated(true);
+        rawJoiner.setSessionId(UUID.randomUUID().toString());
+        User joiner = users.saveAndFlush(rawJoiner);
+
+        // Join
+        mvc.perform(post("/api/v1/servers/join-invite/rejoinLeave1")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isOk());
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), joiner.getId()));
+
+        // Leave
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isNoContent());
+        assertFalse(members.existsByServerIdAndUserId(server.getId(), joiner.getId()));
+
+        // Rejoin
+        mvc.perform(post("/api/v1/servers/join-invite/rejoinLeave1")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isOk());
+
+        long count = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .count();
+        assertEquals(1, count);
+    }
+
+    @Test
+    void rejoiningAfterKick_SucceedsWithSingleRow() throws Exception {
+        com.denhub.domain.Invite inv = new com.denhub.domain.Invite();
+        inv.setServerId(server.getId());
+        inv.setCode("rejoinKick1");
+        inv.setCreatedBy(reader.getId());
+        inv.setStatus("ACTIVE");
+        invites.saveAndFlush(inv);
+
+        User rawJoiner = new User();
+        rawJoiner.setEmail("rejoinkick-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        rawJoiner.setPassword("fixture-" + UUID.randomUUID());
+        rawJoiner.setName("Rejoin Kick");
+        rawJoiner.setActivated(true);
+        rawJoiner.setSessionId(UUID.randomUUID().toString());
+        User joiner = users.saveAndFlush(rawJoiner);
+
+        // Join
+        mvc.perform(post("/api/v1/servers/join-invite/rejoinKick1")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isOk());
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), joiner.getId()));
+
+        // Owner removes joiner
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + joiner.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+        assertFalse(members.existsByServerIdAndUserId(server.getId(), joiner.getId()));
+
+        // Rejoin
+        mvc.perform(post("/api/v1/servers/join-invite/rejoinKick1")
+                .header(HttpHeaders.AUTHORIZATION, bearerFor(joiner)))
+                .andExpect(status().isOk());
+
+        long count = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(joiner.getId()))
+                .count();
+        assertEquals(1, count);
+    }
 }
