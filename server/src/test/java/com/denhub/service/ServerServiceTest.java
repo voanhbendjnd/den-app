@@ -825,7 +825,7 @@ class ServerServiceTest {
         when(inviteRepository.findByCode("valid123")).thenReturn(Optional.of(invite));
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
-        when(serverMemberRepository.save(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(serverMemberRepository.saveAndFlush(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServerResponseDTO result = serverService.joinServerByInviteCode(" valid123 ");
 
@@ -833,7 +833,7 @@ class ServerServiceTest {
         assertThat(result.getName()).isEqualTo("Target Server");
 
         org.mockito.ArgumentCaptor<ServerMember> captor = org.mockito.ArgumentCaptor.forClass(ServerMember.class);
-        verify(serverMemberRepository).save(captor.capture());
+        verify(serverMemberRepository).saveAndFlush(captor.capture());
         ServerMember saved = captor.getValue();
         assertThat(saved.getServerId()).isEqualTo(10L);
         assertThat(saved.getUserId()).isEqualTo(1L);
@@ -907,6 +907,32 @@ class ServerServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> serverService.joinServerByInviteCode("already1"));
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).isEqualTo("Bạn đã là thành viên của Server này rồi");
+        verify(serverMemberRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void joinServerByInviteCode_RejectsConcurrentDuplicateConstraintViolation() {
+        prepareDetailUser();
+
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setCode("concurr1");
+        invite.setStatus("ACTIVE");
+        invite.setServerId(10L);
+
+        Server server = new Server();
+        server.setId(10L);
+
+        when(inviteRepository.findByCode("concurr1")).thenReturn(Optional.of(invite));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+        when(serverMemberRepository.saveAndFlush(any(ServerMember.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint ux_server_member"));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServerByInviteCode("concurr1"));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).isEqualTo("Bạn đã là thành viên của Server này rồi");
     }
 
     @Test
