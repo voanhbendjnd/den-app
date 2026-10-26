@@ -292,6 +292,15 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Tiến độ riêng — Sửa UI tạo và danh sách Server (2026-10-26)
+
+| Phạm vi | FE | BE / DB | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- |
+| Đồng bộ tạo/list, phiên modal, tên 100 UTF-16, Home responsive và liên kết mở Server | IMPLEMENTED | Giữ nguyên | 63/63 browser, 103/103 Node, build PASS | DONE trong phạm vi FE/API mock; chưa kiểm thử SQL Server thật |
+
+- Kế hoạch được duyệt bằng “triển khai”; đang trên nhánh local `fix/server-crud-ui`, chưa commit/push.
+- Chi tiết tại log FIX-SERVER-CRUD-UI và docs/02 mục 9.5. Không thay quyền sửa/xóa, membership, API, schema hoặc dependency.
+
 ### Tiến độ riêng — Delete Server (2026-10-21)
 
 | Phạm vi                                        | FE          | BE          | DB                                              | Verification                                                          | Trạng thái                                                       |
@@ -412,6 +421,20 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-26] FIX-SERVER-CRUD-UI — Sửa lỗi tạo và hiển thị danh sách Server
+
+- **Đã sửa:** response GET cũ không được ghi đè Server vừa tạo; MainLayout theo dõi request đang chờ và tình trạng tải đủ danh sách bằng ref, kể cả GET lỗi khi POST đang chờ. Khi cần, GET mới chạy nền sau POST; Server mới hiện ngay ở Home/dock. Nếu refresh lỗi, giữ danh sách đã biết và hiển thị cảnh báo có nút Thử lại.
+- **Modal:** mỗi lần mở/đóng có session riêng, ref chặn submit trùng. Kết quả POST cũ thành công vẫn thêm đúng Server vào danh sách; success/error/finally cũ không được đóng, reset, hiển thị toast hoặc mở khóa form mới.
+- **UI/validation:** tên tạo tối đa 100 đơn vị UTF-16 theo DTO hiện có; chặn whitespace. Thêm link mở đúng Server bằng tên/ảnh, hỗ trợ bàn phím. Home có CSS riêng: ở chiều rộng dưới 992px thay sidebar phụ bằng nav Tin nhắn/Bạn bè/Hồ sơ/Đăng xuất; dock thu nhỏ dưới 601px. Không đổi layout các route khác.
+- **Tests:** thêm 12 browser cases trong `client/tests/group-chat.browser.test.mjs`: GET cũ 200/503, initial GET lỗi khi POST chờ, refresh lỗi/retry, POST cũ 201/503 với form mới đang chờ, submit trùng, whitespace/101 ASCII/100 UTF-16 emoji, keyboard navigation và viewport 320/375/768/1440. Fixture phân biệt GET trước/sau POST thay vì giả định StrictMode chỉ gọi GET một lần.
+- **Verification cuối**, từ `client/` với NODE_PATH Playwright sẵn có theo docs/02 mục 8.2:
+  - `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs`: PASS **63/63**, 0 failure/error/skip. Chạy tuần tự hai suite để tránh chia sẻ Vite optimizer cache cùng lúc.
+  - `npm test`: PASS **103/103**.
+  - `npm run build`: PASS. Đã xem screenshot Home desktop 1440/mobile 375; browser kiểm thêm 320/768, không có pageerror trong các cases mới.
+- **Quá trình kiểm thử:** trước sửa, regression responsive FAIL tại 320/375/768 và PASS tại 1440. Lượt đầu sau sửa có timeout chờ trạng thái loading và lỗi fixture giả định số request; lượt kế có một assertion dùng sai tên heading Group. Đã chạy hai suite tuần tự, sửa fixture/selector và chạy lại toàn bộ, kết quả cuối như trên.
+- **Docs impact:** cập nhật docs/02 mục 9.5 và tiến độ/log/handoff tại đây. Đã đối chiếu docs/01, docs/03 và docs/04; không đổi nghiệp vụ, DB hay giao diện API, giữ hệ màu/tokens hiện có.
+- **Giới hạn:** API browser là mock; không chạy backend/SQL Server thật trong lượt chỉ sửa FE. Kết quả 215 backend tests PASS ở lượt review trước là baseline, không phải lần chạy mới. PRE-EXISTING ISSUE: bundle >500 kB và các warning Ant Design/style có sẵn còn tồn tại. Chưa commit; không push.
 
 ### [2026-10-26] TASK-3.14-BLOCK-REMOVED-MEMBER-ACCESS — Kiểm Tra Thành Viên Bị Loại Không Còn Truy Cập Được Server
 
@@ -2727,6 +2750,14 @@ Commit:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff — Sửa UI tạo và danh sách Server (2026-10-26)
+
+- Nhánh `fix/server-crud-ui`, đã triển khai theo kế hoạch được duyệt; 63 browser tests, 103 Node tests và build PASS. Thay đổi chưa commit, không push.
+- Khi tạo Server trong lúc GET danh sách chờ hoặc sau lỗi GET, Server mới phải hiện ngay; GET nền lấy lại các Server còn lại. GET cũ không được thay state. Nếu refresh thất bại, cảnh báo cùng nút Thử lại hiển thị cạnh danh sách đã biết.
+- Có thể đóng/mở form khi POST đang chờ. POST cũ thành công vẫn cập nhật dock/Home nhưng không ảnh hưởng draft/loading/toast của phiên form mới. Backend vẫn có thể tạo thành công sau khi người dùng đóng form; đóng modal không hủy giao dịch backend.
+- Home hỗ trợ 320/375/768/1440px; tên/ảnh trên card mở route Server có sẵn bằng Link. Tên tạo dùng giới hạn 100 UTF-16, không phải 100 emoji. CSS mới chỉ tác động Home.
+- Backend, quyền Owner, membership, schema và dependency giữ nguyên. SQL Server thật và các cảnh báo đã có vẫn là giới hạn bàn giao, không coi browser mock/build PASS là kiểm thử tích hợp thật.
 
 ### Handoff hiện tại — Post Edit & Delete (2026-10-25)
 

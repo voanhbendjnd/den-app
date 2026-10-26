@@ -154,6 +154,235 @@ async function screenshot(page, name) {
 const iconFile = { name: 'server.png', mimeType: 'image/png', buffer: Buffer.from('fixture image') };
 const uploadedIcon = 'https://images.unsplash.com/new-upload.png';
 
+async function submitServer(page, name = 'Server vừa tạo') {
+  const dialog = page.getByRole('dialog');
+  await dialog.getByPlaceholder('Ví dụ: Nhóm Học SBA301').fill(name);
+  await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).click();
+}
+
+for (const oldStatus of [200, 503]) {
+  test(`server creation keeps the new server visible when an old list returns ${oldStatus}`, async t => {
+    let releaseOld, releaseFresh;
+    const oldGate = new Promise(resolve => { releaseOld = resolve; });
+    const freshGate = new Promise(resolve => { releaseFresh = resolve; });
+    t.after(() => { releaseOld(); releaseFresh(); });
+    let didCreate = false;
+    let freshLists = 0;
+    const created = { id: 33, name: 'Server vừa tạo', ownerId: 100, iconUrl: null };
+    const { page, errors } = await openPage({ handler: async route => {
+      if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route);
+      if (route.request().method() === 'POST') {
+        didCreate = true;
+        return route.fulfill({ status: 201, json: { data: created } });
+      }
+      const fresh = didCreate;
+      if (fresh) freshLists++;
+      await (fresh ? freshGate : oldGate);
+      return route.fulfill(!fresh && oldStatus === 503
+        ? { status: 503, json: { detail: 'Old failure' } }
+        : { json: { data: fresh ? [created, ...servers] : servers } });
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('status', { name: 'Đang tải danh sách Server' }).waitFor();
+    await openCreateModal(page);
+    await submitServer(page);
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.getByRole('heading', { name: created.name, exact: true }).waitFor();
+    const oldResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/servers' && response.request().method() === 'GET');
+    releaseOld();
+    await (await oldResponse).finished();
+    await settleUI(page);
+    assert.equal(await page.getByRole('heading', { name: created.name, exact: true }).count(), 1);
+    assert.equal(await page.getByRole('link', { name: `Mở nhóm ${created.name}`, exact: true }).count(), 1);
+    releaseFresh();
+    await page.getByRole('heading', { name: 'Không Gian Của Bạn (3)' }).waitFor();
+    assert.ok(freshLists >= 1);
+    assert.equal(await page.getByRole('heading', { name: 'Nhóm học tập', exact: true }).count(), 1);
+    assert.equal(await page.getByRole('heading', { name: 'Chưa tải được danh sách Server' }).count(), 0);
+    assert.deepEqual(errors, []);
+  });
+}
+
+test('creation recovers a failed list and keeps the created server visible if refresh fails', async () => {
+  let allowList = false;
+  let refreshed = false;
+  let didCreate = false;
+  const created = { id: 33, name: 'Server vừa tạo', ownerId: 100 };
+  const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route);
+    if (route.request().method() === 'POST') {
+      didCreate = true;
+      return route.fulfill({ status: 201, json: { data: created } });
+    }
+    if (didCreate) refreshed = true;
+    return route.fulfill(!allowList ? { status: 503, json: { detail: 'Unavailable' } } : { json: { data: [created, ...servers] } });
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Chưa tải được danh sách Server' }).waitFor();
+  await openCreateModal(page);
+  await submitServer(page);
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('heading', { name: created.name, exact: true }).waitFor();
+  await page.getByText('Chưa tải được đầy đủ danh sách Server', { exact: true }).waitFor();
+  assert.equal(refreshed, true);
+  allowList = true;
+  await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
+  await page.getByRole('heading', { name: 'Không Gian Của Bạn (3)' }).waitFor();
+  assert.deepEqual(errors, []);
+});
+
+test('creation refreshes the list even when the initial GET fails while POST is pending', async t => {
+  let releaseList, releaseCreate;
+  const listGate = new Promise(resolve => { releaseList = resolve; });
+  const createGate = new Promise(resolve => { releaseCreate = resolve; });
+  t.after(() => { releaseList(); releaseCreate(); });
+  let committed = false;
+  const created = { id: 33, name: 'Server vừa tạo', ownerId: 100 };
+  const { page, errors } = await openPage({ handler: async route => {
+    if (new URL(route.request().url()).pathname !== '/api/v1/servers') return fulfillServerRequest(route);
+    if (route.request().method() === 'POST') {
+      await createGate;
+      committed = true;
+      return route.fulfill({ status: 201, json: { data: created } });
+    }
+    if (committed) return route.fulfill({ json: { data: [created, ...servers] } });
+    await listGate;
+    return route.fulfill({ status: 503, json: { detail: 'Initial list failed' } });
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await openCreateModal(page);
+  const post = page.waitForRequest(request => request.method() === 'POST');
+  await submitServer(page);
+  await post;
+  releaseList();
+  await page.getByText('Chưa tải được danh sách Server', { exact: true }).waitFor();
+  releaseCreate();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('heading', { name: 'Không Gian Của Bạn (3)' }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: created.name, exact: true }).count(), 1);
+  assert.deepEqual(errors, []);
+});
+
+for (const oldStatus of [201, 503]) {
+  test(`an old create response ${oldStatus} cannot close or unlock a new pending form`, async t => {
+    let releaseOld, releaseNew;
+    const oldGate = new Promise(resolve => { releaseOld = resolve; });
+    const newGate = new Promise(resolve => { releaseNew = resolve; });
+    t.after(() => { releaseOld(); releaseNew(); });
+    let creates = 0;
+    const { page, errors } = await openPage({ handler: async route => {
+      if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+      const current = ++creates;
+      await (current === 1 ? oldGate : newGate);
+      return route.fulfill(current === 1 && oldStatus === 503
+        ? { status: 503, json: { detail: 'Old create error' } }
+        : { status: 201, json: { data: { id: current === 1 ? 33 : 34, ...route.request().postDataJSON() } } });
+    } });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await openCreateModal(page);
+    const oldRequest = page.waitForRequest(request => request.method() === 'POST');
+    await submitServer(page, 'Server cũ');
+    await oldRequest;
+    await page.getByRole('dialog').getByRole('button', { name: 'Hủy bỏ', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await openCreateModal(page);
+    const newRequest = page.waitForRequest(request => request.method() === 'POST');
+    await submitServer(page, 'Bản nháp mới');
+    await newRequest;
+    const oldResponse = page.waitForResponse(response => response.request().method() === 'POST' && response.request().postDataJSON().name === 'Server cũ');
+    releaseOld();
+    await (await oldResponse).finished();
+    await settleUI(page);
+    const dialog = page.getByRole('dialog');
+    assert.equal(await dialog.isVisible(), true);
+    assert.equal(await dialog.getByPlaceholder('Ví dụ: Nhóm Học SBA301').inputValue(), 'Bản nháp mới');
+    await dialog.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit(); });
+    await settleUI(page);
+    assert.equal(creates, 2);
+    assert.equal(await page.getByText('Old create error', { exact: true }).count(), 0);
+    if (oldStatus === 201) await page.getByRole('link', { name: 'Mở nhóm Server cũ', exact: true }).waitFor();
+    releaseNew();
+    await dialog.waitFor({ state: 'hidden' });
+    await page.getByRole('heading', { name: 'Bản nháp mới', exact: true }).waitFor();
+    assert.deepEqual(errors, []);
+  });
+}
+
+test('create form validates whitespace and the 100 UTF-16 boundary and blocks duplicate submit', async t => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const creates = [];
+  const { page, errors } = await openPage({ handler: async route => {
+    if (route.request().method() !== 'POST') return fulfillServerRequest(route);
+    creates.push(route.request().postDataJSON());
+    await gate;
+    return route.fulfill({ status: 201, json: { data: { id: 33, ...creates[0] } } });
+  } });
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  await openCreateModal(page);
+  const dialog = page.getByRole('dialog');
+  const input = dialog.getByPlaceholder('Ví dụ: Nhóm Học SBA301');
+  await submitServer(page, '\u00a0\u2003 ');
+  await dialog.getByText('Vui lòng đặt tên cho Server', { exact: true }).waitFor();
+  assert.equal(creates.length, 0);
+  await input.evaluate(element => {
+    // Exercise the Form validator even if a browser bypasses the native maxlength.
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(element, 'a'.repeat(101));
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await dialog.locator('form').evaluate(form => form.requestSubmit());
+  await dialog.getByText('Tên Server không được vượt quá 100 ký tự', { exact: true }).waitFor();
+  assert.equal(creates.length, 0);
+  const name = '🙂'.repeat(50);
+  assert.equal(name.length, 100);
+  await input.fill(name);
+  const request = page.waitForRequest(request => request.method() === 'POST');
+  await dialog.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit(); });
+  await request;
+  await settleUI(page);
+  assert.equal(creates.length, 1);
+  assert.equal(creates[0].name, name);
+  release();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(errors, []);
+});
+
+test('home server link opens the exact server with the keyboard', async () => {
+  const { page, errors } = await openPage();
+  await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+  const link = page.getByRole('link', { name: 'Mở Server DenHub Design', exact: true });
+  await link.focus();
+  await page.keyboard.press('Enter');
+  await page.waitForURL(`${origin}/servers/12`);
+  await page.getByRole('heading', { name: 'Chào mừng đến với DenHub Design', exact: true }).waitFor();
+  assert.deepEqual(errors, []);
+});
+
+for (const width of [320, 375, 768, 1440]) {
+  test(`home server list fits viewport ${width} and keeps navigation accessible`, async () => {
+    const { page, errors } = await openPage({ width });
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('heading', { name: 'Không Gian Của Bạn (2)' }).waitFor();
+    const title = page.getByRole('heading', { name: 'Nhóm học tập', exact: true });
+    assert.equal(await title.isVisible(), true);
+    const bounds = await title.boundingBox();
+    assert.ok(bounds.width > 30, JSON.stringify(bounds));
+    assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width + 1, JSON.stringify(bounds));
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    if (width < 992) {
+      const nav = page.getByRole('navigation', { name: 'Điều hướng trang chủ' });
+      await nav.getByRole('link', { name: 'Tin nhắn', exact: true }).waitFor();
+      assert.equal(await nav.getByRole('link', { name: 'Bạn bè', exact: true }).getAttribute('href'), '/friends');
+      assert.equal(await nav.getByRole('link', { name: 'Hồ sơ', exact: true }).getAttribute('href'), '/profile');
+    } else {
+      await page.getByRole('link', { name: 'Trang Tổng Quan', exact: true }).waitFor();
+    }
+    await screenshot(page, `home-server-list-${width}.png`);
+    assert.deepEqual(errors, []);
+  });
+}
+
 async function openCreateModal(page) {
   await page.getByText('Tạo Không Gian (Server) Mới', { exact: true }).click();
   await page.getByRole('dialog').waitFor();
