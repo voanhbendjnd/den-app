@@ -1200,4 +1200,48 @@ class ServerSecurityIT {
 
         assertTrue(members.existsByServerIdAndUserId(server.getId(), targetUser.getId()));
     }
+    @Test
+    void joinServer_Directly_NewMemberAppearsInMembersList() throws Exception {
+        addMembership(server.getId());
+
+        User joiner = new User();
+        joiner.setEmail("joiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("Direct Joiner");
+        joiner.setUsername("directjoiner");
+        joiner.setAvatar("https://example.test/direct.png");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+        String joinerToken = bearerFor(joiner);
+
+        // Before joining: outsider cannot read members list (403 Forbidden)
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken)), 403);
+
+        // Joiner performs direct join
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isNoContent());
+
+        // After joining: joiner can read members list and appears as MEMBER
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()))
+                .andExpect(jsonPath("$.data[0].role").value("OWNER"))
+                .andExpect(jsonPath("$.data[1].userId").value(joiner.getId()))
+                .andExpect(jsonPath("$.data[1].username").value("directjoiner"))
+                .andExpect(jsonPath("$.data[1].name").value("Direct Joiner"))
+                .andExpect(jsonPath("$.data[1].avatar").value("https://example.test/direct.png"))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+
+        // Owner also sees the newly joined member
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(joiner.getId()))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+    }
 }
