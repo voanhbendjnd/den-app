@@ -1440,4 +1440,42 @@ class ServerSecurityIT {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].userId").value(reader.getId()));
     }
+    @Test
+    void removeMember_TargetCannotAccessOrMutateChannelsAfterRemoval() throws Exception {
+        addMembership(server.getId());
+
+        User targetMember = new User();
+        targetMember.setEmail("channel-kicked-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        targetMember.setPassword("fixture-" + UUID.randomUUID());
+        targetMember.setName("ChanKicked");
+        targetMember.setActivated(true);
+        targetMember.setSessionId(UUID.randomUUID().toString());
+        targetMember = users.saveAndFlush(targetMember);
+        String targetToken = bearerFor(targetMember);
+
+        // Target joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isNoContent());
+
+        // Target can read channels before being removed
+        mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk());
+
+        // Owner removes target member
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+
+        // Target attempts to read channels -> 400 Bad Request (channel forbidden)
+        problem(mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
+
+        // Target attempts to create a channel in this server -> 400 Bad Request (channel forbidden)
+        problem(mvc.perform(post("/api/v1/channels")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"hacked-channel\",\"serverId\":" + server.getId() + "}")
+                .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
+    }
 }
