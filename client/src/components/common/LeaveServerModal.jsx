@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Button, Modal, Typography, message } from 'antd';
 import { LogoutOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import serverApi from '../../api/serverApi';
@@ -16,18 +16,19 @@ export default function LeaveServerModal({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const submittingRef = useRef(false);
-  const isMountedRef = useRef(true);
+  const sessionRef = useRef(0);
 
-  useEffect(() => {
-    isMountedRef.current = true;
+  useLayoutEffect(() => {
+    sessionRef.current += 1;
+    setLoading(false);
     if (open) {
       setErrorMsg(null);
       submittingRef.current = false;
     }
     return () => {
-      isMountedRef.current = false;
+      sessionRef.current += 1;
     };
-  }, [open, server]);
+  }, [open, server?.id]);
 
   if (!server) return null;
 
@@ -37,24 +38,26 @@ export default function LeaveServerModal({
     if (submittingRef.current || loading || !canLeave) return;
 
     submittingRef.current = true;
+    const session = sessionRef.current;
     setLoading(true);
     setErrorMsg(null);
 
     try {
       await serverApi.leave(server.id);
-      message.success(`Đã rời khỏi Server "${server.name}" thành công!`);
+      if (sessionRef.current === session) message.success(`Đã rời khỏi Server "${server.name}" thành công!`);
+      // Update the Server list even if the original view has unmounted.
       if (onSuccess) {
         onSuccess(server.id);
       }
-      if (isMountedRef.current) {
+      if (sessionRef.current === session) {
         onClose();
       }
     } catch (err) {
-      if (isMountedRef.current) {
+      if (sessionRef.current === session) {
         setErrorMsg(getLeaveErrorMessage(err, server.name));
       }
     } finally {
-      if (isMountedRef.current) {
+      if (sessionRef.current === session) {
         setLoading(false);
         submittingRef.current = false;
       }

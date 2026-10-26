@@ -254,8 +254,12 @@ public class ServerService {
     }
 
     private String ownerNickname(String name) {
+        return generatedNickname(name, "Owner");
+    }
+
+    private String generatedNickname(String name, String fallback) {
         String nickname = name == null ? "" : name.strip();
-        if (nickname.isBlank()) return "Owner";
+        if (nickname.isBlank()) return fallback;
         if (nickname.length() <= 20) return nickname;
         int end = 20;
         if (Character.isHighSurrogate(nickname.charAt(end - 1))
@@ -270,11 +274,7 @@ public class ServerService {
             throw new BadRequestAlertException("Invalid server ID", "server", "idinvalid");
         }
 
-        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
-                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "server", "notloggedin"));
-
-        User currentUser = userRepository.findOneByEmail(currentUserEmail)
-                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "server", "usernotfound"));
+        User currentUser = getActiveCurrentUser();
 
         Server server = serverRepository.findByIdForUpdate(serverId)
                 .orElseThrow(() -> new BadRequestAlertException("Server not found", "server", "servernotfound"));
@@ -288,7 +288,7 @@ public class ServerService {
         member.setUserId(currentUser.getId());
         member.setRole("MEMBER");
         member.setJoinedAt(Instant.now());
-        member.setNickname(currentUser.getName() != null ? currentUser.getName() : "Member");
+        member.setNickname(generatedNickname(currentUser.getName(), "Member"));
         try {
             serverMemberRepository.saveAndFlush(member);
         } catch (DataIntegrityViolationException ex) {
