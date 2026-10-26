@@ -11,7 +11,6 @@ import {
 } from '@ant-design/icons';
 import serverApi from '../../api/serverApi';
 import fileApi from '../../api/fileApi';
-import { useAuth } from '../../hooks/useAuth';
 
 const { Title, Text } = Typography;
 
@@ -61,11 +60,12 @@ const AVATAR_SUGGESTIONS = [
 ];
 
 export default function CreateServerModal({ open, onClose, onSuccess }) {
-  const { currentUser } = useAuth();
   const [form] = Form.useForm();
   const fileInputRef = useRef(null);
   const uploadRequestRef = useRef(0);
   const uploadPendingRef = useRef(false);
+  const createSession = useRef(0);
+  const createPending = useRef(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
@@ -140,6 +140,9 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
 
   // Reset form và khôi phục ảnh đại diện về preset mặc định mỗi khi mở modal
   useEffect(() => {
+    createSession.current += 1;
+    createPending.current = null;
+    setLoading(false);
     invalidateUpload();
     if (open) {
       setSelectedTemplate('custom');
@@ -154,12 +157,16 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
       }
     }
     return () => {
+      createSession.current += 1;
       uploadRequestRef.current += 1;
       uploadPendingRef.current = false;
     };
   }, [open, form]);
 
   const handleClose = () => {
+    createSession.current += 1;
+    createPending.current = null;
+    setLoading(false);
     invalidateUpload();
     setSelectedTemplate('custom');
     setAvatarUrl(AVATAR_SUGGESTIONS[0]);
@@ -171,23 +178,31 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   };
 
   const handleSubmit = async (values) => {
-    if (uploadPendingRef.current || loading) return;
+    if (uploadPendingRef.current || createPending.current !== null) return;
+    const session = createSession.current;
+    createPending.current = session;
     setLoading(true);
     try {
       const res = await serverApi.create({
         name: values.name.trim(),
         iconUrl: values.iconUrl?.trim() || avatarUrl || null,
       });
-      message.success('Khởi tạo không gian Server thành công!');
       const serverData = res.data?.data || res.data;
+      // A committed Server belongs in the list even if its form was closed.
       if (onSuccess) onSuccess(serverData);
+      if (session !== createSession.current) return;
+      message.success('Khởi tạo không gian Server thành công!');
       handleClose();
     } catch (err) {
+      if (session !== createSession.current) return;
       const fieldError = err.response?.data?.fieldErrors?.[0]?.message;
       const errorMsg = fieldError || err.response?.data?.message || err.response?.data?.detail || 'Không thể tạo server. Vui lòng thử lại!';
       message.error(errorMsg);
     } finally {
-      setLoading(false);
+      if (session === createSession.current) {
+        createPending.current = null;
+        setLoading(false);
+      }
     }
   };
 
@@ -396,16 +411,17 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
 
           <Form.Item
             name="name"
-            label={<Text style={{ color: '#94A3B8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tên Server (Tối đa 20 ký tự)</Text>}
+            label={<Text style={{ color: '#94A3B8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tên Server (Tối đa 100 ký tự)</Text>}
             rules={[
-              { required: true, message: 'Vui lòng đặt tên cho Server' },
-              { max: 20, message: 'Tên Server không được vượt quá 20 ký tự' },
+              { required: true, whitespace: true, message: 'Vui lòng đặt tên cho Server' },
+              { validator: (_, value) =>
+                !value || value.length <= 100 ? Promise.resolve() : Promise.reject(new Error('Tên Server không được vượt quá 100 ký tự')) },
             ]}
           >
             <Input 
               placeholder="Ví dụ: Nhóm Học SBA301" 
               size="large"
-              maxLength={20}
+              maxLength={100}
               showCount
               style={{ height: 44, fontSize: 14 }}
             />
