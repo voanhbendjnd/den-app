@@ -142,3 +142,34 @@ test('serverApi.removeMember sends DELETE request to /v1/servers/{serverId}/memb
   assert.equal(capturedUrl, '/v1/servers/42/members/99');
   assert.equal(res.status, 204);
 });
+
+test('canRemoveMember rejects caller with spoofed isOwner or admin role when id differs from server.ownerId', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const imposterUser = {
+    id: '999',
+    username: 'hacker',
+    isOwner: true,
+    role: 'OWNER',
+    authorities: ['ROLE_ADMIN'],
+  };
+  const targetMember = { userId: '200', username: 'bob', role: 'MEMBER' };
+
+  const result = canRemoveMember(server, imposterUser, targetMember);
+  assert.equal(result.canRemove, false);
+  assert.match(result.reason, /Chỉ chủ sở hữu Server mới có quyền loại thành viên/);
+});
+
+test('canRemoveMember rejects when server or user is malformed or missing id/ownerId', () => {
+  const targetMember = { userId: '200', username: 'bob', role: 'MEMBER' };
+
+  // Server missing ownerId
+  const serverWithoutOwner = { id: 10, name: 'No Owner' };
+  assert.equal(canRemoveMember(serverWithoutOwner, { id: '100' }, targetMember).canRemove, false);
+
+  // User missing id
+  const validServer = { id: 10, ownerId: '100' };
+  assert.equal(canRemoveMember(validServer, { username: 'no-id' }, targetMember).canRemove, false);
+
+  // Target member missing userId
+  assert.equal(canRemoveMember(validServer, { id: '100' }, { username: 'no-userId' }).canRemove, false);
+});

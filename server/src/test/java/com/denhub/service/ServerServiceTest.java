@@ -29,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -403,7 +404,16 @@ class ServerServiceTest {
 
         serverService.joinServer(10L);
 
-        verify(serverMemberRepository, times(1)).save(any(ServerMember.class));
+        verify(serverMemberRepository, times(1)).saveAndFlush(any(ServerMember.class));
+    }
+
+    @Test
+    void joinServer_FailWhenServerIdInvalid() {
+        BadRequestAlertException exNull = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(null));
+        assertThat(exNull.getErrorKey()).isEqualTo("idinvalid");
+
+        BadRequestAlertException exNegative = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(-1L));
+        assertThat(exNegative.getErrorKey()).isEqualTo("idinvalid");
     }
 
     @Test
@@ -447,7 +457,34 @@ class ServerServiceTest {
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(true);
 
-        assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+        assertThat(ex.getErrorKey()).isEqualTo("alreadymember");
+        verify(serverMemberRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void joinServer_FailWhenConcurrentDuplicateConstraintViolation() {
+        String email = "test@example.com";
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(email, "password")
+        );
+
+        User mockUser = new User();
+        mockUser.setId(1L);
+        mockUser.setEmail(email);
+
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
+
+        Server server = new Server();
+        server.setId(10L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+        when(serverMemberRepository.saveAndFlush(any(ServerMember.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint ux_server_member"));
+
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+        assertThat(ex.getErrorKey()).isEqualTo("alreadymember");
     }
 
     @Test
@@ -788,7 +825,7 @@ class ServerServiceTest {
         when(inviteRepository.findByCode("valid123")).thenReturn(Optional.of(invite));
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
         when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
-        when(serverMemberRepository.save(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(serverMemberRepository.saveAndFlush(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServerResponseDTO result = serverService.joinServerByInviteCode(" valid123 ");
 
@@ -796,7 +833,7 @@ class ServerServiceTest {
         assertThat(result.getName()).isEqualTo("Target Server");
 
         org.mockito.ArgumentCaptor<ServerMember> captor = org.mockito.ArgumentCaptor.forClass(ServerMember.class);
-        verify(serverMemberRepository).save(captor.capture());
+        verify(serverMemberRepository).saveAndFlush(captor.capture());
         ServerMember saved = captor.getValue();
         assertThat(saved.getServerId()).isEqualTo(10L);
         assertThat(saved.getUserId()).isEqualTo(1L);
@@ -870,6 +907,32 @@ class ServerServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> serverService.joinServerByInviteCode("already1"));
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).isEqualTo("Bạn đã là thành viên của Server này rồi");
+        verify(serverMemberRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void joinServerByInviteCode_RejectsConcurrentDuplicateConstraintViolation() {
+        prepareDetailUser();
+
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setCode("concurr1");
+        invite.setStatus("ACTIVE");
+        invite.setServerId(10L);
+
+        Server server = new Server();
+        server.setId(10L);
+
+        when(inviteRepository.findByCode("concurr1")).thenReturn(Optional.of(invite));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 1L)).thenReturn(false);
+        when(serverMemberRepository.saveAndFlush(any(ServerMember.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint ux_server_member"));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServerByInviteCode("concurr1"));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).isEqualTo("Bạn đã là thành viên của Server này rồi");
     }
 
     @Test
@@ -1071,6 +1134,66 @@ class ServerServiceTest {
                 () -> serverService.removeMember(10L, 50L));
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(ex.getReason()).contains("Thành viên không tồn tại trong Server");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+    }
+
+    @Test
+    void removeMember_FailWhenUserDeactivated() {
+        String email = "deactivated@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(email, null, java.util.List.of()));
+        User inactiveUser = new User();
+        inactiveUser.setId(1L);
+        inactiveUser.setActivated(false);
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(inactiveUser));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 2L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ex.getReason()).contains("Phiên đăng nhập không hợp lệ");
+        verifyNoInteractions(serverRepository, serverMemberRepository);
+    }
+
+    @Test
+    void removeMember_FailWhenCallerHasAdminAuthorityButNotServerOwner() {
+        String email = "admin@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        email,
+                        null,
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))));
+        User adminUser = new User();
+        adminUser.setId(888L);
+        adminUser.setActivated(true);
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(adminUser));
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L); // Actual owner is 1L, not 888L
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 2L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).contains("Chỉ chủ sở hữu Server mới có quyền loại thành viên");
+        verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
+    }
+
+    @Test
+    void removeMember_FailWhenTargetMatchesPrincipal_ReturnsBadRequest() {
+        prepareDetailUser(); // User id = 1L
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 1L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ex.getReason()).contains("Không thể loại chủ sở hữu khỏi Server");
         verify(serverMemberRepository, never()).deleteByServerIdAndUserId(anyLong(), anyLong());
     }
 }

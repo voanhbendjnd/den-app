@@ -20,9 +20,12 @@ export function canRemoveMember(server, currentUser, targetMember) {
     return { canRemove: false, reason: 'Dữ liệu không hợp lệ.' };
   }
 
-  const isCallerOwner =
-    Boolean(server.ownerId && currentUser.id) &&
-    String(server.ownerId) === String(currentUser.id);
+  const targetUserId = targetMember.userId ?? targetMember.id;
+  if (!server.ownerId || !currentUser.id || !targetUserId) {
+    return { canRemove: false, reason: 'Dữ liệu không hợp lệ.' };
+  }
+
+  const isCallerOwner = String(server.ownerId) === String(currentUser.id);
 
   if (!isCallerOwner) {
     return {
@@ -31,9 +34,7 @@ export function canRemoveMember(server, currentUser, targetMember) {
     };
   }
 
-  const isSelf =
-    Boolean(targetMember.userId && currentUser.id) &&
-    String(targetMember.userId) === String(currentUser.id);
+  const isSelf = String(targetUserId) === String(currentUser.id);
 
   if (isSelf) {
     return {
@@ -44,8 +45,7 @@ export function canRemoveMember(server, currentUser, targetMember) {
 
   const isTargetOwner =
     targetMember.role === 'OWNER' ||
-    (Boolean(server.ownerId && targetMember.userId) &&
-      String(server.ownerId) === String(targetMember.userId));
+    String(server.ownerId) === String(targetUserId);
 
   if (isTargetOwner) {
     return {

@@ -413,6 +413,60 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ## 11. COMPLETED WORK LOG
 
+### [2026-10-26] TASK-2.34-SERVER-MEMBER-REMOVAL-AUTHORIZATION — Kiểm Tra & Củng Cố Phân Quyền Loại Thành Viên
+
+- **Mục tiêu:** Kiểm tra và bảo đảm tuyệt đối chỉ người có quyền (Server Owner hợp pháp) mới được phép loại thành viên khỏi Server qua endpoint `DELETE /api/v1/servers/{serverId}/members/{userId}`.
+- **Backend Authorization Hardening & Verification:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Thêm `removeMember_FailWhenUserDeactivated`: Caller có tài khoản `activated = false` bị từ chối 401 Unauthorized (`Phiên đăng nhập không hợp lệ`).
+    - Thêm `removeMember_FailWhenCallerHasAdminAuthorityButNotServerOwner`: Caller có authority `ROLE_ADMIN` toàn cục nhưng không phải `server.ownerId` vẫn bị từ chối 403 Forbidden.
+    - Thêm `removeMember_FailWhenTargetMatchesPrincipal_ReturnsBadRequest`: Owner tự loại mình bị từ chối 400 Bad Request.
+    - Xác nhận `serverMemberRepository.deleteByServerIdAndUserId` không bao giờ được gọi khi có vi phạm authorization.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - Bổ sung helper `bearerFor(User user, List<String> authorities)`.
+    - Thêm `deactivatedUser_CannotRemoveMember_Returns401`: JWT token của tài khoản đã bị vô hiệu hóa bị chặn 401; dữ liệu thành viên giữ nguyên.
+    - Thêm `globalAdminAuthority_CannotRemoveMemberWhenNotServerOwner_Returns403`: JWT chứa `ROLE_ADMIN` không vượt được quyền Server Owner (403).
+    - Thêm `tamperedCallerPayload_DoesNotBypassAuthorization`: Client truyền query param hoặc body giả mạo `callerId`, `isOwner=true`, `role=OWNER` hoàn toàn không thể qua mặt SecurityContext (403).
+- **Frontend Authorization Hardening & Verification:**
+  - `client/src/utils/serverMember.js`: Củng cố `canRemoveMember` kiểm tra chặt chẽ `server.ownerId`, `currentUser.id`, và `targetMember.userId ?? targetMember.id`.
+  - `client/tests/serverRemoveMember.test.mjs`:
+    - Thêm test từ chối caller mang field giả mạo `isOwner: true`, `role: 'OWNER'`, `authorities: ['ROLE_ADMIN']`.
+    - Thêm test từ chối dữ liệu server, user, hoặc member thiếu ID.
+- **Verification:**
+  - Backend `ServerServiceTest`: 100% PASS.
+  - Backend `ServerSecurityIT`: 82/82 tests PASS.
+  - Frontend `npm test`: 82/82 tests PASS.
+  - Frontend `npm run build`: Hoàn tất thành công trong 898ms.
+- **Git:**
+  - Branch: `fix/server-member-removal-authorization`.
+
+### [2026-10-26] TASK-2.29-PREVENT-DUPLICATE-SERVER-MEMBERSHIP — Cháº·n NgÆ°á»i DÃ¹ng Tham Gia Server Nhiá»u Láº§n
+
+- **Má»¥c tiÃªu:** Äáº£m báº£o má»t ngÆ°á»i dÃ¹ng khÃ´ng thá» tham gia má»t Server nhiá»u láº§n dáº«n Äáº¿n trÃ¹ng láº·p báº£n ghi trong báº£ng `server_member`, xá»­ lÃ½ triá»t Äá» race condition vÃ  tráº£ vá» mÃ£ lá»i 400 rÃµ rÃ ng.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/ServerService.java`:
+    - `joinServer`:
+      - Validate `serverId != null && serverId > 0` (nÃ©m `BadRequestAlertException` vá»i errorKey `idinvalid`).
+      - Sá»­ dá»¥ng `serverMemberRepository.saveAndFlush(member)` vÃ  bá»c trong `try ... catch (DataIntegrityViolationException ex)` Äá» chuyá»n lá»i trÃ¹ng khÃ³a cÆ¡ sá» dá»¯ liá»u thÃ nh `BadRequestAlertException("User is already a member of this server", "server", "alreadymember")`.
+    - `joinServerByInviteCode`:
+      - Sá»­ dá»¥ng `serverMemberRepository.saveAndFlush(member)` vÃ  bá»c trong `try ... catch (DataIntegrityViolationException ex)` Äá» chuyá»n lá»i trÃ¹ng khÃ³a thÃ nh `ResponseStatusException(HttpStatus.BAD_REQUEST, "Báº¡n ÄÃ£ lÃ  thÃ nh viÃªn cá»§a Server nÃ y rá»i")`.
+- **Tests Added & Updated:**
+  - `server/src/test/java/com/denhub/service/ServerServiceTest.java`:
+    - Cáº­p nháº­t mock `saveAndFlush` thay vÃ¬ `save`.
+    - ThÃªm unit test `joinServer_FailWhenServerIdInvalid`: Kiá»m tra tá»« chá»i ID server null hoáº·c Ã¢m.
+    - ThÃªm unit test `joinServer_FailWhenConcurrentDuplicateConstraintViolation`: Giáº£ láº­p nÃ©m `DataIntegrityViolationException` khi flush DB, kiá»m tra báº¯t lá»i vÃ  tráº£ vá» `alreadymember`.
+    - ThÃªm unit test `joinServerByInviteCode_RejectsConcurrentDuplicateConstraintViolation`: Giáº£ láº­p nÃ©m `DataIntegrityViolationException` khi flush DB, kiá»m tra báº¯t lá»i vÃ  tráº£ vá» 400 Bad Request.
+  - `server/src/test/java/com/denhub/web/rest/ServerSecurityIT.java`:
+    - `joinServer_Direct_Success_ThenSecondJoinReturns400_NoDuplicateRows`: NgÆ°á»i dÃ¹ng tham gia thÃ nh cÃ´ng láº§n Äáº§u (204), láº§n gá»i thá»© hai bá» tá»« chá»i 400 (`alreadymember`), sá» lÆ°á»£ng báº£n ghi thÃ nh viÃªn trong DB giá»¯ nguyÃªn ÄÃºng 1 báº£n ghi.
+    - `joinServerByInviteCode_SecondJoinReturns400_NoDuplicateRows`: NgÆ°á»i dÃ¹ng tham gia qua mÃ£ má»i thÃ nh cÃ´ng láº§n Äáº§u (200), láº§n gá»i thá»© hai bá» tá»« chá»i 400, sá» lÆ°á»£ng báº£n ghi thÃ nh viÃªn giá»¯ nguyÃªn ÄÃºng 1 báº£n ghi.
+    - `rejoiningAfterLeave_SucceedsWithSingleRow`: Tham gia -> Rá»i server -> Tham gia láº¡i thÃ nh cÃ´ng vá»i ÄÃºng 1 báº£n ghi duy nháº¥t.
+    - `rejoiningAfterKick_SucceedsWithSingleRow`: Tham gia -> Bá» Owner kick -> Tham gia láº¡i thÃ nh cÃ´ng vá»i ÄÃºng 1 báº£n ghi duy nháº¥t.
+- **Verification:**
+  - Gradle test suite: `ServerServiceTest` (100% PASS), `ServerSecurityIT` (79/79 tests PASS), toÃ n bá» backend suite pass (`BUILD SUCCESSFUL in 35s`).
+  - Frontend test suite: `npm test` 80/80 tests PASS.
+- **Git:**
+  - Branch: `fix/prevent-duplicate-server-membership`.
+
 ### [2026-10-26] TASK-2.24-SERVER-REMOVE-MEMBER-UI — Làm UI Loại Thành Viên, Kết Nối API
 
 - **Mục tiêu:** Xây dựng giao diện cho phép Server Owner thực hiện thao tác loại thành viên khỏi Server và tích hợp trực tiếp với API backend `DELETE /api/v1/servers/{serverId}/members/{userId}`.

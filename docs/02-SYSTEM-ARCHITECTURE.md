@@ -819,5 +819,44 @@ Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và
 5. **Thành viên tồn tại**: `targetUserId` phải là thành viên hiện tại của Server trong bảng `server_member`. Nếu không $\rightarrow$ `404 Not Found` ("Thành viên không tồn tại trong Server").
 6. **Xóa thành viên**: Thực hiện `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)`.
 
+### 15.3 Ma trận phân quyền & Chống giả mạo (Task 2.34)
+- **Ma trận quyền hạn (Authorization Matrix)**:
+  | Caller Role / Identity | Target Member | Kết quả HTTP | Ghi chú nghiệp vụ |
+  | :--- | :--- | :--- | :--- |
+  | **Server Owner** | Regular Member | `204 No Content` | Loại thành viên thành công, xóa bản ghi `server_member` |
+  | **Server Owner** | Chính Owner | `400 Bad Request` | Chủ sở hữu không thể tự loại mình khỏi Server |
+  | **Server Owner** | Không thuộc Server | `404 Not Found` | Thành viên không tồn tại trong Server |
+  | **Regular Member** | Regular Member khác | `403 Forbidden` | Chỉ chủ sở hữu Server mới có quyền loại thành viên |
+  | **Outsider** (không trong Server) | Regular Member | `403 Forbidden` | Không có quyền quản lý Server |
+  | **Global Admin** (`ROLE_ADMIN`) | Regular Member | `403 Forbidden` | Quyền quản trị Server DenHub gắn liền với `server.ownerId`, không dùng authority toàn cục để vượt quyền |
+  | **Inactive User** (`activated=false`) | Bất kỳ | `401 Unauthorized` | Phiên đăng nhập không hợp lệ |
+  | **Unauthenticated** (thiếu JWT) | Bất kỳ | `401 Unauthorized` | Yêu cầu đăng nhập |
+- **Cơ chế chống giả mạo danh tính & quyền hạn**:
+  - Backend tuyệt đối không tin cậy các tham số query, body hoặc header giả mạo từ client (như `callerId`, `isOwner`, `role`). Caller identity luôn được trích xuất độc quyền từ Spring `SecurityContextHolder`.
+  - Frontend kiểm soát chặt chẽ qua `canRemoveMember`, chỉ hiển thị nút loại thành viên khi `String(server.ownerId) === String(currentUser.id)` và người bị loại không phải Owner.
+- **Bảo toàn tính toàn vẹn dữ liệu**:
+  - Mọi trường hợp thất bại phân quyền (401, 403, 400, 404) không gọi thao tác xóa; bản ghi thành viên mục tiêu trong `server_member` luôn được nguyên vẹn.
 
+---
 
+## 16. QUY TẮC CHẶN THAM GIA SERVER NHIỀU LẦN (TASK 2.29)
+
+### 16.1 Phạm vi áp dụng & Endpoints
+- `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp vào Server.
+- `POST /api/v1/servers/join-invite/{code}`: Tham gia Server thông qua mã mời hợp lệ.
+
+### 16.2 Cơ chế bảo vệ chống trùng lặp 2 lớp (Two-layer Duplicate Prevention)
+1. **Lớp 1 — Application Validation & Row Lock**:
+   - Khóa Server bằng pessimistic lock: `serverRepository.findByIdForUpdate(serverId)` để tuần tự hóa các thao tác thay đổi membership của Server.
+   - Kiểm tra thành viên hiện tại qua `serverMemberRepository.existsByServerIdAndUserId(serverId, userId)`:
+     - Nếu đã tồn tại: từ chối ngay với HTTP `400 Bad Request`.
+     - Với `joinServer`: `BadRequestAlertException("User is already a member of this server", "server", "alreadymember")`.
+     - Với `joinServerByInviteCode`: `ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn đã là thành viên của Server này rồi")`.
+2. **Lớp 2 — Database Unique Constraint & Concurrency Guard**:
+   - Bảng `server_member` có ràng buộc duy nhất `ux_server_member(server_id, user_id)`.
+   - Khi lưu bản ghi mới, gọi `serverMemberRepository.saveAndFlush(member)` bên trong khối `try ... catch (DataIntegrityViolationException ex)`.
+   - Nếu xảy ra tranh chấp dữ liệu đồng thời (race condition) vượt qua lớp 1, lỗi vi phạm unique constraint từ database sẽ được bắt và chuyển đổi thành HTTP `400 Bad Request` tiêu chuẩn, tuyệt đối không để lộ lỗi `500 Internal Server Error`.
+
+### 16.3 Cho phép tham gia lại sau khi rời hoặc bị loại (Rejoin Support)
+- Do cơ chế thành viên sử dụng hard-delete (`deleteByServerIdAndUserId`) khi rời nhóm (`leaveServer`) hoặc bị Server Owner loại (`removeMember`), toàn bộ bản ghi membership của người dùng đó được xóa hoàn toàn khỏi bảng `server_member`.
+- Khi người dùng nhận được lời mời hợp lệ hoặc tham gia lại, hệ thống cho phép tạo lại bản ghi thành viên mới duy nhất (1 bản ghi) và không bị xung đột khóa.
