@@ -1383,4 +1383,61 @@ class ServerSecurityIT {
         // Member is now forbidden from accessing server detail
         problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, memberToken)), 403);
     }
+    @Test
+    void removeMember_FullLifecycle_TargetMemberCompletelyBlockedFromAllServerEndpoints() throws Exception {
+        addMembership(server.getId());
+
+        User targetMember = new User();
+        targetMember.setEmail("kicked-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        targetMember.setPassword("fixture-" + UUID.randomUUID());
+        targetMember.setName("Kicked Member");
+        targetMember.setUsername("kickedmember");
+        targetMember.setActivated(true);
+        targetMember.setSessionId(UUID.randomUUID().toString());
+        targetMember = users.saveAndFlush(targetMember);
+        String targetToken = bearerFor(targetMember);
+
+        // 1. Target joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isNoContent());
+
+        // Target initially has access
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk());
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+
+        // 2. Owner removes target member
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+
+        // 3. Target is now blocked from detail (403 Forbidden)
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, targetToken)), 403);
+
+        // 4. Target is blocked from members list (403 Forbidden)
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, targetToken)), 403);
+
+        // 5. Server disappears from target's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // 6. Target cannot call leave because they are no longer a member (400 Bad Request)
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
+
+        // 7. Owner still has full access and target is gone from members list
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk());
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()));
+    }
 }
