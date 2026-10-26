@@ -1347,4 +1347,40 @@ class ServerSecurityIT {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].id").value(server.getId()));
     }
+    @Test
+    void leaveServer_ByMemberMeAlias_ThenServerDisappearsFromUserServerList() throws Exception {
+        addMembership(server.getId());
+
+        User memberUser = new User();
+        memberUser.setEmail("alias-leaver-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        memberUser.setPassword("fixture-" + UUID.randomUUID());
+        memberUser.setName("Alias Leaver Member");
+        memberUser.setActivated(true);
+        memberUser.setSessionId(UUID.randomUUID().toString());
+        memberUser = users.saveAndFlush(memberUser);
+        String memberToken = bearerFor(memberUser);
+
+        // Member joins the server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // Verify server is present in member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+
+        // Member leaves using alias endpoint DELETE /api/v1/servers/{serverId}/members/me
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/me")
+                .header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isNoContent());
+
+        // Verify server disappears from member's server list
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, memberToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // Member is now forbidden from accessing server detail
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, memberToken)), 403);
+    }
 }
