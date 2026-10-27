@@ -24,6 +24,10 @@ const authApi = {
   getMe() {
     return axiosClient.get('/v1/users/profile');
   },
+
+  updateProfile(data) {
+    return axiosClient.put('/v1/users/profile', data);
+  },
 };
 
 export default authApi;
