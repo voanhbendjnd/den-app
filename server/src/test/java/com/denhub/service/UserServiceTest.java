@@ -118,6 +118,92 @@ class UserServiceTest {
     }
 
     @Test
+    void updateUserProfile_Success() {
+        authenticateAs(TEST_EMAIL);
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(userRepository.existsByUsernameIgnoreCaseAndIdNot("kyanh_new", 100L)).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.denhub.service.dto.UpdateUserProfileDTO dto = com.denhub.service.dto.UpdateUserProfileDTO.builder()
+                .name("Kỳ Anh Updated")
+                .username("kyanh_new")
+                .avatar("https://denhub.com/new_avatar.png")
+                .build();
+
+        UserProfileResponseDTO result = userService.updateUserProfile(dto);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getName()).isEqualTo("Kỳ Anh Updated");
+        assertThat(result.getUsername()).isEqualTo("kyanh_new");
+        assertThat(result.getAvatar()).isEqualTo("https://denhub.com/new_avatar.png");
+        verify(userRepository).save(mockUser);
+    }
+
+    @Test
+    void updateUserProfile_Success_WhenUsernameUnchanged() {
+        authenticateAs(TEST_EMAIL);
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.denhub.service.dto.UpdateUserProfileDTO dto = com.denhub.service.dto.UpdateUserProfileDTO.builder()
+                .name("Kỳ Anh Renamed")
+                .username("kyanh_test") // Same username
+                .build();
+
+        UserProfileResponseDTO result = userService.updateUserProfile(dto);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getName()).isEqualTo("Kỳ Anh Renamed");
+        assertThat(result.getUsername()).isEqualTo("kyanh_test");
+        verify(userRepository).save(mockUser);
+    }
+
+    @Test
+    void updateUserProfile_Fail_WhenUsernameAlreadyExists() {
+        authenticateAs(TEST_EMAIL);
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(userRepository.existsByUsernameIgnoreCaseAndIdNot("taken_username", 100L)).thenReturn(true);
+
+        com.denhub.service.dto.UpdateUserProfileDTO dto = com.denhub.service.dto.UpdateUserProfileDTO.builder()
+                .username("taken_username")
+                .build();
+
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.updateUserProfile(dto));
+
+        assertThat(ex.getEntityName()).isEqualTo("userProfile");
+        assertThat(ex.getErrorKey()).isEqualTo("usernamealreadyexists");
+    }
+
+    @Test
+    void updateUserProfile_Fail_WhenNotLoggedIn() {
+        SecurityContextHolder.clearContext();
+
+        com.denhub.service.dto.UpdateUserProfileDTO dto = com.denhub.service.dto.UpdateUserProfileDTO.builder()
+                .name("New Name")
+                .build();
+
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.updateUserProfile(dto));
+
+        assertThat(ex.getEntityName()).isEqualTo("userProfile");
+        assertThat(ex.getErrorKey()).isEqualTo("notloggedin");
+    }
+
+    @Test
+    void updateUserProfile_Fail_WhenUserNotFound() {
+        authenticateAs(TEST_EMAIL);
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.empty());
+
+        com.denhub.service.dto.UpdateUserProfileDTO dto = com.denhub.service.dto.UpdateUserProfileDTO.builder()
+                .name("New Name")
+                .build();
+
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.updateUserProfile(dto));
+
+        assertThat(ex.getEntityName()).isEqualTo("userProfile");
+        assertThat(ex.getErrorKey()).isEqualTo("usernotfound");
+    }
+
+    @Test
     void processLogin_NewUser_GeneratesPasswordAndSavesUser() {
         String email = "newuser@example.com";
         when(userRepository.findOneWithAuthoritiesByEmail("newuser@example.com")).thenReturn(Optional.empty());
