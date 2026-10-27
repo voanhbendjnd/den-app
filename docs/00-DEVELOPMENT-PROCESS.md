@@ -767,6 +767,50 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ---
 
+### [2026-10-27] FEAT-USER-PROFILE-UPDATE-API — Làm API Cập Nhật Hồ Sơ & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `PUT /api/v1/users/profile` (kèm alias `PUT /api/v1/users/me`) cho phép người dùng đang đăng nhập cập nhật thông tin hồ sơ cá nhân (`name`, `username`, `avatar`), kiểm tra tính duy nhất của username, bảo mật IDOR và evict cache người dùng.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/UpdateUserProfileDTO.java`:
+    - Tạo DTO request nhận dữ liệu cập nhật: `name` (max 50), `username` (regex `^[a-zA-Z0-9_.-]{3,50}$`), `avatar` (max 500).
+    - Ngăn chặn triệt để việc chỉnh sửa các trường nhạy cảm (`email`, `password`, `activated`, `authorities`).
+  - `server/src/main/java/com/denhub/repository/UserRepository.java`:
+    - Bổ sung `boolean existsByUsernameIgnoreCaseAndIdNot(String username, Long id)` phục vụ kiểm tra trùng lặp username với người dùng khác.
+    - Bổ sung `Optional<User> findOneByUsernameIgnoreCase(String username)`.
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional public UserProfileResponseDTO updateUserProfile(UpdateUserProfileDTO dto)`:
+      - Xác thực người dùng hiện tại từ Spring Security Context (`SecurityUtils.getCurrentUserLogin()`).
+      - Truy vấn entity người dùng từ database qua `userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)`.
+      - Kiểm tra trùng lặp `username` nếu thay đổi; ném `BadRequestAlertException` (`usernamealreadyexists`) nếu đã tồn tại.
+      - Dirty checking có cờ `modified`, chỉ gọi `userRepository.save(user)` và `clearUserCaches(user)` khi thực sự có thay đổi.
+      - Trả về DTO hồ sơ người dùng đã cập nhật.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Bổ sung 2 endpoints PUT:
+      - `PUT /api/v1/users/profile`: Endpoint chính thức cập nhật thông tin hồ sơ cá nhân.
+      - `PUT /api/v1/users/me`: Endpoint alias chuẩn RESTful.
+    - Validate `@Valid @RequestBody UpdateUserProfileDTO` tự động trả về RFC 7807 Problem Details khi vi phạm validation.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `updateUserProfile_Success`: Kiểm tra cập nhật thành công name, username, avatar.
+    - `updateUserProfile_Success_WhenUsernameUnchanged`: Kiểm tra cập nhật khi username giữ nguyên không bị báo lỗi trùng lặp.
+    - `updateUserProfile_Fail_WhenUsernameAlreadyExists`: Kiểm tra ném lỗi `usernamealreadyexists` khi username đã có người dùng khác sử dụng.
+    - `updateUserProfile_Fail_WhenNotLoggedIn`: Kiểm tra ném lỗi `notloggedin` khi chưa đăng nhập.
+    - `updateUserProfile_Fail_WhenUserNotFound`: Kiểm tra ném lỗi `usernotfound` khi người dùng không tồn tại.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `updateUserProfile_Success`: MockMvc PUT `/api/v1/users/profile` trả về HTTP 200 và json data cập nhật.
+    - `updateUserProfile_AliasMe_Success`: MockMvc PUT `/api/v1/users/me` trả về HTTP 200.
+    - `updateUserProfile_Fail_WhenValidationFails`: MockMvc trả về HTTP 400 khi payload không đạt validation Bean (username quá ngắn).
+    - `updateUserProfile_Fail_WhenUsernameAlreadyExists`: MockMvc trả về HTTP 400 Problem Details với errorKey `usernamealreadyexists`.
+    - `updateUserProfile_Fail_WhenNotLoggedIn`: MockMvc trả về HTTP 400 Problem Details với errorKey `notloggedin`.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 16/16 tests (0 failures, 0 errors).
+  - `.\gradlew.bat test`: Toàn bộ test suite máy chủ PASS 100% (BUILD SUCCESSFUL).
+- **Docs & Architecture Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `PUT /api/v1/users/profile` (alias `PUT /api/v1/users/me`) vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
 ### [2026-10-25] FEAT-SERVER-LEAVE-FE — Xây dựng UI Rời Server và Kết Nối API
 
 - **Mục tiêu:** Xây dựng giao diện cho phép thành viên tự rời khỏi Server (`Leave Server`), kết nối với API backend `POST /api/v1/servers/{serverId}/leave`, hiển thị modal xác nhận, xử lý loading/success/error, chống double-click, và điều hướng an toàn về trang chủ.
