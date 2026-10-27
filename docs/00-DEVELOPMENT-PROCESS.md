@@ -811,6 +811,47 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ---
 
+### [2026-10-27] FEAT-USER-PROFILE-EDIT-UI — Làm UI Chỉnh Sửa Hồ Sơ & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng giao diện chỉnh sửa hồ sơ người dùng phong cách Cyber Dark, tích hợp Modal xem trước Avatar theo thời gian thực (Live Preview), preset ảnh đại diện nhanh, validation chặt chẽ và kết nối toàn diện với API `PUT /api/v1/users/profile`.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js` & `client/src/api/authApi.js`:
+    - Bổ sung các phương thức `updateProfile(data)` (gọi `PUT /v1/users/profile`) và `updateMe(data)` (gọi `PUT /v1/users/me`).
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng `validateProfileUpdate(values)` kiểm tra hợp lệ `name` (max 50, không chỉ khoảng trắng), `username` (3-50 ký tự, regex `^[a-zA-Z0-9_.-]{3,50}$`), `avatar` (max 500, regex URL hợp lệ).
+    - Xây dựng `sanitizeProfilePayload(values)` tự động trim khoảng trắng, chuẩn hóa chữ thường username, chuyển avatar rỗng thành `null`.
+    - Xây dựng `getProfileUpdateErrorMessage(error, username)` bóc tách lỗi RFC 7807 problem details, ánh xạ chi tiết các lỗi trùng username (`usernamealreadyexists`), lỗi phiên đăng nhập (`notloggedin`), lỗi Bean validation (`fieldErrors`), lỗi mạng.
+  - `client/src/components/common/EditProfileModal.jsx`:
+    - Tạo Modal chỉnh sửa hồ sơ chuẩn phong cách Cyber Dark với card gradient viền glowing neon.
+    - Khu vực Live Avatar Preview kích thước 68px kèm viền gradient xoay, tự động phản hồi ngay khi nhập URL, hỗ trợ fallback avatar chữ cái đầu và nút xóa ảnh một chạm.
+    - Cung cấp danh sách các Preset Avatar phong cách Sci-Fi giúp người dùng đổi ảnh đại diện nhanh chóng.
+    - Form nhập liệu gồm: trường Email (read-only/khóa an toàn), Tên hiển thị (max 50, bộ đếm ký tự), Tên người dùng (prefix `@`, bộ đếm ký tự, kiểm tra regex), Đường dẫn ảnh đại diện (icon, max 500).
+    - Hộp Alert báo lỗi Cyber Dark sắc nét nếu phát hiện trùng lặp username hoặc dữ liệu không hợp lệ.
+    - Nút Hủy và nút Lưu thay đổi gradient neon, có spinner trạng thái loading chống double-click.
+    - Tích hợp trực tiếp với `useAuth().updateCurrentUser` để cập nhật đồng bộ toàn bộ app (Header, Sidebar, ProfilePage) và `localStorage`.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Tích hợp `EditProfileModal`, quản lý state `isEditModalOpen`.
+    - Bổ sung nút "Chỉnh sửa hồ sơ" nổi bật ở Toolbar trên cùng và kết nối nút ở Quick Actions Footer.
+    - Xử lý callback `handleEditSuccess` giúp cập nhật dữ liệu hiển thị tức thì trên trang Profile mà không cần reload.
+  - `client/src/pages/profile/profile.css`:
+    - Bổ sung quy tắc media query responsive cho Toolbar và Avatar Row trên màn hình nhỏ.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - `validateProfileUpdate validates valid inputs without any errors`: Kiểm tra dữ liệu hợp lệ.
+    - `validateProfileUpdate flags name errors when exceeding length or whitespace only`: Kiểm tra bắt lỗi tên quá 50 ký tự và chỉ chứa khoảng trắng.
+    - `validateProfileUpdate flags username errors for length, pattern, and empty values`: Kiểm tra bắt lỗi username rỗng, quá ngắn (<3), quá dài (>50), chứa ký tự đặc biệt, và chấp nhận ký tự hợp lệ.
+    - `validateProfileUpdate flags avatar errors when exceeding length or invalid protocol`: Kiểm tra bắt lỗi URL ảnh > 500 ký tự và sai protocol.
+    - `sanitizeProfilePayload trims fields, lowercases username, and converts empty avatar to null`: Kiểm tra chuẩn hóa dữ liệu trước khi gửi API.
+    - `getProfileUpdateErrorMessage correctly maps business errors, field errors, and network issues`: Kiểm tra ánh xạ lỗi trùng username, hết phiên đăng nhập, validation errors và lỗi mạng.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 13/13 tests (100%).
+  - `npm run build`: Vite v8.3.3 build production hoàn tất thành công 100% trong 31.46s.
+- **Docs & Roadmaps Updated:**
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+  - Cập nhật các bảng tiến độ Giai đoạn 2 (6/7) và tổng thể (12/28).
+
+---
+
 ### [2026-10-25] FEAT-SERVER-LEAVE-FE — Xây dựng UI Rời Server và Kết Nối API
 
 - **Mục tiêu:** Xây dựng giao diện cho phép thành viên tự rời khỏi Server (`Leave Server`), kết nối với API backend `POST /api/v1/servers/{serverId}/leave`, hiển thị modal xác nhận, xử lý loading/success/error, chống double-click, và điều hướng an toàn về trang chủ.

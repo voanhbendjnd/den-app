@@ -139,3 +139,145 @@ export function getRoleDisplays(authorities = []) {
     }
   });
 }
+
+/**
+ * Biểu thức chính quy cho username: 3-50 ký tự, chỉ gồm chữ cái, chữ số, _, -, .
+ */
+export const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
+
+/**
+ * Kiểm tra tính hợp lệ của dữ liệu cập nhật hồ sơ trước khi gửi API
+ * @param {object} values { name, username, avatar }
+ * @returns {{ isValid: boolean, errors: Record<string, string> }}
+ */
+export function validateProfileUpdate(values = {}) {
+  const errors = {};
+
+  // Validate Name
+  if (values.name !== undefined && values.name !== null) {
+    const trimmedName = String(values.name).trim();
+    if (values.name && trimmedName.length === 0) {
+      errors.name = 'Tên hiển thị không được chỉ chứa khoảng trắng.';
+    } else if (values.name.length > 50) {
+      errors.name = 'Tên hiển thị không được vượt quá 50 ký tự.';
+    }
+  }
+
+  // Validate Username
+  if (values.username !== undefined && values.username !== null) {
+    const trimmedUsername = String(values.username).trim();
+    if (trimmedUsername.length === 0) {
+      errors.username = 'Tên người dùng không được để trống.';
+    } else if (trimmedUsername.length < 3 || trimmedUsername.length > 50) {
+      errors.username = 'Tên người dùng phải có độ dài từ 3 đến 50 ký tự.';
+    } else if (!USERNAME_REGEX.test(trimmedUsername)) {
+      errors.username = 'Tên người dùng chỉ được chứa chữ cái, chữ số, gạch dưới (_), gạch ngang (-) hoặc dấu chấm (.).';
+    }
+  }
+
+  // Validate Avatar URL
+  if (values.avatar !== undefined && values.avatar !== null) {
+    const trimmedAvatar = String(values.avatar).trim();
+    if (trimmedAvatar.length > 500) {
+      errors.avatar = 'Đường dẫn ảnh đại diện không được vượt quá 500 ký tự.';
+    } else if (trimmedAvatar.length > 0) {
+      const isValidUrl = /^https?:\/\/.+/i.test(trimmedAvatar) || /^data:image\/.+/i.test(trimmedAvatar);
+      if (!isValidUrl) {
+        errors.avatar = 'Đường dẫn ảnh đại diện phải bắt đầu bằng http:// hoặc https://';
+      }
+    }
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Chuẩn hóa dữ liệu cập nhật trước khi gửi request tới API
+ * @param {object} values { name, username, avatar }
+ * @returns {object}
+ */
+export function sanitizeProfilePayload(values = {}) {
+  const payload = {};
+
+  if (values.name !== undefined && values.name !== null) {
+    payload.name = String(values.name).trim();
+  }
+
+  if (values.username !== undefined && values.username !== null) {
+    payload.username = String(values.username).trim().toLowerCase();
+  }
+
+  if (values.avatar !== undefined && values.avatar !== null) {
+    const trimmed = String(values.avatar).trim();
+    payload.avatar = trimmed.length > 0 ? trimmed : null;
+  }
+
+  return payload;
+}
+
+/**
+ * Ánh xạ lỗi trả về từ API cập nhật hồ sơ cá nhân sang thông điệp tiếng Việt thân thiện
+ * @param {any} error 
+ * @param {string} [username] 
+ * @returns {string}
+ */
+export function getProfileUpdateErrorMessage(error, username = '') {
+  if (!error) return 'Cập nhật hồ sơ thất bại.';
+
+  const data = error.response?.data;
+  const status = error.response?.status;
+  const errorKey = data?.errorKey || data?.title;
+  const serverMsg = data?.message || data?.detail;
+
+  // Lỗi trùng lặp username
+  if (
+    errorKey === 'usernamealreadyexists' ||
+    (typeof serverMsg === 'string' && (
+      serverMsg.toLowerCase().includes('username already in use') ||
+      serverMsg.toLowerCase().includes('username already exists')
+    ))
+  ) {
+    const formattedUsername = username ? `@${username}` : 'này';
+    return `Tên người dùng ${formattedUsername} đã có người sử dụng. Vui lòng chọn tên khác.`;
+  }
+
+  // Lỗi chưa đăng nhập hoặc không tìm thấy user
+  if (errorKey === 'notloggedin' || status === 401) {
+    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  }
+
+  if (errorKey === 'usernotfound' || status === 404) {
+    return 'Không tìm thấy thông tin tài khoản người dùng.';
+  }
+
+  if (status === 403) {
+    return 'Bạn không có quyền cập nhật thông tin hồ sơ này.';
+  }
+
+  // Lỗi validation từ Bean Validation (fieldErrors)
+  if (data?.fieldErrors && Array.isArray(data.fieldErrors) && data.fieldErrors.length > 0) {
+    const firstErr = data.fieldErrors[0];
+    const fieldName = firstErr.field === 'name'
+      ? 'Tên hiển thị'
+      : firstErr.field === 'username'
+      ? 'Tên người dùng'
+      : firstErr.field === 'avatar'
+      ? 'Ảnh đại diện'
+      : firstErr.field;
+    return `${fieldName}: ${firstErr.message || 'Dữ liệu không hợp lệ.'}`;
+  }
+
+  if (status >= 500) {
+    return serverMsg || 'Máy chủ gặp sự cố khi lưu hồ sơ. Vui lòng thử lại sau.';
+  }
+
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền mạng.';
+  }
+
+  return serverMsg || error.message || 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.';
+}
+
