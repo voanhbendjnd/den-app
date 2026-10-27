@@ -22,6 +22,7 @@ import com.denhub.repository.UserRepository;
 import com.denhub.security.AuthoritiesConstants;
 import com.denhub.security.SecurityUtils;
 import com.denhub.service.dto.RegisterReqDTO;
+import com.denhub.service.dto.UpdateUserProfileDTO;
 import com.denhub.service.dto.UserDTO;
 import com.denhub.service.dto.UserProfileResponseDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
@@ -75,6 +76,65 @@ public class UserService {
 
         User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
                 .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+
+        return UserProfileResponseDTO.fromUser(user);
+    }
+
+    /**
+     * Cập nhật thông tin hồ sơ của người dùng hiện tại đang đăng nhập.
+     *
+     * @param dto UpdateUserProfileDTO chứa thông tin cần cập nhật (name, username, avatar)
+     * @return UserProfileResponseDTO thông tin hồ sơ người dùng sau khi cập nhật
+     * @throws BadRequestAlertException nếu chưa đăng nhập, không tìm thấy người dùng, hoặc username đã tồn tại
+     */
+    @Transactional
+    public UserProfileResponseDTO updateUserProfile(UpdateUserProfileDTO dto) {
+        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+
+        User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+
+        if (dto == null) {
+            return UserProfileResponseDTO.fromUser(user);
+        }
+
+        boolean modified = false;
+
+        // Cập nhật tên hiển thị nếu có truyền
+        if (dto.getName() != null) {
+            String trimmedName = dto.getName().trim();
+            if (!trimmedName.equals(user.getName())) {
+                user.setName(trimmedName.isEmpty() ? null : trimmedName);
+                modified = true;
+            }
+        }
+
+        // Cập nhật username nếu có truyền
+        if (dto.getUsername() != null) {
+            String normalizedUsername = dto.getUsername().trim().toLowerCase(Locale.ENGLISH);
+            if (!normalizedUsername.equals(user.getUsername())) {
+                if (userRepository.existsByUsernameIgnoreCaseAndIdNot(normalizedUsername, user.getId())) {
+                    throw new BadRequestAlertException("Username already in use", "userProfile", "usernamealreadyexists");
+                }
+                user.setUsername(normalizedUsername);
+                modified = true;
+            }
+        }
+
+        // Cập nhật avatar nếu có truyền
+        if (dto.getAvatar() != null) {
+            String trimmedAvatar = dto.getAvatar().trim();
+            if (!trimmedAvatar.equals(user.getAvatar())) {
+                user.setAvatar(trimmedAvatar.isEmpty() ? null : trimmedAvatar);
+                modified = true;
+            }
+        }
+
+        if (modified) {
+            user = userRepository.save(user);
+            this.clearUserCaches(user);
+        }
 
         return UserProfileResponseDTO.fromUser(user);
     }
