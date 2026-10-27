@@ -23,6 +23,7 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import userApi from '../../api/userApi';
+import EditProfileModal from '../../components/common/EditProfileModal';
 import {
   extractProfileData,
   formatJoinDate,
@@ -39,6 +40,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Gọi API lấy thông tin hồ sơ người dùng
   const fetchProfile = useCallback(async (isManualRefresh = false) => {
@@ -90,6 +92,13 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchProfile(false);
   }, [fetchProfile]);
+
+  const handleEditSuccess = (updatedData) => {
+    setProfile((prev) => ({
+      ...(prev || {}),
+      ...updatedData,
+    }));
+  };
 
   // Dữ liệu hiển thị fallback kết hợp giữa API data và currentUser
   const displayData = profile || {
@@ -176,6 +185,19 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="profile-actions-toolbar">
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={() => setIsEditModalOpen(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)',
+                      border: 'none',
+                      fontWeight: 600,
+                      boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+                    }}
+                  >
+                    Chỉnh sửa hồ sơ
+                  </Button>
                   <Tooltip title="Tải lại thông tin từ hệ thống">
                     <Button
                       icon={<ReloadOutlined spin={refreshing} />}
@@ -291,7 +313,7 @@ export default function ProfilePage() {
               <div style={{ display: 'flex', gap: 10 }}>
                 <Button
                   icon={<EditOutlined />}
-                  onClick={() => message.info('Chức năng Chỉnh sửa hồ sơ sẽ sẵn sàng ở tác vụ tiếp theo!')}
+                  onClick={() => setIsEditModalOpen(true)}
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     borderColor: 'var(--border-subtle)',
@@ -317,6 +339,14 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Modal Chỉnh Sửa Hồ Sơ */}
+        <EditProfileModal
+          open={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSuccess={handleEditSuccess}
+          currentProfile={displayData}
+        />
       </div>
     </div>
   );
