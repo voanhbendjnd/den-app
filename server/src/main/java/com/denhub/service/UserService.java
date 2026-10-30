@@ -21,6 +21,7 @@ import com.denhub.repository.AuthorityRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.AuthoritiesConstants;
 import com.denhub.security.SecurityUtils;
+import com.denhub.service.dto.ChangePasswordDTO;
 import com.denhub.service.dto.RegisterReqDTO;
 import com.denhub.service.dto.UpdateUserProfileDTO;
 import com.denhub.service.dto.UserDTO;
@@ -137,6 +138,34 @@ public class UserService {
         }
 
         return UserProfileResponseDTO.fromUser(user);
+    }
+
+    /**
+     * Thay đổi mật khẩu cho người dùng đang đăng nhập.
+     *
+     * @param dto DTO chứa mật khẩu hiện tại và mật khẩu mới.
+     */
+    @Transactional
+    public void changePassword(ChangePasswordDTO dto) {
+        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+
+        User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+
+        if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
+            throw new BadRequestAlertException("Mật khẩu hiện tại không chính xác", "userProfile", "invalidcurrentpassword");
+        }
+
+        if (passwordEncoder.matches(dto.getNewPassword(), user.getPassword())) {
+            throw new BadRequestAlertException("Mật khẩu mới không được trùng với mật khẩu hiện tại", "userProfile", "samepassword");
+        }
+
+        String encryptedPassword = passwordEncoder.encode(dto.getNewPassword());
+        user.setPassword(encryptedPassword);
+        userRepository.save(user);
+        this.clearUserCaches(user);
+        log.info("Changed password for User: {}", currentUserEmail);
     }
 
     public User registerUser(RegisterReqDTO req) {
