@@ -34,7 +34,11 @@ import {
   formatMessageTime,
   formatCompactTime,
   getAuthorInfo,
+  resolveActiveChannel,
+  getChannelTopic,
+  handleIncomingRealtimeMessage,
 } from '../../utils/channelMessages';
+import webSocketService from '../../services/webSocketService';
 import './group-chat.css';
 
 function ChannelSidebar({
@@ -312,12 +316,12 @@ function MembersPanel({
 }
 
 export default function GroupChatPage() {
-  const { serverId } = useParams();
+  const { serverId, channelId } = useParams();
   // Each visit owns its state, including a return to the same Server after visiting another.
-  return <ServerWorkspace key={serverId} serverId={serverId} />;
+  return <ServerWorkspace key={serverId} serverId={serverId} channelIdParam={channelId} />;
 }
 
-function ServerWorkspace({ serverId }) {
+function ServerWorkspace({ serverId, channelIdParam }) {
   const { setServers, onServerDeleted, refreshServers } = useOutletContext();
   const navigate = useNavigate();
   const currentServerId = useRef(serverId);
@@ -398,7 +402,7 @@ function ServerWorkspace({ serverId }) {
         const list = res.data?.data || res.data || [];
         setChannels(list);
         setActiveChannel((prev) => {
-          return list.find((channel) => channel.id === prev?.id) || list[0] || null;
+          return resolveActiveChannel(list, prev?.id, channelIdParam);
         });
       })
       .catch((err) => {
@@ -415,10 +419,23 @@ function ServerWorkspace({ serverId }) {
     return () => { channelsRequest.current += 1; };
   }, [serverId]);
 
+  useEffect(() => {
+    if (channelIdParam && channels.length > 0) {
+      const target = channels.find((ch) => String(ch.id) === String(channelIdParam));
+      if (target && target.id !== activeChannel?.id) {
+        setActiveChannel(target);
+      }
+    }
+  }, [channelIdParam, channels, activeChannel?.id]);
+
   const handleSelectChannel = (channel) => {
+    if (!channel) return;
     setActiveChannel(channel);
     if (!screens.lg) {
       setChannelsOpen(false);
+    }
+    if (channelIdParam) {
+      navigate(`/servers/${serverId}/channels/${channel.id}`, { replace: true });
     }
   };
 
@@ -505,6 +522,56 @@ function ServerWorkspace({ serverId }) {
     }
   }, [activeChannel?.id, fetchChannelMessages]);
 
+  // Subscribe to real-time events for activeChannel
+  useEffect(() => {
+    const channelId = activeChannel?.id;
+    if (!channelId || currentServerId.current !== serverId) return;
+
+    const session = channelSession.current;
+    const topic = getChannelTopic(channelId);
+    let unsubscribe = null;
+
+    const handleRealtimePayload = (payload) => {
+      if (currentServerId.current !== serverId || channelSession.current !== session) return;
+      if (activeChannelId.current !== channelId) return;
+
+      setMessages((prev) => handleIncomingRealtimeMessage(prev, payload, channelId));
+      requestAnimationFrame(() => {
+        if (currentServerId.current !== serverId || channelSession.current !== session) return;
+        const el = chatContainerRef.current;
+        if (el) {
+          const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+          if (isNearBottom) {
+            el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+          }
+        }
+      });
+    };
+
+    webSocketService.connect(
+      () => {
+        if (currentServerId.current !== serverId || channelSession.current !== session) return;
+        if (activeChannelId.current !== channelId) return;
+        unsubscribe = webSocketService.subscribeTopic(topic, handleRealtimePayload);
+      },
+      () => {
+        // Disconnected
+      }
+    );
+
+    if (webSocketService.isConnected()) {
+      unsubscribe = webSocketService.subscribeTopic(topic, handleRealtimePayload);
+    }
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      } else {
+        webSocketService.unsubscribeTopic(topic);
+      }
+    };
+  }, [activeChannel?.id, serverId]);
+
   const handleLoadMore = useCallback(async () => {
     const channelId = activeChannel?.id;
     if (!channelId || !hasMore || morePending.current || !nextCursor
@@ -565,10 +632,7 @@ function ServerWorkspace({ serverId }) {
   const handleSentMessage = (sentMessage, channelId) => {
     if (!sentMessage || currentServerId.current !== serverId || activeChannelId.current !== channelId) return;
     const session = channelSession.current;
-    setMessages((prev) => {
-      if (prev.some((m) => m.id === sentMessage.id)) return prev;
-      return [...prev, sentMessage];
-    });
+    setMessages((prev) => handleIncomingRealtimeMessage(prev, sentMessage, channelId));
     requestAnimationFrame(() => {
       if (currentServerId.current !== serverId || channelSession.current !== session) return;
       const el = chatContainerRef.current;
@@ -606,7 +670,7 @@ function ServerWorkspace({ serverId }) {
       const nextList = prevList.filter((c) => c.id !== deletedChannelId);
       setActiveChannel((prevActive) => {
         if (prevActive?.id === deletedChannelId) {
-          return nextList.length > 0 ? nextList[0] : null;
+          return resolveActiveChannel(nextList, null, channelIdParam);
         }
         return prevActive;
       });
