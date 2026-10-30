@@ -1,13 +1,17 @@
 package com.denhub.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.denhub.service.UserService;
+import com.denhub.service.dto.ChangePasswordDTO;
 import com.denhub.service.dto.UpdateUserProfileDTO;
 import com.denhub.service.dto.UserProfileResponseDTO;
 import com.denhub.util.ResFormatResponse;
@@ -200,6 +204,106 @@ class UserProfileResourceTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.entityName").value("userProfile"))
                 .andExpect(jsonPath("$.errorKey").value("usernamealreadyexists"));
+    }
+
+    @Test
+    void changePassword_Success() throws Exception {
+        ChangePasswordDTO requestDto = ChangePasswordDTO.builder()
+                .currentPassword("OldSecret123")
+                .newPassword("NewSecret456")
+                .build();
+
+        doNothing().when(userService).changePassword(any(ChangePasswordDTO.class));
+
+        mockMvc.perform(post("/api/v1/users/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200));
+    }
+
+    @Test
+    void changePassword_Alias_Success() throws Exception {
+        ChangePasswordDTO requestDto = ChangePasswordDTO.builder()
+                .currentPassword("OldSecret123")
+                .newPassword("NewSecret456")
+                .build();
+
+        doNothing().when(userService).changePassword(any(ChangePasswordDTO.class));
+
+        mockMvc.perform(post("/api/v1/users/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200));
+    }
+
+    @Test
+    void changePassword_Fail_WhenValidationFails() throws Exception {
+        // newPassword too short (< 4 chars)
+        ChangePasswordDTO invalidDto = ChangePasswordDTO.builder()
+                .currentPassword("OldSecret123")
+                .newPassword("12")
+                .build();
+
+        mockMvc.perform(post("/api/v1/users/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidDto)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void changePassword_Fail_WhenCurrentPasswordIncorrect() throws Exception {
+        ChangePasswordDTO requestDto = ChangePasswordDTO.builder()
+                .currentPassword("WrongOldPass")
+                .newPassword("NewSecret456")
+                .build();
+
+        doThrow(new BadRequestAlertException("Mật khẩu hiện tại không chính xác", "userProfile", "invalidcurrentpassword"))
+                .when(userService).changePassword(any(ChangePasswordDTO.class));
+
+        mockMvc.perform(post("/api/v1/users/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.entityName").value("userProfile"))
+                .andExpect(jsonPath("$.errorKey").value("invalidcurrentpassword"));
+    }
+
+    @Test
+    void changePassword_Fail_WhenNewPasswordSameAsCurrent() throws Exception {
+        ChangePasswordDTO requestDto = ChangePasswordDTO.builder()
+                .currentPassword("SamePassword123")
+                .newPassword("SamePassword123")
+                .build();
+
+        doThrow(new BadRequestAlertException("Mật khẩu mới không được trùng với mật khẩu hiện tại", "userProfile", "samepassword"))
+                .when(userService).changePassword(any(ChangePasswordDTO.class));
+
+        mockMvc.perform(post("/api/v1/users/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.entityName").value("userProfile"))
+                .andExpect(jsonPath("$.errorKey").value("samepassword"));
+    }
+
+    @Test
+    void changePassword_Fail_WhenNotLoggedIn() throws Exception {
+        ChangePasswordDTO requestDto = ChangePasswordDTO.builder()
+                .currentPassword("OldSecret123")
+                .newPassword("NewSecret456")
+                .build();
+
+        doThrow(new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"))
+                .when(userService).changePassword(any(ChangePasswordDTO.class));
+
+        mockMvc.perform(post("/api/v1/users/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.entityName").value("userProfile"))
+                .andExpect(jsonPath("$.errorKey").value("notloggedin"));
     }
 
     @Test

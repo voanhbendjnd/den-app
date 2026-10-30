@@ -9,6 +9,7 @@ import com.denhub.domain.User;
 import com.denhub.repository.AuthorityRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.AuthoritiesConstants;
+import com.denhub.service.dto.ChangePasswordDTO;
 import com.denhub.service.dto.ResLoginDTO;
 import com.denhub.service.dto.UserProfileResponseDTO;
 import com.denhub.service.errors.BadRequestResourceException;
@@ -198,6 +199,74 @@ class UserServiceTest {
                 .build();
 
         BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.updateUserProfile(dto));
+
+        assertThat(ex.getEntityName()).isEqualTo("userProfile");
+        assertThat(ex.getErrorKey()).isEqualTo("usernotfound");
+    }
+
+    @Test
+    void changePassword_Success() {
+        authenticateAs(TEST_EMAIL);
+        mockUser.setPassword("hashed_old_password");
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(passwordEncoder.matches("OldPassword123", "hashed_old_password")).thenReturn(true);
+        when(passwordEncoder.matches("NewPassword456", "hashed_old_password")).thenReturn(false);
+        when(passwordEncoder.encode("NewPassword456")).thenReturn("hashed_new_password");
+
+        ChangePasswordDTO dto = new ChangePasswordDTO("OldPassword123", "NewPassword456");
+        userService.changePassword(dto);
+
+        assertThat(mockUser.getPassword()).isEqualTo("hashed_new_password");
+        verify(userRepository).save(mockUser);
+    }
+
+    @Test
+    void changePassword_Fail_WhenCurrentPasswordIncorrect() {
+        authenticateAs(TEST_EMAIL);
+        mockUser.setPassword("hashed_old_password");
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(passwordEncoder.matches("WrongPassword", "hashed_old_password")).thenReturn(false);
+
+        ChangePasswordDTO dto = new ChangePasswordDTO("WrongPassword", "NewPassword456");
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.changePassword(dto));
+
+        assertThat(ex.getEntityName()).isEqualTo("userProfile");
+        assertThat(ex.getErrorKey()).isEqualTo("invalidcurrentpassword");
+    }
+
+    @Test
+    void changePassword_Fail_WhenNewPasswordSameAsCurrent() {
+        authenticateAs(TEST_EMAIL);
+        mockUser.setPassword("hashed_old_password");
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.of(mockUser));
+        when(passwordEncoder.matches("OldPassword123", "hashed_old_password")).thenReturn(true);
+        when(passwordEncoder.matches("OldPassword123", "hashed_old_password")).thenReturn(true);
+
+        ChangePasswordDTO dto = new ChangePasswordDTO("OldPassword123", "OldPassword123");
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.changePassword(dto));
+
+        assertThat(ex.getEntityName()).isEqualTo("userProfile");
+        assertThat(ex.getErrorKey()).isEqualTo("samepassword");
+    }
+
+    @Test
+    void changePassword_Fail_WhenNotLoggedIn() {
+        SecurityContextHolder.clearContext();
+
+        ChangePasswordDTO dto = new ChangePasswordDTO("OldPassword123", "NewPassword456");
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.changePassword(dto));
+
+        assertThat(ex.getEntityName()).isEqualTo("userProfile");
+        assertThat(ex.getErrorKey()).isEqualTo("notloggedin");
+    }
+
+    @Test
+    void changePassword_Fail_WhenUserNotFound() {
+        authenticateAs(TEST_EMAIL);
+        when(userRepository.findOneWithAuthoritiesByEmail(TEST_EMAIL)).thenReturn(Optional.empty());
+
+        ChangePasswordDTO dto = new ChangePasswordDTO("OldPassword123", "NewPassword456");
+        BadRequestAlertException ex = assertThrows(BadRequestAlertException.class, () -> userService.changePassword(dto));
 
         assertThat(ex.getEntityName()).isEqualTo("userProfile");
         assertThat(ex.getErrorKey()).isEqualTo("usernotfound");
