@@ -37,6 +37,7 @@ import {
   resolveActiveChannel,
   getChannelTopic,
   handleIncomingRealtimeMessage,
+  isMessageForActiveChannel,
 } from '../../utils/channelMessages';
 import webSocketService from '../../services/webSocketService';
 import './group-chat.css';
@@ -522,18 +523,21 @@ function ServerWorkspace({ serverId, channelIdParam }) {
     }
   }, [activeChannel?.id, fetchChannelMessages]);
 
-  // Subscribe to real-time events for activeChannel
+  // Subscribe to real-time events for activeChannel (Sprint 3: 3.01 & 3.06)
   useEffect(() => {
     const channelId = activeChannel?.id;
     if (!channelId || currentServerId.current !== serverId) return;
 
     const session = channelSession.current;
-    const topic = getChannelTopic(channelId);
-    let unsubscribe = null;
+    let cleanup = null;
 
     const handleRealtimePayload = (payload) => {
+      // 3.06: Discard any message if user has switched channel or server
       if (currentServerId.current !== serverId || channelSession.current !== session) return;
       if (activeChannelId.current !== channelId) return;
+
+      // 3.06: Strict channel ID check prevents cross-channel leakage
+      if (!isMessageForActiveChannel(payload, channelId)) return;
 
       setMessages((prev) => handleIncomingRealtimeMessage(prev, payload, channelId));
       requestAnimationFrame(() => {
@@ -548,26 +552,30 @@ function ServerWorkspace({ serverId, channelIdParam }) {
       });
     };
 
-    webSocketService.connect(
-      () => {
-        if (currentServerId.current !== serverId || channelSession.current !== session) return;
-        if (activeChannelId.current !== channelId) return;
-        unsubscribe = webSocketService.subscribeTopic(topic, handleRealtimePayload);
-      },
-      () => {
-        // Disconnected
-      }
-    );
+    const subscribe = () => {
+      if (currentServerId.current !== serverId || channelSession.current !== session) return;
+      if (activeChannelId.current !== channelId) return;
+      cleanup = webSocketService.subscribeChannel(channelId, handleRealtimePayload);
+    };
+
+    // 3.01: Connect and subscribe to activeChannel
+    webSocketService.connect(subscribe, () => {});
 
     if (webSocketService.isConnected()) {
-      unsubscribe = webSocketService.subscribeTopic(topic, handleRealtimePayload);
+      subscribe();
     }
 
+    const removeListener = webSocketService.addConnectionListener?.((connected) => {
+      if (connected) subscribe();
+    });
+
+    // 3.06: Immediately unsubscribe when channel changes or component unmounts
     return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
+      if (typeof removeListener === 'function') removeListener();
+      if (typeof cleanup === 'function') {
+        cleanup();
       } else {
-        webSocketService.unsubscribeTopic(topic);
+        webSocketService.unsubscribeChannel(channelId);
       }
     };
   }, [activeChannel?.id, serverId]);
