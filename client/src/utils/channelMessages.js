@@ -154,18 +154,26 @@ export function normalizeRealtimeMessage(payload) {
 }
 
 /**
+ * Verifies whether an incoming message belongs to the active channel.
+ * Returns false if incoming message belongs to another channel, preventing cross-channel message leakage.
+ */
+export function isMessageForActiveChannel(incoming, activeChannelId) {
+  if (incoming == null || activeChannelId == null) return false;
+  const normalized = normalizeRealtimeMessage(incoming);
+  if (!normalized) return false;
+  if (normalized.channelId == null) return true;
+  return String(normalized.channelId) === String(activeChannelId);
+}
+
+/**
  * Handles incoming real-time message by verifying it belongs to activeChannelId,
  * preventing duplicates, and maintaining chronological order.
  */
 export function handleIncomingRealtimeMessage(currentMessages = [], incoming = null, activeChannelId = null) {
   const current = Array.isArray(currentMessages) ? currentMessages : [];
+  if (!isMessageForActiveChannel(incoming, activeChannelId)) return current;
   const normalized = normalizeRealtimeMessage(incoming);
-  if (!normalized || activeChannelId == null) return current;
-
-  // Enforce channel isolation: only accept messages belonging to current active channel
-  if (normalized.channelId != null && String(normalized.channelId) !== String(activeChannelId)) {
-    return current;
-  }
+  if (!normalized) return current;
 
   // Check if message is already in list
   const existingIndex = current.findIndex((m) => m && String(m.id) === String(normalized.id));
