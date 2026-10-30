@@ -1478,4 +1478,97 @@ class ServerSecurityIT {
                 .content("{\"name\":\"hacked-channel\",\"serverId\":" + server.getId() + "}")
                 .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
     }
+    @Test
+    void joinServerByInviteCode_BlankOrWhitespaceCode_Returns400() throws Exception {
+        mvc.perform(post("/api/v1/servers/join-invite/%20%20%20")
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void joinServerByInviteCode_ServerDeletedAfterInvite_Returns404() throws Exception {
+        User joiner = new User();
+        joiner.setEmail("orphan-joiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("OrphanJoiner");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+        String joinerToken = bearerFor(joiner);
+
+        com.denhub.domain.Invite orphanInvite = new com.denhub.domain.Invite();
+        orphanInvite.setServerId(99999999L);
+        orphanInvite.setCode("ORPHAN88");
+        orphanInvite.setStatus("ACTIVE");
+        orphanInvite.setCreatedBy(reader.getId());
+        orphanInvite.setCreatedAt(Instant.now());
+        invites.saveAndFlush(orphanInvite);
+
+        problem(mvc.perform(post("/api/v1/servers/join-invite/ORPHAN88")
+                .header(HttpHeaders.AUTHORIZATION, joinerToken)), 404);
+    }
+
+    @Test
+    void createServerInvite_GlobalAdminNotOwner_Returns403() throws Exception {
+        User systemAdmin = new User();
+        systemAdmin.setEmail("admin-nonowner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        systemAdmin.setPassword("fixture-" + UUID.randomUUID());
+        systemAdmin.setName("System Admin");
+        systemAdmin.setActivated(true);
+        systemAdmin.setSessionId(UUID.randomUUID().toString());
+        systemAdmin = users.saveAndFlush(systemAdmin);
+        String adminToken = bearerFor(systemAdmin, List.of("ROLE_ADMIN"));
+
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/invites")
+                .header(HttpHeaders.AUTHORIZATION, adminToken)), 403);
+    }
+
+    @Test
+    void joinServerByInviteCode_ImmediateAccessToChannelsAndMembersAfterJoin() throws Exception {
+        addMembership(server.getId());
+
+        User joiner = new User();
+        joiner.setEmail("lifecycle-joiner-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName("Lifecycle Joiner");
+        joiner.setUsername("lifecyclejoiner");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        joiner = users.saveAndFlush(joiner);
+        String joinerToken = bearerFor(joiner);
+
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken)), 403);
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken)), 403);
+        problem(mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, joinerToken)), 400);
+
+        String inviteCode = "LIFE" + UUID.randomUUID().toString().replace("-", "").substring(0, 4);
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setServerId(server.getId());
+        invite.setCode(inviteCode);
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(reader.getId());
+        invite.setCreatedAt(Instant.now());
+        invites.saveAndFlush(invite);
+
+        mvc.perform(post("/api/v1/servers/join-invite/" + inviteCode)
+                .header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(jsonPath("$.data.id").value(server.getId()));
+
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(server.getId()));
+
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(joiner.getId()))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+
+        mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk());
+    }
 }
