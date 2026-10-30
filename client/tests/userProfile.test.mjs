@@ -8,6 +8,8 @@ import {
   validateProfileUpdate,
   sanitizeProfilePayload,
   getProfileUpdateErrorMessage,
+  validatePasswordChange,
+  getPasswordChangeErrorMessage,
 } from '../src/utils/profileUtils.js';
 
 test('formatJoinDate formats valid dates correctly in both compact and verbose modes', () => {
@@ -303,5 +305,144 @@ test('getProfileUpdateErrorMessage correctly maps business errors, field errors,
 
   // Null error fallback
   assert.equal(getProfileUpdateErrorMessage(null), 'Cập nhật hồ sơ thất bại.');
+});
+
+test('validatePasswordChange validates correct matching password input', () => {
+  const validData = {
+    currentPassword: 'OldPassword123',
+    newPassword: 'NewPassword456',
+    confirmPassword: 'NewPassword456',
+  };
+
+  const result = validatePasswordChange(validData);
+  assert.equal(result.isValid, true);
+  assert.deepEqual(result.errors, {});
+});
+
+test('validatePasswordChange flags errors when currentPassword is missing or whitespace only', () => {
+  const resultEmpty = validatePasswordChange({
+    currentPassword: '',
+    newPassword: 'NewPassword456',
+    confirmPassword: 'NewPassword456',
+  });
+  assert.equal(resultEmpty.isValid, false);
+  assert.match(resultEmpty.errors.currentPassword, /nhập mật khẩu hiện tại/);
+
+  const resultWs = validatePasswordChange({
+    currentPassword: '   ',
+    newPassword: 'NewPassword456',
+    confirmPassword: 'NewPassword456',
+  });
+  assert.equal(resultWs.isValid, false);
+  assert.match(resultWs.errors.currentPassword, /nhập mật khẩu hiện tại/);
+});
+
+test('validatePasswordChange flags errors when newPassword is too short, too long, or same as currentPassword', () => {
+  // Too short (< 4 chars)
+  const resultShort = validatePasswordChange({
+    currentPassword: 'OldPassword123',
+    newPassword: '123',
+    confirmPassword: '123',
+  });
+  assert.equal(resultShort.isValid, false);
+  assert.match(resultShort.errors.newPassword, /từ 4 đến 100 ký tự/);
+
+  // Too long (> 100 chars)
+  const resultLong = validatePasswordChange({
+    currentPassword: 'OldPassword123',
+    newPassword: 'a'.repeat(101),
+    confirmPassword: 'a'.repeat(101),
+  });
+  assert.equal(resultLong.isValid, false);
+  assert.match(resultLong.errors.newPassword, /từ 4 đến 100 ký tự/);
+
+  // Same as current password
+  const resultSame = validatePasswordChange({
+    currentPassword: 'SameSecret123',
+    newPassword: 'SameSecret123',
+    confirmPassword: 'SameSecret123',
+  });
+  assert.equal(resultSame.isValid, false);
+  assert.match(resultSame.errors.newPassword, /không được trùng với mật khẩu hiện tại/);
+});
+
+test('validatePasswordChange flags errors when confirmPassword does not match newPassword', () => {
+  // Empty confirm password
+  const resultEmptyConfirm = validatePasswordChange({
+    currentPassword: 'OldPassword123',
+    newPassword: 'NewPassword456',
+    confirmPassword: '',
+  });
+  assert.equal(resultEmptyConfirm.isValid, false);
+  assert.match(resultEmptyConfirm.errors.confirmPassword, /xác nhận lại mật khẩu mới/);
+
+  // Mismatched confirm password
+  const resultMismatch = validatePasswordChange({
+    currentPassword: 'OldPassword123',
+    newPassword: 'NewPassword456',
+    confirmPassword: 'DifferentPassword789',
+  });
+  assert.equal(resultMismatch.isValid, false);
+  assert.match(resultMismatch.errors.confirmPassword, /không khớp/);
+});
+
+test('getPasswordChangeErrorMessage maps business error keys and validation details', () => {
+  // Incorrect current password
+  const wrongPassErr = {
+    response: {
+      status: 400,
+      data: { errorKey: 'invalidcurrentpassword' },
+    },
+  };
+  assert.match(getPasswordChangeErrorMessage(wrongPassErr), /Mật khẩu hiện tại không chính xác/);
+
+  // Same password
+  const samePassErr = {
+    response: {
+      status: 400,
+      data: { errorKey: 'samepassword' },
+    },
+  };
+  assert.match(getPasswordChangeErrorMessage(samePassErr), /không được trùng với mật khẩu hiện tại/);
+
+  // Not logged in
+  const notLoggedInErr = {
+    response: {
+      status: 401,
+      data: { errorKey: 'notloggedin' },
+    },
+  };
+  assert.match(getPasswordChangeErrorMessage(notLoggedInErr), /Phiên đăng nhập đã hết hạn/);
+
+  // User not found
+  const notFoundErr = {
+    response: {
+      status: 404,
+      data: { errorKey: 'usernotfound' },
+    },
+  };
+  assert.match(getPasswordChangeErrorMessage(notFoundErr), /Không tìm thấy thông tin tài khoản/);
+
+  // Bean validation field error
+  const fieldErr = {
+    response: {
+      status: 400,
+      data: {
+        fieldErrors: [
+          { field: 'newPassword', message: 'Mật khẩu mới phải từ 4 đến 100 ký tự' },
+        ],
+      },
+    },
+  };
+  assert.match(getPasswordChangeErrorMessage(fieldErr), /Mật khẩu mới: Mật khẩu mới phải từ 4 đến 100 ký tự/);
+
+  // Network error
+  assert.match(
+    getPasswordChangeErrorMessage({ code: 'ERR_NETWORK' }),
+    /Không thể kết nối đến máy chủ/
+  );
+
+  // Fallback
+  assert.equal(getPasswordChangeErrorMessage(null), 'Đổi mật khẩu thất bại.');
 });
 
