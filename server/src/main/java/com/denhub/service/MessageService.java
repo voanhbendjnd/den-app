@@ -23,6 +23,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
 import java.util.Locale;
@@ -36,6 +38,13 @@ public class MessageService {
     private final UserRepository userRepository;
     private final Validator validator;
     private final ServerRepository serverRepository;
+
+    @Autowired(required = false)
+    private SimpMessagingTemplate messagingTemplate;
+
+    public void setMessagingTemplate(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
 
     public MessageService(MessageRepository messageRepository,
                           ChannelRepository channelRepository,
@@ -80,12 +89,22 @@ public class MessageService {
         message.setContent(request.content());
 
         Message savedMessage = messageRepository.save(message);
-        return new MessageResponse(
+        MessageResponse response = new MessageResponse(
                 savedMessage.getId(),
                 savedMessage.getChannelId(),
                 savedMessage.getAuthorId(),
                 savedMessage.getContent(),
                 savedMessage.getCreatedDate());
+
+        if (messagingTemplate != null) {
+            try {
+                messagingTemplate.convertAndSend("/topic/channels/" + channelId, response);
+            } catch (Exception ignored) {
+                // Ignore real-time delivery failure to preserve HTTP response
+            }
+        }
+
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -195,13 +214,23 @@ public class MessageService {
         message.setContent(request.content());
         Message savedMessage = messageRepository.save(message);
 
-        return new MessageResponse(
+        MessageResponse response = new MessageResponse(
                 savedMessage.getId(),
                 savedMessage.getChannelId(),
                 savedMessage.getAuthorId(),
                 savedMessage.getContent(),
                 savedMessage.getCreatedDate(),
                 savedMessage.getLastModifiedDate());
+
+        if (messagingTemplate != null) {
+            try {
+                messagingTemplate.convertAndSend("/topic/channels/" + savedMessage.getChannelId(), response);
+            } catch (Exception ignored) {
+                // Ignore real-time delivery failure
+            }
+        }
+
+        return response;
     }
 
     private void validateUpdateRequest(UpdateMessageRequest request) {
