@@ -15,11 +15,25 @@ export const DESTINATIONS = {
 let stompClient = null;
 let activeSubscription = null;
 const subscriptions = new Map();
+const connectionListeners = new Set();
 
 const webSocketService = {
   connect(onConnected, onDisconnected) {
+    if (onConnected) this.addConnectionListener(onConnected);
+
     if (stompClient && stompClient.connected) {
-      if (onConnected) onConnected();
+      if (onConnected) {
+        try {
+          onConnected(true);
+        } catch {
+          // ignore callback error
+        }
+      }
+      return;
+    }
+
+    if (stompClient && stompClient.active) {
+      // Already activating or connecting
       return;
     }
 
@@ -30,10 +44,29 @@ const webSocketService = {
         Authorization: `Bearer ${getAccessToken()}`,
       },
       onConnect: () => {
-        if (onConnected) onConnected();
+        connectionListeners.forEach((fn) => {
+          try {
+            fn(true);
+          } catch {
+            // ignore
+          }
+        });
       },
       onDisconnect: () => {
-        if (onDisconnected) onDisconnected();
+        if (onDisconnected) {
+          try {
+            onDisconnected();
+          } catch {
+            // ignore
+          }
+        }
+        connectionListeners.forEach((fn) => {
+          try {
+            fn(false);
+          } catch {
+            // ignore
+          }
+        });
       },
       onStompError: (frame) => {
         console.error('STOMP error:', frame);
@@ -41,6 +74,25 @@ const webSocketService = {
     });
 
     stompClient.activate();
+  },
+
+  addConnectionListener(callback) {
+    if (typeof callback !== 'function') return () => {};
+    connectionListeners.add(callback);
+    if (this.isConnected()) {
+      try {
+        callback(true);
+      } catch {
+        // ignore
+      }
+    }
+    return () => {
+      connectionListeners.delete(callback);
+    };
+  },
+
+  removeConnectionListener(callback) {
+    connectionListeners.delete(callback);
   },
 
   disconnect() {
@@ -53,6 +105,7 @@ const webSocketService = {
       }
     });
     subscriptions.clear();
+    connectionListeners.clear();
     if (stompClient) {
       stompClient.deactivate();
       stompClient = null;
@@ -128,6 +181,21 @@ const webSocketService = {
       }
       subscriptions.delete(destination);
     }
+  },
+
+  subscribeChannel(channelId, callback) {
+    if (channelId == null || channelId === '') return () => {};
+    return this.subscribeTopic(DESTINATIONS.subscribeChannel(channelId), callback);
+  },
+
+  unsubscribeChannel(channelId) {
+    if (channelId == null || channelId === '') return;
+    this.unsubscribeTopic(DESTINATIONS.subscribeChannel(channelId));
+  },
+
+  publishChannelMessage(channelId, body) {
+    if (channelId == null || channelId === '') return;
+    this.publish(DESTINATIONS.publishChannelMessage(channelId), body);
   },
 
   unsubscribe() {
