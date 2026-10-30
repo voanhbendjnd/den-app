@@ -332,7 +332,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | Module                       |     FE      |     BE      |                  DB                  |      Integration      |     Test     |               Status               | Last Update |
 | :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----------: | :--------------------------------: | :---------: |
 | **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      |    TESTED    |            IN_PROGRESS             | 2026-10-11  |
-| **Server & Invite**          |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-14  |
+| **Server & Invite (Task 3.24)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-27  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
 | **Member & Role**            | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |         DONE          |     PASS     |            IN_PROGRESS             | 2026-10-26  |
@@ -2960,7 +2960,48 @@ Commit:
 
 ---
 
+### [2026-10-27] TASK-3.24 — Kiểm tra mã mời và quyền thành viên (Server Invitation & Member Permissions Verification)
+
+Implemented & Verified:
+- Audit toàn diện 12 trường hợp kiểm thử luồng mã mời và phân quyền thành viên Server:
+  1. Người có quyền tạo mã mời: Server Owner tạo mã 8 ký tự Base62 thành công (HTTP 201).
+  2. Người không có quyền tạo mã mời: Thành viên thường, người ngoài và tài khoản admin hệ thống không phải Server Owner bị từ chối (HTTP 403 Forbidden).
+  3. Mã mời hợp lệ: Outsider tham gia thành công bằng mã mời (HTTP 200, ServerResponseDTO).
+  4. Mã mời sai: Mã không tồn tại (HTTP 404), mã rỗng/khoảng trắng (HTTP 400).
+  5. Mã mời hết hạn: Mã có expiresAt < now() bị từ chối (HTTP 400).
+  6. Mã mời hết lượt sử dụng: Khảo sát thực tế schema bảng `invites` không có `usage_limit` / `use_count` (MVP không hỗ trợ, ghi nhận đúng thực tế).
+  7. Mã mời bị vô hiệu hóa: Mã có status != ACTIVE (ví dụ REVOKED) bị từ chối (HTTP 400).
+  8. Người tham gia thành công: Tạo `ServerMember` trong DB, hiển thị ngay trong danh sách thành viên (`GET /api/v1/servers/{serverId}/members`) với role MEMBER.
+  9. Người đã là member dùng lại mã: Bị từ chối với HTTP 400 (bảo vệ 2 lớp: application check + unique constraint `ux_server_member`).
+  10. Người chưa xác thực sử dụng mã: Bị từ chối HTTP 401 Unauthorized Problem Details.
+  11. Người không còn là member truy cập tài nguyên: Bị từ chối HTTP 403 trên Server detail, member list, channel list.
+  12. Quyền REST và WebSocket: REST endpoint kiểm tra ServerMember nghiêm ngặt; WebSocket inbound STOMP chỉ dùng cho chat 1-1 và feed, channel messaging dùng REST.
+- Backend Tests:
+  - Bổ sung 4 integration tests biên trong `ServerSecurityIT.java`:
+    - `joinServerByInviteCode_BlankOrWhitespaceCode_Returns400`
+    - `joinServerByInviteCode_ServerDeletedAfterInvite_Returns404`
+    - `createServerInvite_GlobalAdminNotOwner_Returns403`
+    - `joinServerByInviteCode_ImmediateAccessToChannelsAndMembersAfterJoin`
+  - Kết quả: `ServerSecurityIT` (92 tests) PASS 100%, `ServerServiceTest` PASS 100%.
+- Frontend Tests:
+  - Bổ sung 2 tests trong `client/tests/serverInvite.test.mjs` xác minh chuẩn hóa trim whitespace và phân loại lỗi `inviteexpired`, `inviterevoked`, `alreadymember`.
+  - Kết quả: 105/105 tests PASS 100%, client production build PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Section 10 Progress, Section 11 Log, Section 12 Handoff).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Section 18 Task 3.24 Audit & Invitation Matrix).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff hiện tại — Task 3.24: Kiểm tra mã mời và quyền thành viên (2026-10-27)
+
+- Task 3.24 hoàn thành xuất sắc toàn bộ 12 ca kiểm thử theo yêu cầu.
+- Mã mời và quyền thành viên được kiểm soát chặt chẽ ở cả tầng ứng dụng và cơ sở dữ liệu.
+- Toàn bộ backend integration & service tests PASS 100%.
+- Toàn bộ frontend unit tests (105 tests) và production build PASS 100%.
+- Sẵn sàng chuyển tiếp sang Task 4.04 sau khi người dùng xác nhận.
 
 ### Handoff — Tự mở Server vừa tạo (2026-10-27)
 
