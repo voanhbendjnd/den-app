@@ -852,6 +852,81 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ---
 
+### [2026-10-30] FEAT-USER-CHANGE-PASSWORD-API — Làm API Đổi Mật Khẩu & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `POST /api/v1/users/change-password` (kèm các alias `/api/v1/users/password` và `/api/account/change-password`) cho phép người dùng đang đăng nhập đổi mật khẩu tài khoản an toàn, xác thực mật khẩu cũ bằng BCrypt, chống đặt trùng mật khẩu hiện tại, mã hóa mật khẩu mới và dọn dẹp cache người dùng.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/ChangePasswordDTO.java`:
+    - Tạo DTO request nhận: `currentPassword` (@NotBlank), `newPassword` (@NotBlank, @Size min=4, max=100).
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional public void changePassword(ChangePasswordDTO dto)`:
+      - Xác thực người dùng hiện tại từ Spring Security Context (`SecurityUtils.getCurrentUserLogin()`), ném lỗi `notloggedin` nếu chưa xác thực.
+      - Truy vấn entity người dùng từ DB, ném lỗi `usernotfound` nếu không tìm thấy.
+      - Kiểm tra mật khẩu hiện tại với `passwordEncoder.matches`, ném lỗi `invalidcurrentpassword` nếu sai.
+      - Kiểm tra mật khẩu mới không được trùng mật khẩu cũ (`samepassword`).
+      - Mã hóa mật khẩu mới qua `passwordEncoder.encode`, lưu vào DB và gọi `clearUserCaches(user)`.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Bổ sung 2 endpoints:
+      - `POST /api/v1/users/change-password`: Endpoint chính thức đổi mật khẩu.
+      - `POST /api/v1/users/password`: Endpoint alias theo chuẩn RESTful.
+  - `server/src/main/java/com/denhub/web/rest/AccountResource.java`:
+    - Bổ sung endpoint `POST /api/account/change-password`: Endpoint alias tương thích theo chuẩn Spring Security / JHipster.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `changePassword_Success`: Đổi mật khẩu thành công và lưu mã băm mới.
+    - `changePassword_Fail_WhenCurrentPasswordIncorrect`: Bắt lỗi `invalidcurrentpassword` khi mật khẩu cũ sai.
+    - `changePassword_Fail_WhenNewPasswordSameAsCurrent`: Bắt lỗi `samepassword` khi mật khẩu mới trùng mật khẩu cũ.
+    - `changePassword_Fail_WhenNotLoggedIn`: Bắt lỗi `notloggedin`.
+    - `changePassword_Fail_WhenUserNotFound`: Bắt lỗi `usernotfound`.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `changePassword_Success`: MockMvc POST `/api/v1/users/change-password` trả về HTTP 200.
+    - `changePassword_Alias_Success`: MockMvc POST `/api/v1/users/password` trả về HTTP 200.
+    - `changePassword_Fail_WhenValidationFails`: Trả về HTTP 400 khi payload không hợp lệ (< 4 ký tự).
+    - `changePassword_Fail_WhenCurrentPasswordIncorrect`: Trả về HTTP 400 Problem Details với `errorKey: "invalidcurrentpassword"`.
+    - `changePassword_Fail_WhenNewPasswordSameAsCurrent`: Trả về HTTP 400 Problem Details với `errorKey: "samepassword"`.
+    - `changePassword_Fail_WhenNotLoggedIn`: Trả về HTTP 400 Problem Details với `errorKey: "notloggedin"`.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 100% (32 tests).
+- **Docs & Architecture Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `POST /api/v1/users/change-password` vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
+### [2026-10-30] FEAT-USER-CHANGE-PASSWORD-UI — Làm UI Đổi Mật Khẩu & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng modal đổi mật khẩu chuẩn Cyber Dark, kiểm tra validation tức thời (mật khẩu hiện tại, mật khẩu mới, xác nhận mật khẩu), kết nối API backend `POST /api/v1/users/change-password` và tích hợp hoàn chỉnh vào trang Profile.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js` & `client/src/api/authApi.js`:
+    - Bổ sung method `changePassword(data)` gửi request POST tới `/v1/users/change-password`.
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng `validatePasswordChange(values)` kiểm tra đầy đủ mật khẩu hiện tại, độ dài mật khẩu mới (4-100 ký tự), kiểm tra trùng với mật khẩu cũ và khớp với mật khẩu xác nhận.
+    - Xây dựng `getPasswordChangeErrorMessage(error)` ánh xạ các mã lỗi `invalidcurrentpassword`, `samepassword`, `notloggedin`, `usernotfound`, lỗi Bean validation `fieldErrors` và lỗi kết nối mạng sang thông báo tiếng Việt.
+  - `client/src/components/common/ChangePasswordModal.jsx`:
+    - Tạo Modal đổi mật khẩu Cyber Dark với card bo góc 18px, viền neon gradient `#6366F1` &rarr; `#00F2FE`.
+    - Hộp nhắc nhở bảo mật an toàn (Security Advice Banner).
+    - Các trường mật khẩu dạng ẩn với icon khóa, eye toggle bật/tắt hiển thị mật khẩu.
+    - Hộp Alert báo lỗi tự động khi sai mật khẩu hiện tại hoặc trùng mật khẩu cũ.
+    - Nút Đổi mật khẩu gradient có trạng thái loading chống click đúp.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Tích hợp `ChangePasswordModal`, quản lý state `isChangePasswordModalOpen`.
+    - Kết nối nút "Đổi mật khẩu" ở Toolbar và Quick Actions Footer.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - `validatePasswordChange validates correct matching password input`: Dữ liệu hợp lệ.
+    - `validatePasswordChange flags errors when currentPassword is missing or whitespace only`: Bắt lỗi mật khẩu hiện tại rỗng.
+    - `validatePasswordChange flags errors when newPassword is too short, too long, or same as currentPassword`: Bắt lỗi mật khẩu mới quá ngắn, quá dài hoặc trùng mật khẩu cũ.
+    - `validatePasswordChange flags errors when confirmPassword does not match newPassword`: Bắt lỗi mật khẩu xác nhận không khớp.
+    - `getPasswordChangeErrorMessage maps business error keys and validation details`: Kiểm tra ánh xạ lỗi kinh doanh và lỗi mạng.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 18/18 tests (100%).
+  - `npm run build`: Vite build production hoàn tất thành công 100% trong 41.91s.
+- **Docs & Roadmaps Updated:**
+  - Cập nhật hoàn thành Giai đoạn 2 (7/7 nhiệm vụ - 100%).
+  - Cập nhật tiến độ Giai đoạn 3 (1/5 nhiệm vụ) và tổng thể (14/28 nhiệm vụ).
+
+---
+
 ### [2026-10-25] FEAT-SERVER-LEAVE-FE — Xây dựng UI Rời Server và Kết Nối API
 
 - **Mục tiêu:** Xây dựng giao diện cho phép thành viên tự rời khỏi Server (`Leave Server`), kết nối với API backend `POST /api/v1/servers/{serverId}/leave`, hiển thị modal xác nhận, xử lý loading/success/error, chống double-click, và điều hướng an toàn về trang chủ.

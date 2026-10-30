@@ -161,6 +161,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **User Profile** | `GET` | `/api/v1/users/profile` (alias `/api/v1/users/me`) | Lấy thông tin chi tiết hồ sơ cá nhân của người dùng đang đăng nhập | `CONFIRMED` |
 | **User Profile** | `PUT` | `/api/v1/users/profile` (alias `/api/v1/users/me`) | Cập nhật thông tin hồ sơ cá nhân (name, username, avatar) của người dùng đang đăng nhập | `CONFIRMED` |
+| **User Profile** | `POST` | `/api/v1/users/change-password` (alias `/api/v1/users/password`, `/api/account/change-password`) | Đổi mật khẩu của người dùng đang đăng nhập | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/login` | Đăng nhập và lấy Access Token JWT | `TBD` |
 | **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tương user hiện tại qua token | `TBD` |
