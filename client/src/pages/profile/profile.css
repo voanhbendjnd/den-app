@@ -291,3 +291,18 @@
   flex-wrap: wrap;
   gap: 12px;
 }
+
+/* Responsive adjustments for Profile Actions */
+@media (max-width: 640px) {
+  .profile-avatar-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .profile-actions-toolbar {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+

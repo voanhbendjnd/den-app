@@ -12,6 +12,7 @@ import com.denhub.service.dto.ResLoginDTO;
 import com.denhub.util.ResFormatResponse;
 import com.denhub.web.rest.errors.ExceptionTranslator;
 import com.denhub.web.rest.errors.LoginAlreadyUsedException;
+import com.denhub.web.rest.vm.SocialLoginVM;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -189,6 +190,45 @@ class AccountResourceIT {
         GoogleLoginReqDTO req = new GoogleLoginReqDTO();
 
         mockMvc.perform(post("/api/auth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void socialLoginSuccessReturnsResLoginDTO() throws Exception {
+        SocialLoginVM req = new SocialLoginVM();
+        req.setAccessToken("valid-github-token");
+        req.setType("GITHUB");
+
+        ResLoginDTO loginDTO = new ResLoginDTO();
+        loginDTO.setAccessToken("mocked-social-jwt-token");
+        loginDTO.setRefreshToken("mocked-refresh-token");
+        ResLoginDTO.UserLogin userLogin = new ResLoginDTO.UserLogin();
+        userLogin.setId(303L);
+        userLogin.setEmail("githubuser@example.com");
+        userLogin.setName("GitHub User");
+        loginDTO.setUser(userLogin);
+
+        when(userService.loginWithSocialMedia("valid-github-token", null, "GITHUB")).thenReturn(loginDTO);
+
+        mockMvc.perform(post("/api/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("mocked-social-jwt-token"))
+                .andExpect(jsonPath("$.data.user.email").value("githubuser@example.com"))
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.message").value("Đăng nhập bằng mạng xã hội thành công"));
+
+        verify(userService, times(1)).loginWithSocialMedia("valid-github-token", null, "GITHUB");
+    }
+
+    @Test
+    void socialLoginMissingFieldsReturnsBadRequest() throws Exception {
+        SocialLoginVM req = new SocialLoginVM();
+
+        mockMvc.perform(post("/api/social-login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());

@@ -386,12 +386,13 @@ class ServerServiceTest {
     void joinServer_Success() {
         String email = "test@example.com";
         SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(email, "password")
+            new UsernamePasswordAuthenticationToken(email, "password", java.util.List.of())
         );
 
         User mockUser = new User();
         mockUser.setId(1L);
         mockUser.setEmail(email);
+        mockUser.setActivated(true);
         mockUser.setName("Test User");
 
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
@@ -407,6 +408,47 @@ class ServerServiceTest {
         verify(serverMemberRepository, times(1)).saveAndFlush(any(ServerMember.class));
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void joinServer_RejectsInactiveOrMissingAccountBeforeAccessingServer(boolean missing) {
+        User user = prepareDetailUser();
+        if (missing) when(userRepository.findOneByEmail("detail@example.test")).thenReturn(Optional.empty());
+        else user.setActivated(false);
+        assertThat(assertThrows(ResponseStatusException.class,
+                () -> serverService.joinServer(10L)).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(serverRepository, serverMemberRepository);
+    }
+
+    @ParameterizedTest
+    @MethodSource("joinNames")
+    void joinServer_NormalizesGeneratedNicknameWithoutChangingUserName(String name, String expected) {
+        User user = prepareDetailUser();
+        user.setName(name);
+        Server target = new Server();
+        target.setId(10L);
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(target));
+        serverService.joinServer(10L);
+        ArgumentCaptor<ServerMember> saved = ArgumentCaptor.forClass(ServerMember.class);
+        verify(serverMemberRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getNickname()).isEqualTo(expected);
+        assertThat(saved.getValue().getServerId()).isEqualTo(10L);
+        assertThat(saved.getValue().getUserId()).isEqualTo(user.getId());
+        assertThat(saved.getValue().getRole()).isEqualTo("MEMBER");
+        assertThat(user.getName()).isEqualTo(name);
+        verify(userRepository, never()).save(any());
+    }
+
+    static java.util.stream.Stream<Arguments> joinNames() {
+        return java.util.stream.Stream.of(
+                Arguments.of(null, "Member"),
+                Arguments.of("", "Member"),
+                Arguments.of(" \t\u2003 ", "Member"),
+                Arguments.of("  Test User  ", "Test User"),
+                Arguments.of("a".repeat(50), "a".repeat(20)),
+                Arguments.of("a".repeat(19) + "🙂x", "a".repeat(19)),
+                Arguments.of("🙂".repeat(11), "🙂".repeat(10)));
+    }
+
     @Test
     void joinServer_FailWhenServerIdInvalid() {
         BadRequestAlertException exNull = assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(null));
@@ -418,19 +460,20 @@ class ServerServiceTest {
 
     @Test
     void joinServer_FailWhenNotLoggedIn() {
-        assertThrows(BadRequestAlertException.class, () -> serverService.joinServer(10L));
+        assertThat(assertThrows(ResponseStatusException.class, () -> serverService.joinServer(10L)).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     void joinServer_FailWhenServerNotFound() {
         String email = "test@example.com";
         SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(email, "password")
+            new UsernamePasswordAuthenticationToken(email, "password", java.util.List.of())
         );
 
         User mockUser = new User();
         mockUser.setId(1L);
         mockUser.setEmail(email);
+        mockUser.setActivated(true);
 
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.empty());
@@ -442,12 +485,13 @@ class ServerServiceTest {
     void joinServer_FailWhenAlreadyMember() {
         String email = "test@example.com";
         SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(email, "password")
+            new UsernamePasswordAuthenticationToken(email, "password", java.util.List.of())
         );
 
         User mockUser = new User();
         mockUser.setId(1L);
         mockUser.setEmail(email);
+        mockUser.setActivated(true);
 
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
 
@@ -466,12 +510,13 @@ class ServerServiceTest {
     void joinServer_FailWhenConcurrentDuplicateConstraintViolation() {
         String email = "test@example.com";
         SecurityContextHolder.getContext().setAuthentication(
-            new UsernamePasswordAuthenticationToken(email, "password")
+            new UsernamePasswordAuthenticationToken(email, "password", java.util.List.of())
         );
 
         User mockUser = new User();
         mockUser.setId(1L);
         mockUser.setEmail(email);
+        mockUser.setActivated(true);
 
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
 

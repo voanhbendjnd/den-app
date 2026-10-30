@@ -87,6 +87,7 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
     @JsonIgnore
     @Column(name = "refresh_token")
     private String refreshToken;
+    private String type;
     @JsonIgnore
     @ManyToMany
     @JoinTable(

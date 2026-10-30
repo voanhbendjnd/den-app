@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { Link, Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
 import {
@@ -313,10 +313,15 @@ function MembersPanel({
 
 export default function GroupChatPage() {
   const { serverId } = useParams();
+  // Each visit owns its state, including a return to the same Server after visiting another.
+  return <ServerWorkspace key={serverId} serverId={serverId} />;
+}
+
+function ServerWorkspace({ serverId }) {
   const { setServers, onServerDeleted, refreshServers } = useOutletContext();
   const navigate = useNavigate();
   const currentServerId = useRef(serverId);
-  useEffect(() => {
+  useLayoutEffect(() => {
     currentServerId.current = serverId;
     return () => { currentServerId.current = null; };
   }, [serverId]);
@@ -347,6 +352,8 @@ export default function GroupChatPage() {
   const [channelsError, setChannelsError] = useState(null);
   const [activeChannel, setActiveChannel] = useState(null);
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+  const channelsRequest = useRef(0);
+  const membersRequest = useRef(0);
 
   // Members state
   const [members, setMembers] = useState([]);
@@ -354,71 +361,58 @@ export default function GroupChatPage() {
   const [membersError, setMembersError] = useState(null);
 
   const fetchMembers = (id) => {
+    if (currentServerId.current !== String(id)) return;
+    const request = ++membersRequest.current;
+    const current = () => currentServerId.current === String(id) && request === membersRequest.current;
     setMembersLoading(true);
     setMembersError(null);
     serverApi.getMembers(id)
       .then((res) => {
+        if (!current()) return;
         const list = res.data?.data || res.data || [];
         setMembers(list);
       })
       .catch((err) => {
+        if (!current()) return;
         setMembersError(err.response?.data?.message || 'Không thể tải danh sách thành viên.');
       })
       .finally(() => {
-        setMembersLoading(false);
+        if (current()) setMembersLoading(false);
       });
   };
 
   useEffect(() => {
-    let active = true;
-    if (serverId) {
-      setMembersLoading(true);
-      setMembersError(null);
-      serverApi.getMembers(serverId)
-        .then((res) => {
-          if (!active) return;
-          const list = res.data?.data || res.data || [];
-          setMembers(list);
-        })
-        .catch((err) => {
-          if (!active) return;
-          setMembersError(err.response?.data?.message || 'Không thể tải danh sách thành viên.');
-        })
-        .finally(() => {
-          if (active) setMembersLoading(false);
-        });
-    }
-    return () => {
-      active = false;
-    };
+    fetchMembers(serverId);
+    return () => { membersRequest.current += 1; };
   }, [serverId]);
 
   const fetchChannels = (id) => {
+    if (currentServerId.current !== String(id)) return;
+    const request = ++channelsRequest.current;
+    const current = () => currentServerId.current === String(id) && request === channelsRequest.current;
     setChannelsLoading(true);
     setChannelsError(null);
     channelApi.getByServerId(id)
       .then((res) => {
+        if (!current()) return;
         const list = res.data?.data || res.data || [];
         setChannels(list);
         setActiveChannel((prev) => {
-          if (prev && list.some((c) => c.id === prev.id)) {
-            return prev;
-          }
-          return list.length > 0 ? list[0] : null;
+          return list.find((channel) => channel.id === prev?.id) || list[0] || null;
         });
       })
       .catch((err) => {
+        if (!current()) return;
         setChannelsError(err.response?.data?.message || 'Không thể tải danh sách kênh.');
       })
       .finally(() => {
-        setChannelsLoading(false);
+        if (current()) setChannelsLoading(false);
       });
   };
 
   useEffect(() => {
-    if (serverId) {
-      fetchChannels(serverId);
-    }
+    fetchChannels(serverId);
+    return () => { channelsRequest.current += 1; };
   }, [serverId]);
 
   const handleSelectChannel = (channel) => {
@@ -437,18 +431,45 @@ export default function GroupChatPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const chatContainerRef = useRef(null);
   const prevScrollHeightRef = useRef(0);
+  const activeChannelId = useRef(null);
+  const channelSession = useRef(0);
+  const messagesRequest = useRef(0);
+  const moreRequest = useRef(0);
+  const morePending = useRef(false);
+
+  useLayoutEffect(() => {
+    activeChannelId.current = activeChannel?.id ?? null;
+    channelSession.current += 1;
+    setMessages([]);
+    setMessagesError(null);
+    setMessagesLoading(Boolean(activeChannel?.id));
+    setHasMore(false);
+    setNextCursor(null);
+    setLoadingMore(false);
+    morePending.current = false;
+    return () => {
+      activeChannelId.current = null;
+      channelSession.current += 1;
+      messagesRequest.current += 1;
+      moreRequest.current += 1;
+      morePending.current = false;
+    };
+  }, [activeChannel?.id]);
 
   const fetchChannelMessages = useCallback(async (channelId) => {
-    if (!channelId) {
-      setMessages([]);
-      setHasMore(false);
-      setNextCursor(null);
-      return;
-    }
+    if (!channelId || activeChannelId.current !== channelId || currentServerId.current !== serverId) return;
+    const session = channelSession.current;
+    const request = ++messagesRequest.current;
+    const current = () => currentServerId.current === serverId && channelSession.current === session
+      && activeChannelId.current === channelId && messagesRequest.current === request;
+    moreRequest.current += 1;
+    morePending.current = false;
+    setLoadingMore(false);
     setMessagesLoading(true);
     setMessagesError(null);
     try {
       const res = await messageApi.getMessages(channelId, { limit: 30 });
+      if (!current()) return;
       const pageData = res.data?.data || res.data || {};
       const items = pageData.items || [];
       const sorted = sortMessagesChronological(items);
@@ -456,22 +477,23 @@ export default function GroupChatPage() {
       setHasMore(Boolean(pageData.hasMore));
       setNextCursor(pageData.nextCursor ?? null);
       requestAnimationFrame(() => {
+        if (!current()) return;
         const el = chatContainerRef.current;
         if (el) {
           el.scrollTop = el.scrollHeight;
           setTimeout(() => {
-            if (chatContainerRef.current) {
+            if (current() && chatContainerRef.current) {
               chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
             }
           }, 60);
         }
       });
     } catch (err) {
-      setMessagesError(err.response?.data?.message || 'Không thể tải lịch sử tin nhắn.');
+      if (current()) setMessagesError(err.response?.data?.message || 'Không thể tải lịch sử tin nhắn.');
     } finally {
-      setMessagesLoading(false);
+      if (current()) setMessagesLoading(false);
     }
-  }, []);
+  }, [serverId]);
 
   useEffect(() => {
     if (activeChannel?.id) {
@@ -484,21 +506,30 @@ export default function GroupChatPage() {
   }, [activeChannel?.id, fetchChannelMessages]);
 
   const handleLoadMore = useCallback(async () => {
-    if (!activeChannel?.id || !hasMore || loadingMore || !nextCursor) return;
+    const channelId = activeChannel?.id;
+    if (!channelId || !hasMore || morePending.current || !nextCursor
+      || activeChannelId.current !== channelId || currentServerId.current !== serverId) return;
+    const session = channelSession.current;
+    const history = messagesRequest.current;
+    const request = ++moreRequest.current;
+    const current = () => currentServerId.current === serverId && channelSession.current === session
+      && activeChannelId.current === channelId && messagesRequest.current === history && moreRequest.current === request;
+    morePending.current = true;
     const container = chatContainerRef.current;
     if (container) {
       prevScrollHeightRef.current = container.scrollHeight;
     }
     setLoadingMore(true);
     try {
-      const res = await messageApi.getMessages(activeChannel.id, { before: nextCursor, limit: 30 });
+      const res = await messageApi.getMessages(channelId, { before: nextCursor, limit: 30 });
+      if (!current()) return;
       const pageData = res.data?.data || res.data || {};
       const newItems = pageData.items || [];
       setMessages((prev) => mergeMessagePages(prev, newItems));
       setHasMore(Boolean(pageData.hasMore));
       setNextCursor(pageData.nextCursor ?? null);
       requestAnimationFrame(() => {
-        if (container) {
+        if (current() && container) {
           const newScrollHeight = container.scrollHeight;
           container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
         }
@@ -506,9 +537,12 @@ export default function GroupChatPage() {
     } catch {
       // Giữ nguyên tin nhắn hiện tại khi tải thêm thất bại
     } finally {
-      setLoadingMore(false);
+      if (current()) {
+        morePending.current = false;
+        setLoadingMore(false);
+      }
     }
-  }, [activeChannel?.id, hasMore, loadingMore, nextCursor]);
+  }, [activeChannel?.id, hasMore, nextCursor, serverId]);
 
   const handleChatScroll = () => {
     const el = chatContainerRef.current;
@@ -519,17 +553,24 @@ export default function GroupChatPage() {
   };
 
   const handleSendMessage = async (chId, payload) => {
+    if (currentServerId.current !== serverId || activeChannelId.current !== chId) {
+      throw new Error('Kênh đang chọn đã thay đổi.');
+    }
+    const session = channelSession.current;
     const res = await messageApi.sendMessage(chId, payload);
+    if (currentServerId.current !== serverId || channelSession.current !== session || activeChannelId.current !== chId) return null;
     return res.data?.data || res.data;
   };
 
-  const handleSentMessage = (sentMessage) => {
-    if (!sentMessage) return;
+  const handleSentMessage = (sentMessage, channelId) => {
+    if (!sentMessage || currentServerId.current !== serverId || activeChannelId.current !== channelId) return;
+    const session = channelSession.current;
     setMessages((prev) => {
       if (prev.some((m) => m.id === sentMessage.id)) return prev;
       return [...prev, sentMessage];
     });
     requestAnimationFrame(() => {
+      if (currentServerId.current !== serverId || channelSession.current !== session) return;
       const el = chatContainerRef.current;
       if (el) {
         el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
@@ -982,6 +1023,7 @@ export default function GroupChatPage() {
             onServerDeleted(leftServerId);
           }
           refreshServers?.();
+          if (currentServerId.current !== serverId) return;
           setIsLeaveOpen(false);
           navigate('/', { replace: true });
         }}
@@ -993,6 +1035,11 @@ export default function GroupChatPage() {
         member={memberToRemove}
         onClose={() => setMemberToRemove(null)}
         onSuccess={(removedUserId) => {
+          if (currentServerId.current !== serverId) return;
+          // Invalidate a members snapshot requested before the successful removal.
+          membersRequest.current += 1;
+          setMembersLoading(false);
+          setMembersError(null);
           setMembers((prev) => prev.filter((m) => String(m.userId) !== String(removedUserId)));
           setMemberToRemove(null);
         }}

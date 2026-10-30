@@ -66,4 +66,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(value = "select u.activated from User u where u.id = :userId")
     boolean getActivatedById(@Param("userId") Long userId);
 
+    boolean existsByUsernameIgnoreCaseAndIdNot(String username, Long id);
+
+    Optional<User> findOneByUsernameIgnoreCase(String username);
 }

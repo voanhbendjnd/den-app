@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Button, Modal, Typography, message } from 'antd';
 import { UserDeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import serverApi from '../../api/serverApi';
@@ -17,18 +17,19 @@ export default function RemoveMemberModal({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const submittingRef = useRef(false);
-  const isMountedRef = useRef(true);
+  const sessionRef = useRef(0);
 
-  useEffect(() => {
-    isMountedRef.current = true;
+  useLayoutEffect(() => {
+    sessionRef.current += 1;
+    setLoading(false);
     if (open) {
       setErrorMsg(null);
       submittingRef.current = false;
     }
     return () => {
-      isMountedRef.current = false;
+      sessionRef.current += 1;
     };
-  }, [open, member]);
+  }, [open, server?.id, member?.userId]);
 
   if (!server || !member) return null;
 
@@ -39,24 +40,26 @@ export default function RemoveMemberModal({
     if (submittingRef.current || loading || !canRemove) return;
 
     submittingRef.current = true;
+    const session = sessionRef.current;
     setLoading(true);
     setErrorMsg(null);
 
     try {
       await serverApi.removeMember(server.id, member.userId);
+      if (sessionRef.current !== session) return;
       message.success(`Đã loại "${displayName}" khỏi Server thành công!`);
       if (onSuccess) {
         onSuccess(member.userId);
       }
-      if (isMountedRef.current) {
+      if (sessionRef.current === session) {
         onClose();
       }
     } catch (err) {
-      if (isMountedRef.current) {
+      if (sessionRef.current === session) {
         setErrorMsg(getRemoveMemberErrorMessage(err, displayName));
       }
     } finally {
-      if (isMountedRef.current) {
+      if (sessionRef.current === session) {
         setLoading(false);
         submittingRef.current = false;
       }

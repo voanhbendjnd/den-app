@@ -13,12 +13,24 @@ const authApi = {
     return axiosClient.post('/auth/google', data);
   },
 
+  socialLogin(data) {
+    return axiosClient.post('/social-login', data);
+  },
+
   getProfile() {
     return axiosClient.get('/v1/users/profile');
   },
 
   getMe() {
     return axiosClient.get('/v1/users/profile');
+  },
+
+  changePassword(data) {
+    return axiosClient.post('/v1/users/change-password', data);
+  },
+
+  updateProfile(data) {
+    return axiosClient.put('/v1/users/profile', data);
   },
 };
 

@@ -1,0 +1,28 @@
+.home-mobile-nav { display: none; }
+.home-server-link { display: flex; align-items: center; gap: 14px; min-width: 0; border-radius: 8px; }
+.home-server-link:focus-visible, .home-mobile-nav a:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 4px; }
+.home-servers-header, .home-servers-actions { flex-wrap: wrap; gap: 12px; }
+.home-list-warning { margin-bottom: 16px; }
+
+/* Keep the compact navigation scoped to Home; chat and other routes retain their layouts. */
+@media (max-width: 991px) {
+  .home-layout > .main-secondary-sidebar { display: none !important; }
+  .home-layout > .main-workspace { margin-left: 72px !important; }
+  .home-page { padding: 24px 20px !important; }
+  .home-mobile-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .home-mobile-nav a { color: var(--color-text-main); }
+  .home-hero { padding: 24px !important; }
+  .home-hero .ant-typography { overflow-wrap: anywhere; }
+}
+
+@media (max-width: 600px) {
+  .home-layout > .main-primary-dock { width: 56px !important; min-width: 56px !important; max-width: 56px !important; flex-basis: 56px !important; }
+  .home-layout > .main-workspace { margin-left: 56px !important; }
+  .home-page { padding: 20px 12px !important; }
+  .home-hero { padding: 20px 16px !important; }
+  .home-hero h2.ant-typography { font-size: 24px !important; }
+  .home-hero .ant-btn { max-width: 100%; height: auto !important; min-height: 44px; white-space: normal; padding: 8px 12px !important; }
+  .home-servers-actions { gap: 4px; }
+  .home-servers-actions .ant-btn { padding-inline: 4px; }
+  .home-list-warning { flex-wrap: wrap; }
+}

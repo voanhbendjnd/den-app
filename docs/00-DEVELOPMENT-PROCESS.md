@@ -292,6 +292,33 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Tiến độ riêng — Tự mở Server vừa tạo (2026-10-27)
+
+- DONE trong phạm vi FE/API mock: tạo thành công cập nhật danh sách, đóng modal và mở ngay `/servers/{id}`; không chờ GET danh sách. Response form/route cũ chỉ cập nhật danh sách, không chiếm điều hướng của phiên mới.
+- Verification cuối: 85/85 browser, 103/103 Node, build PASS. Luồng mới kiểm trên desktop 1440/mobile 375; backend/DB giữ nguyên, chưa kiểm thử SQL Server thật. Nhánh `fix/server-crud-ui`, chưa commit/push lượt này.
+
+### Tiến độ riêng — Đồng bộ cú pháp serverApi (2026-10-26)
+
+- DONE: 11 hàm trong `client/src/api/serverApi.js` dùng method shorthand và `return` giống `userApi`/`roomApi`. Giữ tên hàm, tham số, URL, HTTP method, encodeURIComponent và Promise trả về.
+- Verification: từ `client/`, `npm test` PASS 103/103; `npm run build` PASS. Chỉ thay cú pháp, không thêm test hoặc thay contract; các thay đổi của lượt này chưa commit/push.
+
+### Tiến độ riêng — 5 lỗi Server/kênh và Join bằng ID (2026-10-26)
+
+| Phạm vi | FE | BE | DB | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Cô lập kênh/history/pagination/send, leave/kick đúng phiên; Join active và nickname an toàn | IMPLEMENTED | IMPLEMENTED | Giữ mapping hiện có | 234 BE, 78 browser, 103 Node, build PASS | DONE trong phạm vi H2/API mock đã duyệt; SQL Server thật chưa kiểm thử |
+
+- Nhánh `fix/server-crud-ui`, chưa commit/push các sửa đổi của lượt này. Chi tiết tại log FIX-SERVER-SCOPE-AND-DIRECT-JOIN và docs/02 mục 9.6; quy tắc Join cập nhật docs/01 mục 5.
+
+### Tiến độ riêng — Sửa UI tạo và danh sách Server (2026-10-26)
+
+| Phạm vi | FE | BE / DB | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- |
+| Đồng bộ tạo/list, phiên modal, tên 100 UTF-16, Home responsive và liên kết mở Server | IMPLEMENTED | Giữ nguyên | 63/63 browser, 103/103 Node, build PASS | DONE trong phạm vi FE/API mock; chưa kiểm thử SQL Server thật |
+
+- Kế hoạch được duyệt bằng “triển khai”; đang trên nhánh local `fix/server-crud-ui`, chưa commit/push.
+- Chi tiết tại log FIX-SERVER-CRUD-UI và docs/02 mục 9.5. Không thay quyền sửa/xóa, membership, API, schema hoặc dependency.
+
 ### Tiến độ riêng — Delete Server (2026-10-21)
 
 | Phạm vi                                        | FE          | BE          | DB                                              | Verification                                                          | Trạng thái                                                       |
@@ -412,6 +439,53 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-27] FEAT-OPEN-CREATED-SERVER — Tạo Server xong mở ngay Server đó
+
+- Người dùng duyệt kế hoạch bằng “triển khai”. `CreateServerModal` tiếp tục gọi `onSuccess` cho mọi POST thành công để cập nhật danh sách. Chỉ session form hiện tại được thông báo thành công, đóng/reset và gọi callback nội bộ `onOpenServer` với ID response.
+- `MainLayout` điều hướng bằng route đã có, không await GET danh sách nền; history dùng push để Back trở về trang trước. Callback kiểm token của route visit và URL thực tế (pathname/search/hash), ngăn request cũ chiếm điều hướng sau khi chuyển trang hoặc Back/Forward. Kiểm URL còn bảo vệ khoảng thời gian browser đã đổi URL nhưng React chưa commit view mới.
+- Tests: thêm 7 browser cases (desktop/mobile, 400/503 và retry, form đã đóng, form còn mở nhưng route đổi, trở lại history entry cũ); cập nhật 8 cases tạo/list/upload/session/validation để xác minh trang Server rồi quay Home kiểm danh sách. Fixture trả đúng DTO/kênh general của Server đã tạo; callback Playwright được bọc để không truyền nhầm Request vào tham số danh sách fixture.
+- Red/green: test auto-open FAIL trước sửa vì vẫn ở Home. Lượt kiểm biên phát hiện race URL Back trước React commit và lỗi callback fixture trong test detail retry; đã sửa guard/fixture và chạy lại toàn bộ thành công.
+- Verification cuối từ `client/`, NODE_PATH Playwright theo docs/02 mục 8.2:
+  - `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs`: PASS **85/85**, 0 failure/skip, không pageerror trong các cases mới.
+  - `npm test`: PASS **103/103**.
+  - `npm run build`: PASS; PRE-EXISTING ISSUE: warning bundle >500 kB và Ant Design có sẵn vẫn còn.
+- Documentation: cập nhật business flow tại docs/01 mục 5, implementation/verification tại docs/02 mục 9.7 và tiến độ/log/handoff tại đây. Đã đối chiếu docs/03–04: không đổi Entity/schema hoặc thiết kế trực quan. Backend/API/Security/WebSocket/dependency giữ nguyên; không chạy lại backend hoặc SQL Server thật trong lượt chỉ sửa FE.
+- Nhánh `fix/server-crud-ui`; sửa đổi lượt này chưa commit/push. Đã review diff, giữ nguyên các công việc trước đó.
+
+### [2026-10-26] STYLE-SERVER-API — Đồng bộ cách khai báo hàm API frontend
+
+- Người dùng duyệt kế hoạch bằng “triẻn khai”. Chuyển 11 arrow functions trong `serverApi.js` thành method shorthand có `return`; giữ nguyên axiosClient dùng chung, tên/tham số hàm, HTTP method, endpoint và encoding mã mời. Không đổi backend, schema, Security hoặc dependency.
+- Không thêm/sửa test vì hành vi không đổi. Từ `client/`: `npm test` PASS **103/103**; `npm run build` PASS. PRE-EXISTING ISSUE: warning bundle >500 kB vẫn còn. Không chạy lại backend/browser suite trong lượt chỉ đổi cú pháp này.
+- Đã đối chiếu docs/01–04: không có thay đổi business/API/DB/thiết kế cần đồng bộ; chỉ cập nhật tiến độ/log/handoff tại đây. Review diff để xác nhận đủ 11 `return` và giữ nguyên request. Nhánh `fix/server-crud-ui`, chưa commit/push các sửa đổi của lượt này.
+
+### [2026-10-26] FIX-SERVER-SCOPE-AND-DIRECT-JOIN — Sửa đúng 5 lỗi được chọn từ audit Server
+
+- **Approval:** người dùng chọn 5 lỗi, duyệt kế hoạch bằng “triển khai”. Giữ nhánh `fix/server-crud-ui`, không tạo commit hoặc push.
+- **FE:** workspace React key theo Server ID; mỗi lần vào Server có state riêng. Ref phiên và request bảo vệ kênh, thành viên, history/retry, cursor pagination, kết quả gửi và callback cuộn trễ. Chuyển kênh reset dữ liệu trước paint. Leave cũ vẫn cập nhật danh sách Server nhưng không navigate khỏi view mới; kick cũ không cập nhật danh sách/modal của Server mới. Hai modal dùng session, giữ khả năng retry lỗi ở phiên hiện tại.
+- **BE:** Join bằng ID dùng active identity guard, trả 401 cho tài khoản inactive/missing và không ghi membership. Nickname mới strip/fallback `Member`, cắt 20 UTF-16 an toàn với emoji; không sửa User.name. Helper dùng chung nhưng giữ hành vi/fallback của Owner và Invite. Không đổi API thành công, schema, Entity, roles, dependency hoặc WebSocket.
+- **Tests thêm/cập nhật:** 9 service cases mới; fixture Join cũ được đổi thành Authentication đã xác thực/User active, case chưa đăng nhập kiểm 401. Thêm 10 HTTP/JWT/H2 cases kiểm inactive/missing/JWT, nickname null/rỗng/dài/emoji, đọc lại User/membership và từ chối join trùng. Thêm 15 browser cases cho response success/error cũ giữa A/B và A/B/A, chuyển kênh, pagination/send đang chờ, leave/kick sau Back và current failure/retry.
+- **Red/green:** trước sửa, 2 service cases identity và 2 browser cases kênh/kick FAIL đúng lỗi audit. Sau sửa, bộ Server PASS. Lượt mở rộng browser có một fixture dùng trùng ID giữa tin cũ và tin mới khiến assertion gửi tin thất bại; đã dùng ID riêng cho tin mới và chạy lại toàn bộ.
+- **Verification cuối:**
+  - Từ `server/`: `.\gradlew.bat test --tests "com.denhub.service.Server*" --tests "com.denhub.web.rest.Server*" check --no-daemon`: PASS **234/234**, 0 failure/error/skip.
+  - Từ `client/`, NODE_PATH Playwright theo docs/02 mục 8.2: `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs`: PASS **78/78**, 0 failure/skip; không có pageerror trong các cases mới.
+  - `npm test`: PASS **103/103**. `npm run build`: PASS.
+- **Documentation:** cập nhật business rule Join tại docs/01, implementation/API/errors tại docs/02 mục 9.6, tiến độ/log/handoff tại đây. Đã kiểm tra docs/03 (tái sử dụng nickname 20 và mapping hiện tại) và docs/04 (không đổi thiết kế trực quan), không cần sửa hai tài liệu này.
+- **Giới hạn:** chưa truy cập hoặc test SQL Server thật; các test HTTP dùng H2, browser dùng API mock. PRE-EXISTING ISSUE: bundle >500 kB và các warning Ant Design có sẵn. Các lỗi mã mời toàn số, rename rồi xóa general và Unicode blank tại API tạo Server nằm ngoài 5 mục, chưa sửa. Mâu thuẫn tài liệu về quyền kênh/Join bằng ID không được tự chốt trong lượt này.
+
+### [2026-10-26] FIX-SERVER-CRUD-UI — Sửa lỗi tạo và hiển thị danh sách Server
+
+- **Đã sửa:** response GET cũ không được ghi đè Server vừa tạo; MainLayout theo dõi request đang chờ và tình trạng tải đủ danh sách bằng ref, kể cả GET lỗi khi POST đang chờ. Khi cần, GET mới chạy nền sau POST; Server mới hiện ngay ở Home/dock. Nếu refresh lỗi, giữ danh sách đã biết và hiển thị cảnh báo có nút Thử lại.
+- **Modal:** mỗi lần mở/đóng có session riêng, ref chặn submit trùng. Kết quả POST cũ thành công vẫn thêm đúng Server vào danh sách; success/error/finally cũ không được đóng, reset, hiển thị toast hoặc mở khóa form mới.
+- **UI/validation:** tên tạo tối đa 100 đơn vị UTF-16 theo DTO hiện có; chặn whitespace. Thêm link mở đúng Server bằng tên/ảnh, hỗ trợ bàn phím. Home có CSS riêng: ở chiều rộng dưới 992px thay sidebar phụ bằng nav Tin nhắn/Bạn bè/Hồ sơ/Đăng xuất; dock thu nhỏ dưới 601px. Không đổi layout các route khác.
+- **Tests:** thêm 12 browser cases trong `client/tests/group-chat.browser.test.mjs`: GET cũ 200/503, initial GET lỗi khi POST chờ, refresh lỗi/retry, POST cũ 201/503 với form mới đang chờ, submit trùng, whitespace/101 ASCII/100 UTF-16 emoji, keyboard navigation và viewport 320/375/768/1440. Fixture phân biệt GET trước/sau POST thay vì giả định StrictMode chỉ gọi GET một lần.
+- **Verification cuối**, từ `client/` với NODE_PATH Playwright sẵn có theo docs/02 mục 8.2:
+  - `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs`: PASS **63/63**, 0 failure/error/skip. Chạy tuần tự hai suite để tránh chia sẻ Vite optimizer cache cùng lúc.
+  - `npm test`: PASS **103/103**.
+  - `npm run build`: PASS. Đã xem screenshot Home desktop 1440/mobile 375; browser kiểm thêm 320/768, không có pageerror trong các cases mới.
+- **Quá trình kiểm thử:** trước sửa, regression responsive FAIL tại 320/375/768 và PASS tại 1440. Lượt đầu sau sửa có timeout chờ trạng thái loading và lỗi fixture giả định số request; lượt kế có một assertion dùng sai tên heading Group. Đã chạy hai suite tuần tự, sửa fixture/selector và chạy lại toàn bộ, kết quả cuối như trên.
+- **Docs impact:** cập nhật docs/02 mục 9.5 và tiến độ/log/handoff tại đây. Đã đối chiếu docs/01, docs/03 và docs/04; không đổi nghiệp vụ, DB hay giao diện API, giữ hệ màu/tokens hiện có.
+- **Giới hạn:** API browser là mock; không chạy backend/SQL Server thật trong lượt chỉ sửa FE. Kết quả 215 backend tests PASS ở lượt review trước là baseline, không phải lần chạy mới. PRE-EXISTING ISSUE: bundle >500 kB và các warning Ant Design/style có sẵn còn tồn tại. Chưa commit; không push.
 
 ### [2026-10-26] TASK-3.14-BLOCK-REMOVED-MEMBER-ACCESS — Kiểm Tra Thành Viên Bị Loại Không Còn Truy Cập Được Server
 
@@ -690,6 +764,166 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
   - `npm run build`: Vite v8.3.3 build production hoàn tất thành công 100%.
 - **Docs & Roadmaps Updated:**
   - Cập nhật tiến độ hoàn thành UI xem hồ sơ cá nhân và kết nối API.
+
+---
+
+### [2026-10-27] FEAT-USER-PROFILE-UPDATE-API — Làm API Cập Nhật Hồ Sơ & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `PUT /api/v1/users/profile` (kèm alias `PUT /api/v1/users/me`) cho phép người dùng đang đăng nhập cập nhật thông tin hồ sơ cá nhân (`name`, `username`, `avatar`), kiểm tra tính duy nhất của username, bảo mật IDOR và evict cache người dùng.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/UpdateUserProfileDTO.java`:
+    - Tạo DTO request nhận dữ liệu cập nhật: `name` (max 50), `username` (regex `^[a-zA-Z0-9_.-]{3,50}$`), `avatar` (max 500).
+    - Ngăn chặn triệt để việc chỉnh sửa các trường nhạy cảm (`email`, `password`, `activated`, `authorities`).
+  - `server/src/main/java/com/denhub/repository/UserRepository.java`:
+    - Bổ sung `boolean existsByUsernameIgnoreCaseAndIdNot(String username, Long id)` phục vụ kiểm tra trùng lặp username với người dùng khác.
+    - Bổ sung `Optional<User> findOneByUsernameIgnoreCase(String username)`.
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional public UserProfileResponseDTO updateUserProfile(UpdateUserProfileDTO dto)`:
+      - Xác thực người dùng hiện tại từ Spring Security Context (`SecurityUtils.getCurrentUserLogin()`).
+      - Truy vấn entity người dùng từ database qua `userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)`.
+      - Kiểm tra trùng lặp `username` nếu thay đổi; ném `BadRequestAlertException` (`usernamealreadyexists`) nếu đã tồn tại.
+      - Dirty checking có cờ `modified`, chỉ gọi `userRepository.save(user)` và `clearUserCaches(user)` khi thực sự có thay đổi.
+      - Trả về DTO hồ sơ người dùng đã cập nhật.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Bổ sung 2 endpoints PUT:
+      - `PUT /api/v1/users/profile`: Endpoint chính thức cập nhật thông tin hồ sơ cá nhân.
+      - `PUT /api/v1/users/me`: Endpoint alias chuẩn RESTful.
+    - Validate `@Valid @RequestBody UpdateUserProfileDTO` tự động trả về RFC 7807 Problem Details khi vi phạm validation.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `updateUserProfile_Success`: Kiểm tra cập nhật thành công name, username, avatar.
+    - `updateUserProfile_Success_WhenUsernameUnchanged`: Kiểm tra cập nhật khi username giữ nguyên không bị báo lỗi trùng lặp.
+    - `updateUserProfile_Fail_WhenUsernameAlreadyExists`: Kiểm tra ném lỗi `usernamealreadyexists` khi username đã có người dùng khác sử dụng.
+    - `updateUserProfile_Fail_WhenNotLoggedIn`: Kiểm tra ném lỗi `notloggedin` khi chưa đăng nhập.
+    - `updateUserProfile_Fail_WhenUserNotFound`: Kiểm tra ném lỗi `usernotfound` khi người dùng không tồn tại.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `updateUserProfile_Success`: MockMvc PUT `/api/v1/users/profile` trả về HTTP 200 và json data cập nhật.
+    - `updateUserProfile_AliasMe_Success`: MockMvc PUT `/api/v1/users/me` trả về HTTP 200.
+    - `updateUserProfile_Fail_WhenValidationFails`: MockMvc trả về HTTP 400 khi payload không đạt validation Bean (username quá ngắn).
+    - `updateUserProfile_Fail_WhenUsernameAlreadyExists`: MockMvc trả về HTTP 400 Problem Details với errorKey `usernamealreadyexists`.
+    - `updateUserProfile_Fail_WhenNotLoggedIn`: MockMvc trả về HTTP 400 Problem Details với errorKey `notloggedin`.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 16/16 tests (0 failures, 0 errors).
+  - `.\gradlew.bat test`: Toàn bộ test suite máy chủ PASS 100% (BUILD SUCCESSFUL).
+- **Docs & Architecture Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `PUT /api/v1/users/profile` (alias `PUT /api/v1/users/me`) vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
+### [2026-10-27] FEAT-USER-PROFILE-EDIT-UI — Làm UI Chỉnh Sửa Hồ Sơ & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng giao diện chỉnh sửa hồ sơ người dùng phong cách Cyber Dark, tích hợp Modal xem trước Avatar theo thời gian thực (Live Preview), preset ảnh đại diện nhanh, validation chặt chẽ và kết nối toàn diện với API `PUT /api/v1/users/profile`.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js` & `client/src/api/authApi.js`:
+    - Bổ sung các phương thức `updateProfile(data)` (gọi `PUT /v1/users/profile`) và `updateMe(data)` (gọi `PUT /v1/users/me`).
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng `validateProfileUpdate(values)` kiểm tra hợp lệ `name` (max 50, không chỉ khoảng trắng), `username` (3-50 ký tự, regex `^[a-zA-Z0-9_.-]{3,50}$`), `avatar` (max 500, regex URL hợp lệ).
+    - Xây dựng `sanitizeProfilePayload(values)` tự động trim khoảng trắng, chuẩn hóa chữ thường username, chuyển avatar rỗng thành `null`.
+    - Xây dựng `getProfileUpdateErrorMessage(error, username)` bóc tách lỗi RFC 7807 problem details, ánh xạ chi tiết các lỗi trùng username (`usernamealreadyexists`), lỗi phiên đăng nhập (`notloggedin`), lỗi Bean validation (`fieldErrors`), lỗi mạng.
+  - `client/src/components/common/EditProfileModal.jsx`:
+    - Tạo Modal chỉnh sửa hồ sơ chuẩn phong cách Cyber Dark với card gradient viền glowing neon.
+    - Khu vực Live Avatar Preview kích thước 68px kèm viền gradient xoay, tự động phản hồi ngay khi nhập URL, hỗ trợ fallback avatar chữ cái đầu và nút xóa ảnh một chạm.
+    - Cung cấp danh sách các Preset Avatar phong cách Sci-Fi giúp người dùng đổi ảnh đại diện nhanh chóng.
+    - Form nhập liệu gồm: trường Email (read-only/khóa an toàn), Tên hiển thị (max 50, bộ đếm ký tự), Tên người dùng (prefix `@`, bộ đếm ký tự, kiểm tra regex), Đường dẫn ảnh đại diện (icon, max 500).
+    - Hộp Alert báo lỗi Cyber Dark sắc nét nếu phát hiện trùng lặp username hoặc dữ liệu không hợp lệ.
+    - Nút Hủy và nút Lưu thay đổi gradient neon, có spinner trạng thái loading chống double-click.
+    - Tích hợp trực tiếp với `useAuth().updateCurrentUser` để cập nhật đồng bộ toàn bộ app (Header, Sidebar, ProfilePage) và `localStorage`.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Tích hợp `EditProfileModal`, quản lý state `isEditModalOpen`.
+    - Bổ sung nút "Chỉnh sửa hồ sơ" nổi bật ở Toolbar trên cùng và kết nối nút ở Quick Actions Footer.
+    - Xử lý callback `handleEditSuccess` giúp cập nhật dữ liệu hiển thị tức thì trên trang Profile mà không cần reload.
+  - `client/src/pages/profile/profile.css`:
+    - Bổ sung quy tắc media query responsive cho Toolbar và Avatar Row trên màn hình nhỏ.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - `validateProfileUpdate validates valid inputs without any errors`: Kiểm tra dữ liệu hợp lệ.
+    - `validateProfileUpdate flags name errors when exceeding length or whitespace only`: Kiểm tra bắt lỗi tên quá 50 ký tự và chỉ chứa khoảng trắng.
+    - `validateProfileUpdate flags username errors for length, pattern, and empty values`: Kiểm tra bắt lỗi username rỗng, quá ngắn (<3), quá dài (>50), chứa ký tự đặc biệt, và chấp nhận ký tự hợp lệ.
+    - `validateProfileUpdate flags avatar errors when exceeding length or invalid protocol`: Kiểm tra bắt lỗi URL ảnh > 500 ký tự và sai protocol.
+    - `sanitizeProfilePayload trims fields, lowercases username, and converts empty avatar to null`: Kiểm tra chuẩn hóa dữ liệu trước khi gửi API.
+    - `getProfileUpdateErrorMessage correctly maps business errors, field errors, and network issues`: Kiểm tra ánh xạ lỗi trùng username, hết phiên đăng nhập, validation errors và lỗi mạng.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 13/13 tests (100%).
+  - `npm run build`: Vite v8.3.3 build production hoàn tất thành công 100% trong 31.46s.
+- **Docs & Roadmaps Updated:**
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+  - Cập nhật các bảng tiến độ Giai đoạn 2 (6/7) và tổng thể (12/28).
+
+---
+
+### [2026-10-30] FEAT-USER-CHANGE-PASSWORD-API — Làm API Đổi Mật Khẩu & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `POST /api/v1/users/change-password` (kèm các alias `/api/v1/users/password` và `/api/account/change-password`) cho phép người dùng đang đăng nhập đổi mật khẩu tài khoản an toàn, xác thực mật khẩu cũ bằng BCrypt, chống đặt trùng mật khẩu hiện tại, mã hóa mật khẩu mới và dọn dẹp cache người dùng.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/ChangePasswordDTO.java`:
+    - Tạo DTO request nhận: `currentPassword` (@NotBlank), `newPassword` (@NotBlank, @Size min=4, max=100).
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional public void changePassword(ChangePasswordDTO dto)`:
+      - Xác thực người dùng hiện tại từ Spring Security Context (`SecurityUtils.getCurrentUserLogin()`), ném lỗi `notloggedin` nếu chưa xác thực.
+      - Truy vấn entity người dùng từ DB, ném lỗi `usernotfound` nếu không tìm thấy.
+      - Kiểm tra mật khẩu hiện tại với `passwordEncoder.matches`, ném lỗi `invalidcurrentpassword` nếu sai.
+      - Kiểm tra mật khẩu mới không được trùng mật khẩu cũ (`samepassword`).
+      - Mã hóa mật khẩu mới qua `passwordEncoder.encode`, lưu vào DB và gọi `clearUserCaches(user)`.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Bổ sung 2 endpoints:
+      - `POST /api/v1/users/change-password`: Endpoint chính thức đổi mật khẩu.
+      - `POST /api/v1/users/password`: Endpoint alias theo chuẩn RESTful.
+  - `server/src/main/java/com/denhub/web/rest/AccountResource.java`:
+    - Bổ sung endpoint `POST /api/account/change-password`: Endpoint alias tương thích theo chuẩn Spring Security / JHipster.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `changePassword_Success`: Đổi mật khẩu thành công và lưu mã băm mới.
+    - `changePassword_Fail_WhenCurrentPasswordIncorrect`: Bắt lỗi `invalidcurrentpassword` khi mật khẩu cũ sai.
+    - `changePassword_Fail_WhenNewPasswordSameAsCurrent`: Bắt lỗi `samepassword` khi mật khẩu mới trùng mật khẩu cũ.
+    - `changePassword_Fail_WhenNotLoggedIn`: Bắt lỗi `notloggedin`.
+    - `changePassword_Fail_WhenUserNotFound`: Bắt lỗi `usernotfound`.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `changePassword_Success`: MockMvc POST `/api/v1/users/change-password` trả về HTTP 200.
+    - `changePassword_Alias_Success`: MockMvc POST `/api/v1/users/password` trả về HTTP 200.
+    - `changePassword_Fail_WhenValidationFails`: Trả về HTTP 400 khi payload không hợp lệ (< 4 ký tự).
+    - `changePassword_Fail_WhenCurrentPasswordIncorrect`: Trả về HTTP 400 Problem Details với `errorKey: "invalidcurrentpassword"`.
+    - `changePassword_Fail_WhenNewPasswordSameAsCurrent`: Trả về HTTP 400 Problem Details với `errorKey: "samepassword"`.
+    - `changePassword_Fail_WhenNotLoggedIn`: Trả về HTTP 400 Problem Details với `errorKey: "notloggedin"`.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 100% (32 tests).
+- **Docs & Architecture Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `POST /api/v1/users/change-password` vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
+### [2026-10-30] FEAT-USER-CHANGE-PASSWORD-UI — Làm UI Đổi Mật Khẩu & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng modal đổi mật khẩu chuẩn Cyber Dark, kiểm tra validation tức thời (mật khẩu hiện tại, mật khẩu mới, xác nhận mật khẩu), kết nối API backend `POST /api/v1/users/change-password` và tích hợp hoàn chỉnh vào trang Profile.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js` & `client/src/api/authApi.js`:
+    - Bổ sung method `changePassword(data)` gửi request POST tới `/v1/users/change-password`.
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng `validatePasswordChange(values)` kiểm tra đầy đủ mật khẩu hiện tại, độ dài mật khẩu mới (4-100 ký tự), kiểm tra trùng với mật khẩu cũ và khớp với mật khẩu xác nhận.
+    - Xây dựng `getPasswordChangeErrorMessage(error)` ánh xạ các mã lỗi `invalidcurrentpassword`, `samepassword`, `notloggedin`, `usernotfound`, lỗi Bean validation `fieldErrors` và lỗi kết nối mạng sang thông báo tiếng Việt.
+  - `client/src/components/common/ChangePasswordModal.jsx`:
+    - Tạo Modal đổi mật khẩu Cyber Dark với card bo góc 18px, viền neon gradient `#6366F1` &rarr; `#00F2FE`.
+    - Hộp nhắc nhở bảo mật an toàn (Security Advice Banner).
+    - Các trường mật khẩu dạng ẩn với icon khóa, eye toggle bật/tắt hiển thị mật khẩu.
+    - Hộp Alert báo lỗi tự động khi sai mật khẩu hiện tại hoặc trùng mật khẩu cũ.
+    - Nút Đổi mật khẩu gradient có trạng thái loading chống click đúp.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Tích hợp `ChangePasswordModal`, quản lý state `isChangePasswordModalOpen`.
+    - Kết nối nút "Đổi mật khẩu" ở Toolbar và Quick Actions Footer.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - `validatePasswordChange validates correct matching password input`: Dữ liệu hợp lệ.
+    - `validatePasswordChange flags errors when currentPassword is missing or whitespace only`: Bắt lỗi mật khẩu hiện tại rỗng.
+    - `validatePasswordChange flags errors when newPassword is too short, too long, or same as currentPassword`: Bắt lỗi mật khẩu mới quá ngắn, quá dài hoặc trùng mật khẩu cũ.
+    - `validatePasswordChange flags errors when confirmPassword does not match newPassword`: Bắt lỗi mật khẩu xác nhận không khớp.
+    - `getPasswordChangeErrorMessage maps business error keys and validation details`: Kiểm tra ánh xạ lỗi kinh doanh và lỗi mạng.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 18/18 tests (100%).
+  - `npm run build`: Vite build production hoàn tất thành công 100% trong 41.91s.
+- **Docs & Roadmaps Updated:**
+  - Cập nhật hoàn thành Giai đoạn 2 (7/7 nhiệm vụ - 100%).
+  - Cập nhật tiến độ Giai đoạn 3 (1/5 nhiệm vụ) và tổng thể (14/28 nhiệm vụ).
 
 ---
 
@@ -2769,6 +3003,31 @@ Docs Updated:
 - Toàn bộ frontend unit tests (105 tests) và production build PASS 100%.
 - Sẵn sàng chuyển tiếp sang Task 4.04 sau khi người dùng xác nhận.
 
+### Handoff — Tự mở Server vừa tạo (2026-10-27)
+
+- Tạo thành công trong session form/route hiện tại sẽ đóng modal và mở `/servers/{id}` từ response ngay; trang Group tự tải detail/general. Không đợi danh sách; Back về trang trước khi tạo.
+- `onSuccess` vẫn cập nhật danh sách cho POST cũ thành công. `onOpenServer` chỉ dùng ở session hiện tại, kiểm cả route visit và URL; form cũ hoặc Back/Forward không được kéo người dùng khỏi view mới. Tạo lỗi giữ nguyên form/trang để retry.
+- 85 browser cases, 103 Node cases và build PASS; còn giới hạn API mock/SQL Server thật và warning cũ. Contract mới ở docs/01 mục 5 và docs/02 mục 9.7. Nhánh `fix/server-crud-ui`, chưa commit/push các sửa đổi lượt này.
+
+### Handoff — Đồng bộ cú pháp serverApi (2026-10-26)
+
+- `serverApi.js` dùng `method(args) { return axiosClient...; }` giống `userApi`/`roomApi`. Nơi gọi và backend không cần thay đổi. `npm test` 103/103 và build PASS; chưa commit/push lượt style này.
+
+### Handoff — 5 lỗi Server/kênh và Join bằng ID (2026-10-26)
+
+- Đã triển khai đúng kế hoạch duyệt, chưa commit/push; nhánh `fix/server-crud-ui`. Kết quả cuối: 234 BE tests/check, 78 browser cases, 103 Node cases và build PASS.
+- Mỗi Server visit là workspace riêng; dữ liệu kênh/history/modal không tái sử dụng khi đổi Server, kể cả quay lại cùng ID. Trong cùng Server, request kênh/thành viên mới nhất thắng; kênh/history/pagination/send có session guard, kể cả scroll callback/finally.
+- Leave thành công sau khi chuyển trang vẫn loại Server đã rời khỏi danh sách chung. Chỉ phiên gốc đang mở mới được navigate Home; kick cũ không sửa danh sách B. Cleanup chỉ chặn cập nhật UI cũ, không hủy transaction backend.
+- Join bằng ID yêu cầu account active, dùng nickname mặc định `Member` nếu null/blank, tối đa 20 UTF-16 không tách emoji. Giữ User.name và schema; Owner/invite giữ fallback đang có. Contract chính thức: docs/01 mục 5 và docs/02 mục 9.6.
+- SQL Server thật, các lỗi audit ngoài 5 mục và các mâu thuẫn contract lịch sử vẫn cần công việc riêng. Không coi PASS H2/browser mock là bằng chứng đã kiểm thử môi trường triển khai.
+
+### Handoff — Sửa UI tạo và danh sách Server (2026-10-26)
+
+- Nhánh `fix/server-crud-ui`, đã triển khai theo kế hoạch được duyệt; 63 browser tests, 103 Node tests và build PASS. Thay đổi chưa commit, không push.
+- Khi tạo Server trong lúc GET danh sách chờ hoặc sau lỗi GET, Server mới phải hiện ngay; GET nền lấy lại các Server còn lại. GET cũ không được thay state. Nếu refresh thất bại, cảnh báo cùng nút Thử lại hiển thị cạnh danh sách đã biết.
+- Có thể đóng/mở form khi POST đang chờ. POST cũ thành công vẫn cập nhật dock/Home nhưng không ảnh hưởng draft/loading/toast của phiên form mới. Backend vẫn có thể tạo thành công sau khi người dùng đóng form; đóng modal không hủy giao dịch backend.
+- Home hỗ trợ 320/375/768/1440px; tên/ảnh trên card mở route Server có sẵn bằng Link. Tên tạo dùng giới hạn 100 UTF-16, không phải 100 emoji. CSS mới chỉ tác động Home.
+- Backend, quyền Owner, membership, schema và dependency giữ nguyên. SQL Server thật và các cảnh báo đã có vẫn là giới hạn bàn giao, không coi browser mock/build PASS là kiểm thử tích hợp thật.
 
 ### Handoff hiện tại — Post Edit & Delete (2026-10-25)
 
@@ -3185,3 +3444,21 @@ Mô tả luồng từ gõ chữ đến React state, Send, Axios, Backend lưu, D
 Giải thích bằng tiếng Việt dễ hiểu, giữ thuật ngữ kỹ thuật; comment code bằng tiếng Anh khi cần. Báo: Implemented, Tests Added/Updated, Verification (lệnh và kết quả thật), Documentation, Remaining Issues, Git Status và Push. Không dùng kết quả test của log cũ để nhận PASS cho phiên hiện tại.
 
 Luôn ghi: `Not pushed — AI agents are not allowed to push DenHub.`
+
+---
+
+## 21. Cập nhật ngày 2026-10-26: Hoàn thiện tính năng Social Login (Google & GitHub)
+
+- **Backend:**
+  - Endpoint `POST /api/social-login` (nhận `SocialLoginVM`: `accessToken`, `type`).
+  - Mở quyền truy cập `permitAll()` trong `SecurityConfiguration.java` và bổ sung vào `publicEndpoints`.
+  - Khắc phục lỗi bảo mật: cấu hình cookie `SameSite="Strict"`, ẩn `refreshToken` trong response body (`res.setRefreshToken(null)`), bổ sung `@ApiMessage`.
+  - Khắc phục lỗi Crash DB 500: gán mật khẩu ngẫu nhiên mã hóa `passwordEncoder.encode(UUID.randomUUID().toString())` đáp ứng ràng buộc `@NotNull password_hash`.
+  - Khắc phục lỗi NullPointerException: bóc tách chính xác các trường từ GitHub API (`login`, `avatar_url`, xử lý an toàn email private qua `/user/emails`).
+  - Viết bộ kiểm thử toàn diện: `AccountResourceIT` (MockMvc test cho social-login) và `UserServiceTest` (Unit test cho `processLogin` và `loginWithSocialMedia`). Toàn bộ test PASS 100%.
+- **Frontend:**
+  - Tích hợp hàm `socialLogin` trong `client/src/api/authApi.js`.
+  - Cập nhật `AuthContext.jsx` hàm `loginWithSocial` lưu Access Token và chuẩn hóa User context.
+  - Thiết kế giao diện Đăng nhập (`LoginPage.jsx`) và Đăng ký (`RegisterPage.jsx`) chuẩn Cyberpunk / Discord Glassmorphism: Divider phân cách, lưới nút đăng nhập Google & GitHub đồng bộ, Modal xác thực GitHub Token cho nhà phát triển và người dùng.
+  - Build frontend `npm run build` PASS thành công 100%.
+

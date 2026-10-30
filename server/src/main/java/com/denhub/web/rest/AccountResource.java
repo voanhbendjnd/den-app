@@ -1,5 +1,6 @@
 package com.denhub.web.rest;
 
+import com.denhub.web.rest.vm.SocialLoginVM;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
@@ -25,6 +26,7 @@ import com.denhub.security.CustomUserDetails;
 import com.denhub.service.AuthService;
 import com.denhub.service.MailService;
 import com.denhub.service.UserService;
+import com.denhub.service.dto.ChangePasswordDTO;
 import com.denhub.service.dto.GoogleLoginReqDTO;
 import com.denhub.service.dto.RegisterReqDTO;
 import com.denhub.service.dto.ResLoginDTO;
@@ -68,6 +70,24 @@ public class AccountResource {
     public ResponseEntity<UserDTO> registerAccount(@Valid @RequestBody RegisterReqDTO req) {
         User user = userService.registerUser(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(user));
+    }
+    @PostMapping("/social-login")
+    @ApiMessage("Đăng nhập bằng mạng xã hội thành công")
+    @Operation(summary = "Đăng nhập bằng mạng xã hội", description = "Đăng nhập hoặc đăng ký tài khoản thông qua mạng xã hội (Google, GitHub).")
+    public ResponseEntity<ResLoginDTO> socialLogin(@RequestBody @Valid SocialLoginVM req) {
+        if ((req.getAccessToken() == null || req.getAccessToken().isBlank()) && (req.getCode() == null || req.getCode().isBlank())) {
+            throw new AccountResourceException("accessToken hoặc code là bắt buộc");
+        }
+        var res = userService.loginWithSocialMedia(req.getAccessToken(), req.getCode(), req.getType());
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", res.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(refreshTokenExpiration)
+                .sameSite("Strict")
+                .build();
+        res.setRefreshToken(null);
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(res);
     }
 
     @PostMapping({"/auth/google", "/login/google"})
@@ -173,6 +193,14 @@ public class AccountResource {
     /*
     * vm: username, password
     * */
+    @PostMapping(path = "/account/change-password")
+    @Operation(summary = "Đổi mật khẩu tài khoản", description = "Thay đổi mật khẩu của tài khoản đang đăng nhập.")
+    @ApiMessage("Đổi mật khẩu thành công")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto) {
+        userService.changePassword(dto);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Đăng nhập", description = "Xác thực người dùng và nhận về Access Token cùng Refresh Token (cookie).")
     public ResponseEntity<ResLoginDTO> loginWithEmail(@Valid @RequestBody LoginVM vm) {

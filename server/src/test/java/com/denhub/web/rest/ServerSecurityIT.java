@@ -91,6 +91,67 @@ class ServerSecurityIT {
         assertEquals("Detail server", servers.findById(server.getId()).orElseThrow().getName());
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void directJoinRejectsInactiveOrMissingAccountWithoutWriting(boolean missing) throws Exception {
+        String jwt = bearer();
+        server.setOwnerId(reader.getId() + 100000);
+        servers.saveAndFlush(server);
+        if (missing) users.delete(reader);
+        else { reader.setActivated(false); users.saveAndFlush(reader); }
+        long before = members.count();
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, jwt)), 401);
+        entityManager.clear();
+        assertEquals(before, members.count());
+        assertFalse(members.existsByServerIdAndUserId(server.getId(), reader.getId()));
+        assertTrue(servers.existsById(server.getId()));
+    }
+
+    @Test
+    void directJoinRequiresJwtWithoutWriting() throws Exception {
+        long before = members.count();
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")), 401);
+        assertEquals(before, members.count());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("directJoinNames")
+    void directJoinPersistsSafeNicknameAndPreservesProfile(String name, String expected) throws Exception {
+        reader.setName(name);
+        users.saveAndFlush(reader);
+        server.setOwnerId(reader.getId() + 100000);
+        servers.saveAndFlush(server);
+        String jwt = bearer();
+        long before = members.count();
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, jwt)).andExpect(status().isNoContent());
+        entityManager.clear();
+        var rows = members.findAllByServerId(server.getId());
+        assertEquals(before + 1, members.count());
+        assertEquals(1, rows.size());
+        assertEquals(expected, rows.getFirst().getNickname());
+        assertEquals(name, users.findById(reader.getId()).orElseThrow().getName());
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()))
+                .andExpect(jsonPath("$.data[0].role").value("MEMBER"));
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, jwt)), 400);
+        assertEquals(before + 1, members.count());
+    }
+
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> directJoinNames() {
+        return java.util.stream.Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of(null, "Member"),
+                org.junit.jupiter.params.provider.Arguments.of("", "Member"),
+                org.junit.jupiter.params.provider.Arguments.of(" \t\u2003 ", "Member"),
+                org.junit.jupiter.params.provider.Arguments.of("123456789012345678901234567890", "12345678901234567890"),
+                org.junit.jupiter.params.provider.Arguments.of("  Member name  ", "Member name"),
+                org.junit.jupiter.params.provider.Arguments.of("1234567890123456789🙂x", "1234567890123456789"),
+                org.junit.jupiter.params.provider.Arguments.of("🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂", "🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂"));
+    }
+
     @Test
     void memberReadsDetail() throws Exception {
         makeReaderOutsider();

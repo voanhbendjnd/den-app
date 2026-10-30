@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Outlet, useNavigate, useLocation, useMatch, Link } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, Typography, Tooltip, Spin } from 'antd';
 import {
@@ -29,8 +29,15 @@ export default function MainLayout() {
     const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const creationRoute = useMemo(() => ({ key: location.key }), [location.key]);
+    const activeCreationRoute = useRef(creationRoute);
+    useLayoutEffect(() => {
+        activeCreationRoute.current = creationRoute;
+        return () => { activeCreationRoute.current = null; };
+    }, [creationRoute]);
     const groupMatch = useMatch('/servers/:serverId');
     const isGroupPage = Boolean(groupMatch);
+    const isHomePage = location.pathname === '/';
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
     const [isCreateChannelModalOpen, setIsCreateChannelModalOpen] = useState(false);
@@ -39,6 +46,8 @@ export default function MainLayout() {
     const [serversLoading, setServersLoading] = useState(true);
     const [serversError, setServersError] = useState(null);
     const serversRequest = useRef(0);
+    const serversPending = useRef(false);
+    const serversComplete = useRef(false);
     const [conversations, setConversations] = useState([]);
     const [conversationsLoading, setConversationsLoading] = useState(true);
     const conversationsRequest = useRef(0);
@@ -81,26 +90,46 @@ export default function MainLayout() {
         }
     };
 
-    const fetchServers = async () => {
+    const fetchServers = async ({ background = false } = {}) => {
         const request = ++serversRequest.current;
-        setServersLoading(true);
+        serversPending.current = true;
+        setServersLoading(!background);
         setServersError(null);
         try {
             const res = await serverApi.getAll();
             const serverList = res.data?.data || res.data || [];
             if (request !== serversRequest.current) return;
             if (Array.isArray(serverList)) {
+                serversComplete.current = true;
                 setServers(serverList);
             } else {
+                serversComplete.current = false;
                 setServersError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
             }
         } catch {
             if (request === serversRequest.current) {
+                serversComplete.current = false;
                 setServersError('Không thể tải danh sách nhóm. Vui lòng thử lại.');
             }
         } finally {
-            if (request === serversRequest.current) setServersLoading(false);
+            if (request === serversRequest.current) {
+                serversPending.current = false;
+                setServersLoading(false);
+            }
         }
+    };
+
+    const handleServerCreated = (newServer) => {
+        // Read the latest state even if POST started before the list failed.
+        const refreshNeeded = serversPending.current || !serversComplete.current;
+        // A list requested before POST committed must not replace the new Server.
+        serversRequest.current += 1;
+        serversPending.current = false;
+        setServers(previous => [newServer, ...previous.filter(item => String(item.id) !== String(newServer.id))]);
+        setServersLoading(false);
+        setServersError(null);
+        // Recover the rest of the list without hiding the Server we just created.
+        if (refreshNeeded) fetchServers({ background: true });
     };
 
     const handleLogout = () => {
@@ -110,9 +139,11 @@ export default function MainLayout() {
 
     const handleServerDeleted = (id) => {
         // Invalidate list snapshots started before DELETE completed.
+        const refreshNeeded = serversPending.current;
         serversRequest.current += 1;
+        serversPending.current = false;
         setServers(previous => previous.filter(item => String(item.id) !== String(id)));
-        if (serversLoading) {
+        if (refreshNeeded) {
             fetchServers();
             return;
         }
@@ -175,11 +206,12 @@ export default function MainLayout() {
     ];
 
     return (
-        <Layout className={isGroupPage ? 'group-layout' : undefined} style={{ minHeight: '100vh', background: 'var(--color-bg-base)' }}>
+        <Layout className={isGroupPage ? 'group-layout' : isHomePage ? 'home-layout' : undefined} style={{ minHeight: '100vh', background: 'var(--color-bg-base)' }}>
             {/* =========================================================
           Primary Dock (Far-Left Server Launcher)
          ========================================================= */}
             <Sider
+                className="main-primary-dock"
                 width={72}
                 style={{
                     background: 'var(--color-bg-sidebar)',
@@ -394,6 +426,7 @@ export default function MainLayout() {
           Secondary Sidebar (Navigation)
          ========================================================= */}
             {!isGroupPage && <Sider
+                className="main-secondary-sidebar"
                 width={240}
                 style={{
                     background: 'var(--color-bg-layout)',
@@ -646,7 +679,7 @@ export default function MainLayout() {
             {/* =========================================================
           Main Content Workspace
          ========================================================= */}
-            <Layout style={{ marginLeft: isGroupPage ? 72 : 312, minWidth: 0, background: 'var(--color-bg-base)', minHeight: '100vh' }}>
+            <Layout className="main-workspace" style={{ marginLeft: isGroupPage ? 72 : 312, minWidth: 0, background: 'var(--color-bg-base)', minHeight: '100vh' }}>
                 <Content style={{ position: 'relative', height: '100vh', overflowY: 'auto' }}>
                     <Outlet context={{
                         servers,
@@ -669,8 +702,14 @@ export default function MainLayout() {
             <CreateServerModal
                 open={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
-                onSuccess={(newServer) => {
-                    setServers(prev => [newServer, ...prev.filter(s => s.id !== newServer.id)]);
+                onSuccess={handleServerCreated}
+                onOpenServer={(id) => {
+                    // A pending create must not take over a newer visit, including Back/Forward.
+                    const currentPath = window.location.pathname + window.location.search + window.location.hash;
+                    const originPath = location.pathname + location.search + location.hash;
+                    if (id != null && activeCreationRoute.current === creationRoute && currentPath === originPath) {
+                        navigate(`/servers/${id}`);
+                    }
                 }}
             />
 

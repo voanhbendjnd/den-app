@@ -1,17 +1,22 @@
 import { useState } from 'react';
-import { Form, Input, Button, Alert } from 'antd';
+import { Form, Input, Button, Alert, Modal } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
 import authApi from '../../api/authApi';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { loginWithGoogle } = useAuth();
+  const { loginWithGoogle, loginWithSocial } = useAuth();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [githubModalOpen, setGithubModalOpen] = useState(false);
+  const [githubTokenInput, setGithubTokenInput] = useState('');
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+
+  const githubClientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
   const handleSubmit = async (values) => {
     setLoading(true);
@@ -57,6 +62,37 @@ export default function RegisterPage() {
       setError(msg);
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleGithubRegisterClick = () => {
+    if (githubClientId) {
+      const redirectUri = encodeURIComponent(window.location.origin + '/login');
+      window.location.href = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&scope=read:user,user:email&redirect_uri=${redirectUri}`;
+    } else {
+      setGithubModalOpen(true);
+    }
+  };
+
+  const handleGithubTokenRegister = async () => {
+    if (!githubTokenInput || !githubTokenInput.trim()) {
+      setError('Vui lòng nhập GitHub Personal Access Token');
+      return;
+    }
+    setGithubLoading(true);
+    setError(null);
+    try {
+      await loginWithSocial({
+        accessToken: githubTokenInput.trim(),
+        type: 'GITHUB',
+      });
+      setGithubModalOpen(false);
+      navigate('/');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Đăng ký bằng GitHub thất bại. Kiểm tra lại Access Token!';
+      setError(msg);
+    } finally {
+      setGithubLoading(false);
     }
   };
 
@@ -204,8 +240,25 @@ export default function RegisterPage() {
           </Button>
         </Form.Item>
 
-        {/* Google Fast Register Button */}
-        <div style={{ marginBottom: 16 }}>
+        {/* Divider */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          margin: '16px 0 14px 0',
+          color: '#949ba4',
+          fontSize: 12,
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}>
+          <div style={{ flex: 1, height: 1, backgroundColor: '#3f4147' }} />
+          <span style={{ padding: '0 10px' }}>Hoặc đăng ký với</span>
+          <div style={{ flex: 1, height: 1, backgroundColor: '#3f4147' }} />
+        </div>
+
+        {/* Social Register Buttons Grid: Google & GitHub */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+          {/* Google Button */}
           <Button
             type="default"
             onClick={handleGoogleRegister}
@@ -218,7 +271,20 @@ export default function RegisterPage() {
               <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
               <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
             </svg>
-            <span>Đăng ký nhanh bằng Google</span>
+            <span>Google</span>
+          </Button>
+
+          {/* GitHub Button */}
+          <Button
+            type="default"
+            onClick={handleGithubRegisterClick}
+            loading={githubLoading}
+            className="discord-button-github"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#f2f3f5">
+              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+            </svg>
+            <span>GitHub</span>
           </Button>
         </div>
 
@@ -229,6 +295,63 @@ export default function RegisterPage() {
           </Link>
         </div>
       </Form>
+
+      {/* GitHub Token Modal for Fast Register */}
+      <Modal
+        title={
+          <div style={{ color: '#f2f3f5', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#f2f3f5">
+              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+            </svg>
+            <span>Đăng ký nhanh bằng GitHub</span>
+          </div>
+        }
+        open={githubModalOpen}
+        onCancel={() => setGithubModalOpen(false)}
+        footer={null}
+        styles={{
+          content: {
+            backgroundColor: '#313338',
+            color: '#f2f3f5',
+            borderRadius: 8,
+            border: '1px solid #3f4147',
+          },
+          header: {
+            backgroundColor: '#313338',
+            borderBottom: '1px solid #3f4147',
+            paddingBottom: 12,
+          },
+        }}
+      >
+        <div style={{ marginTop: 12 }}>
+          <p style={{ color: '#b5bac1', fontSize: 14 }}>
+            Nhập <strong>GitHub Access Token</strong> (Personal Access Token có quyền <code>read:user</code> và <code>user:email</code>) để tạo tài khoản tức thì:
+          </p>
+          <Input.Password
+            className="discord-input"
+            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+            value={githubTokenInput}
+            onChange={(e) => setGithubTokenInput(e.target.value)}
+            style={{ height: 40, marginBottom: 16 }}
+          />
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <Button
+              onClick={() => setGithubModalOpen(false)}
+              style={{ backgroundColor: 'transparent', color: '#b5bac1', borderColor: '#4e5058' }}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="primary"
+              className="discord-button-blurple"
+              loading={githubLoading}
+              onClick={handleGithubTokenRegister}
+            >
+              Xác thực & Tạo tài khoản
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

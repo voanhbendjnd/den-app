@@ -31,7 +31,7 @@ export default function AuthLayout() {
             letterSpacing: '-0.3px',
             fontFamily: "'Plus Jakarta Sans', sans-serif"
           }}>
-            Discord
+            Den hub
           </span>
         </Link>
       </div>

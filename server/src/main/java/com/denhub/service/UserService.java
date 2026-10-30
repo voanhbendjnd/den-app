@@ -1,10 +1,16 @@
 package com.denhub.service;
 
+import com.denhub.service.dto.ResLoginDTO;
+import com.denhub.service.errors.BadRequestResourceException;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,11 +21,14 @@ import com.denhub.repository.AuthorityRepository;
 import com.denhub.repository.UserRepository;
 import com.denhub.security.AuthoritiesConstants;
 import com.denhub.security.SecurityUtils;
+import com.denhub.service.dto.ChangePasswordDTO;
 import com.denhub.service.dto.RegisterReqDTO;
+import com.denhub.service.dto.UpdateUserProfileDTO;
 import com.denhub.service.dto.UserDTO;
 import com.denhub.service.dto.UserProfileResponseDTO;
 import com.denhub.web.rest.errors.BadRequestAlertException;
 import com.denhub.web.rest.errors.LoginAlreadyUsedException;
+import org.springframework.web.client.RestTemplate;
 import tech.jhipster.security.RandomUtil;
 
 import java.time.Instant;
@@ -37,6 +46,17 @@ public class UserService {
     CacheManager cacheManager;
     PasswordEncoder passwordEncoder;
     AuthorityRepository authorityRepository;
+    AuthService authService;
+    private static final String LINK_GITHUB_USER = "https://api.github.com/user";
+    private static final String LINK_GOOGLE_USER = "https://www.googleapis.com/oauth2/v3/userinfo";
+
+    @org.springframework.beans.factory.annotation.Value("${github.client-id:}")
+    @lombok.experimental.NonFinal
+    String githubClientId;
+
+    @org.springframework.beans.factory.annotation.Value("${github.client-secret:}")
+    @lombok.experimental.NonFinal
+    String githubClientSecret;
 
     @Transactional(readOnly = true)
     public Optional<User> getUserWithAuthorities() {
@@ -61,6 +81,93 @@ public class UserService {
         return UserProfileResponseDTO.fromUser(user);
     }
 
+    /**
+     * Cập nhật thông tin hồ sơ của người dùng hiện tại đang đăng nhập.
+     *
+     * @param dto UpdateUserProfileDTO chứa thông tin cần cập nhật (name, username, avatar)
+     * @return UserProfileResponseDTO thông tin hồ sơ người dùng sau khi cập nhật
+     * @throws BadRequestAlertException nếu chưa đăng nhập, không tìm thấy người dùng, hoặc username đã tồn tại
+     */
+    @Transactional
+    public UserProfileResponseDTO updateUserProfile(UpdateUserProfileDTO dto) {
+        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+
+        User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+
+        if (dto == null) {
+            return UserProfileResponseDTO.fromUser(user);
+        }
+
+        boolean modified = false;
+
+        // Cập nhật tên hiển thị nếu có truyền
+        if (dto.getName() != null) {
+            String trimmedName = dto.getName().trim();
+            if (!trimmedName.equals(user.getName())) {
+                user.setName(trimmedName.isEmpty() ? null : trimmedName);
+                modified = true;
+            }
+        }
+
+        // Cập nhật username nếu có truyền
+        if (dto.getUsername() != null) {
+            String normalizedUsername = dto.getUsername().trim().toLowerCase(Locale.ENGLISH);
+            if (!normalizedUsername.equals(user.getUsername())) {
+                if (userRepository.existsByUsernameIgnoreCaseAndIdNot(normalizedUsername, user.getId())) {
+                    throw new BadRequestAlertException("Username already in use", "userProfile", "usernamealreadyexists");
+                }
+                user.setUsername(normalizedUsername);
+                modified = true;
+            }
+        }
+
+        // Cập nhật avatar nếu có truyền
+        if (dto.getAvatar() != null) {
+            String trimmedAvatar = dto.getAvatar().trim();
+            if (!trimmedAvatar.equals(user.getAvatar())) {
+                user.setAvatar(trimmedAvatar.isEmpty() ? null : trimmedAvatar);
+                modified = true;
+            }
+        }
+
+        if (modified) {
+            user = userRepository.save(user);
+            this.clearUserCaches(user);
+        }
+
+        return UserProfileResponseDTO.fromUser(user);
+    }
+
+    /**
+     * Thay đổi mật khẩu cho người dùng đang đăng nhập.
+     *
+     * @param dto DTO chứa mật khẩu hiện tại và mật khẩu mới.
+     */
+    @Transactional
+    public void changePassword(ChangePasswordDTO dto) {
+        String currentUserEmail = SecurityUtils.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+
+        User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+
+        if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
+            throw new BadRequestAlertException("Mật khẩu hiện tại không chính xác", "userProfile", "invalidcurrentpassword");
+        }
+
+        if (passwordEncoder.matches(dto.getNewPassword(), user.getPassword())) {
+            throw new BadRequestAlertException("Mật khẩu mới không được trùng với mật khẩu hiện tại", "userProfile", "samepassword");
+        }
+
+        String encryptedPassword = passwordEncoder.encode(dto.getNewPassword());
+        user.setPassword(encryptedPassword);
+        userRepository.save(user);
+        this.clearUserCaches(user);
+        log.info("Changed password for User: {}", currentUserEmail);
+    }
+
     public User registerUser(RegisterReqDTO req) {
         String normalizedEmail = req.getEmail().trim().toLowerCase(Locale.ENGLISH);
         userRepository.findOneByEmail(normalizedEmail).ifPresent(existingUser -> {
@@ -81,6 +188,7 @@ public class UserService {
         if (req.getUsername() != null && !req.getUsername().isBlank()) {
             newUser.setUsername(req.getUsername().trim());
         }
+        newUser.setType("SYSTEM");
         newUser.setActivated(true);
         Set<Authority> authorities = new HashSet<>();
         authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
@@ -114,6 +222,174 @@ public class UserService {
         newUser = userRepository.save(newUser);
         this.clearUserCaches(newUser);
         return newUser;
+    }
+
+    public ResLoginDTO processLogin(String email, String avatar, String name, String username, String type) {
+        String normalizedEmail = email.trim().toLowerCase(Locale.ENGLISH);
+        Optional<User> userOp = userRepository.findOneWithAuthoritiesByEmail(normalizedEmail);
+        if (userOp.isPresent()) {
+            User existingUser = userOp.get();
+            boolean changed = false;
+            if ((existingUser.getName() == null || existingUser.getName().isBlank()) && name != null && !name.isBlank()) {
+                existingUser.setName(name.trim());
+                changed = true;
+            }
+            if ((existingUser.getAvatar() == null || existingUser.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+                existingUser.setAvatar(avatar);
+                changed = true;
+            }
+            if (!Boolean.TRUE.equals(existingUser.getActivated())) {
+                existingUser.setActivated(true);
+                changed = true;
+            }
+            if (changed) {
+                userRepository.save(existingUser);
+                this.clearUserCaches(existingUser);
+            }
+            return authService.generateResLoginDTO(existingUser);
+        } else {
+            User newUser = new User();
+            Set<Authority> authorities = new HashSet<>();
+            authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
+            newUser.setAuthorities(authorities);
+            if (username != null && !username.isBlank()) {
+                newUser.setUsername(username.trim());
+            }
+            newUser.setAvatar(avatar);
+            if (name != null && !name.isBlank()) {
+                newUser.setName(name.trim());
+            } else {
+                newUser.setName(username != null && !username.isBlank() ? username.trim() : normalizedEmail.split("@")[0]);
+            }
+            newUser.setType(type != null ? type.toUpperCase(Locale.ENGLISH) : "SOCIAL");
+            newUser.setEmail(normalizedEmail);
+            newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            newUser.setActivated(true);
+            User saveUser = userRepository.save(newUser);
+            this.clearUserCaches(saveUser);
+            return authService.generateResLoginDTO(saveUser);
+        }
+    }
+
+    private Map<String, Object> getUserInfo(String accessToken, String link) {
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "application/json");
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        ResponseEntity<Map> response = restTemplate.exchange(link,
+                HttpMethod.GET,
+                entity,
+                Map.class);
+        return response.getBody();
+    }
+
+    private List<Map<String, Object>> getGithubEmails(String accessToken) {
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "application/json");
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        ResponseEntity<List> response = restTemplate.exchange("https://api.github.com/user/emails",
+                HttpMethod.GET,
+                entity,
+                List.class);
+        return response.getBody();
+    }
+
+    private String getGithubAccessTokenFromCode(String code) {
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Accept", "application/json");
+        Map<String, String> body = new HashMap<>();
+        body.put("client_id", githubClientId);
+        body.put("client_secret", githubClientSecret);
+        body.put("code", code);
+        HttpEntity<Map<String, String>> entity = new HttpEntity<>(body, headers);
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity("https://github.com/login/oauth/access_token", entity, Map.class);
+            if (response.getBody() != null && response.getBody().get("access_token") != null) {
+                return (String) response.getBody().get("access_token");
+            }
+            log.warn("GitHub OAuth token exchange did not return access_token: {}", response.getBody());
+        } catch (Exception ex) {
+            log.error("Lỗi đổi code lấy GitHub access token: {}", ex.getMessage());
+        }
+        return null;
+    }
+
+    public ResLoginDTO loginWithSocialMedia(String accessToken, String type) {
+        return loginWithSocialMedia(accessToken, null, type);
+    }
+
+    public ResLoginDTO loginWithSocialMedia(String accessToken, String code, String type) {
+        if ((accessToken == null || accessToken.isBlank()) && code != null && !code.isBlank()) {
+            if ("GITHUB".equalsIgnoreCase(type)) {
+                accessToken = getGithubAccessTokenFromCode(code);
+                if (accessToken == null) {
+                    throw new BadRequestResourceException("Không thể xác thực mã xác thực từ GitHub", "accountManagement", "invalidgithubcode");
+                }
+            }
+        }
+        String username = null, avatar = null, email = null, name = null;
+        if ("GITHUB".equalsIgnoreCase(type)) {
+            Map<String, Object> userInfo = this.getUserInfo(accessToken, LINK_GITHUB_USER);
+            if (userInfo == null) {
+                throw new BadRequestResourceException("Không thể lấy thông tin người dùng từ GitHub", "accountManagement", "githubuserinfofailed");
+            }
+            username = userInfo.get("login") != null ? userInfo.get("login").toString() : null;
+            name = userInfo.get("name") != null ? userInfo.get("name").toString() : username;
+            avatar = userInfo.get("avatar_url") != null ? userInfo.get("avatar_url").toString() : null;
+            Object rawEmail = userInfo.get("email");
+            email = rawEmail != null ? rawEmail.toString() : null;
+
+            if (email == null) {
+                try {
+                    List<Map<String, Object>> mails = this.getGithubEmails(accessToken);
+                    if (mails != null) {
+                        email = mails.stream()
+                                .filter(e -> Boolean.TRUE.equals(e.get("primary")) && Boolean.TRUE.equals(e.get("verified")))
+                                .map(e -> (String) e.get("email"))
+                                .findFirst()
+                                .orElse(null);
+                        if (email == null) {
+                            email = mails.stream()
+                                    .filter(e -> Boolean.TRUE.equals(e.get("verified")))
+                                    .map(e -> (String) e.get("email"))
+                                    .findFirst()
+                                    .orElse(null);
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.warn("Không thể lấy email từ GitHub emails endpoint: {}", ex.getMessage());
+                }
+            }
+            if (email == null) {
+                throw new BadRequestResourceException("Tài khoản GitHub không cung cấp email hợp lệ", "accountManagement", "emailnull");
+            }
+        } else if ("GOOGLE".equalsIgnoreCase(type)) {
+            Map<String, Object> userInfo = this.getUserInfo(accessToken, LINK_GOOGLE_USER);
+            if (userInfo == null) {
+                throw new BadRequestResourceException("Không thể lấy thông tin người dùng từ Google", "accountManagement", "googleuserinfofailed");
+            }
+            email = (String) userInfo.get("email");
+            avatar = (String) userInfo.get("picture");
+            name = (String) userInfo.get("name");
+            username = email != null ? email.split("@")[0] : null;
+            Boolean isEmailVerified = userInfo.get("email_verified") instanceof Boolean
+                    ? (Boolean) userInfo.get("email_verified")
+                    : Boolean.parseBoolean(String.valueOf(userInfo.get("email_verified")));
+            if (isEmailVerified != null && !isEmailVerified) {
+                throw new BadRequestResourceException("Google mail chưa được xác minh", "accountManagement", "notemailverified");
+            }
+        } else {
+            throw new BadRequestResourceException("Loại đăng nhập mạng xã hội không được hỗ trợ: " + type, "accountManagement", "unsupportedtype");
+        }
+
+        if (email == null || email.isBlank()) {
+            throw new BadRequestResourceException("Email không được cung cấp", "accountManagement", "emailnull");
+        }
+        return this.processLogin(email, avatar, name, username, type);
     }
 
     public User processGoogleUser(String email, String name, String avatar, String googleId) {

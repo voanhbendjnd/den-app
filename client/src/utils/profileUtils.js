@@ -139,3 +139,234 @@ export function getRoleDisplays(authorities = []) {
     }
   });
 }
+
+/**
+ * Biểu thức chính quy cho username: 3-50 ký tự, chỉ gồm chữ cái, chữ số, _, -, .
+ */
+export const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
+
+/**
+ * Kiểm tra tính hợp lệ của dữ liệu cập nhật hồ sơ trước khi gửi API
+ * @param {object} values { name, username, avatar }
+ * @returns {{ isValid: boolean, errors: Record<string, string> }}
+ */
+export function validateProfileUpdate(values = {}) {
+  const errors = {};
+
+  // Validate Name
+  if (values.name !== undefined && values.name !== null) {
+    const trimmedName = String(values.name).trim();
+    if (values.name && trimmedName.length === 0) {
+      errors.name = 'Tên hiển thị không được chỉ chứa khoảng trắng.';
+    } else if (values.name.length > 50) {
+      errors.name = 'Tên hiển thị không được vượt quá 50 ký tự.';
+    }
+  }
+
+  // Validate Username
+  if (values.username !== undefined && values.username !== null) {
+    const trimmedUsername = String(values.username).trim();
+    if (trimmedUsername.length === 0) {
+      errors.username = 'Tên người dùng không được để trống.';
+    } else if (trimmedUsername.length < 3 || trimmedUsername.length > 50) {
+      errors.username = 'Tên người dùng phải có độ dài từ 3 đến 50 ký tự.';
+    } else if (!USERNAME_REGEX.test(trimmedUsername)) {
+      errors.username = 'Tên người dùng chỉ được chứa chữ cái, chữ số, gạch dưới (_), gạch ngang (-) hoặc dấu chấm (.).';
+    }
+  }
+
+  // Validate Avatar URL
+  if (values.avatar !== undefined && values.avatar !== null) {
+    const trimmedAvatar = String(values.avatar).trim();
+    if (trimmedAvatar.length > 500) {
+      errors.avatar = 'Đường dẫn ảnh đại diện không được vượt quá 500 ký tự.';
+    } else if (trimmedAvatar.length > 0) {
+      const isValidUrl = /^https?:\/\/.+/i.test(trimmedAvatar) || /^data:image\/.+/i.test(trimmedAvatar);
+      if (!isValidUrl) {
+        errors.avatar = 'Đường dẫn ảnh đại diện phải bắt đầu bằng http:// hoặc https://';
+      }
+    }
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Chuẩn hóa dữ liệu cập nhật trước khi gửi request tới API
+ * @param {object} values { name, username, avatar }
+ * @returns {object}
+ */
+export function sanitizeProfilePayload(values = {}) {
+  const payload = {};
+
+  if (values.name !== undefined && values.name !== null) {
+    payload.name = String(values.name).trim();
+  }
+
+  if (values.username !== undefined && values.username !== null) {
+    payload.username = String(values.username).trim().toLowerCase();
+  }
+
+  if (values.avatar !== undefined && values.avatar !== null) {
+    const trimmed = String(values.avatar).trim();
+    payload.avatar = trimmed.length > 0 ? trimmed : null;
+  }
+
+  return payload;
+}
+
+/**
+ * Ánh xạ lỗi trả về từ API cập nhật hồ sơ cá nhân sang thông điệp tiếng Việt thân thiện
+ * @param {any} error 
+ * @param {string} [username] 
+ * @returns {string}
+ */
+export function getProfileUpdateErrorMessage(error, username = '') {
+  if (!error) return 'Cập nhật hồ sơ thất bại.';
+
+  const data = error.response?.data;
+  const status = error.response?.status;
+  const errorKey = data?.errorKey || data?.title;
+  const serverMsg = data?.message || data?.detail;
+
+  // Lỗi trùng lặp username
+  if (
+    errorKey === 'usernamealreadyexists' ||
+    (typeof serverMsg === 'string' && (
+      serverMsg.toLowerCase().includes('username already in use') ||
+      serverMsg.toLowerCase().includes('username already exists')
+    ))
+  ) {
+    const formattedUsername = username ? `@${username}` : 'này';
+    return `Tên người dùng ${formattedUsername} đã có người sử dụng. Vui lòng chọn tên khác.`;
+  }
+
+  // Lỗi chưa đăng nhập hoặc không tìm thấy user
+  if (errorKey === 'notloggedin' || status === 401) {
+    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  }
+
+  if (errorKey === 'usernotfound' || status === 404) {
+    return 'Không tìm thấy thông tin tài khoản người dùng.';
+  }
+
+  if (status === 403) {
+    return 'Bạn không có quyền cập nhật thông tin hồ sơ này.';
+  }
+
+  // Lỗi validation từ Bean Validation (fieldErrors)
+  if (data?.fieldErrors && Array.isArray(data.fieldErrors) && data.fieldErrors.length > 0) {
+    const firstErr = data.fieldErrors[0];
+    const fieldName = firstErr.field === 'name'
+      ? 'Tên hiển thị'
+      : firstErr.field === 'username'
+      ? 'Tên người dùng'
+      : firstErr.field === 'avatar'
+      ? 'Ảnh đại diện'
+      : firstErr.field;
+    return `${fieldName}: ${firstErr.message || 'Dữ liệu không hợp lệ.'}`;
+  }
+
+  if (status >= 500) {
+    return serverMsg || 'Máy chủ gặp sự cố khi lưu hồ sơ. Vui lòng thử lại sau.';
+  }
+
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền mạng.';
+  }
+
+  return serverMsg || error.message || 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.';
+}
+
+/**
+ * Kiểm tra tính hợp lệ của dữ liệu đổi mật khẩu
+ * @param {object} values { currentPassword, newPassword, confirmPassword }
+ * @returns {{ isValid: boolean, errors: Record<string, string> }}
+ */
+export function validatePasswordChange(values = {}) {
+  const errors = {};
+
+  // Current password
+  if (!values.currentPassword || String(values.currentPassword).trim().length === 0) {
+    errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại.';
+  }
+
+  // New password
+  if (!values.newPassword || String(values.newPassword).trim().length === 0) {
+    errors.newPassword = 'Vui lòng nhập mật khẩu mới.';
+  } else if (values.newPassword.length < 4 || values.newPassword.length > 100) {
+    errors.newPassword = 'Mật khẩu mới phải có độ dài từ 4 đến 100 ký tự.';
+  } else if (values.currentPassword && values.newPassword === values.currentPassword) {
+    errors.newPassword = 'Mật khẩu mới không được trùng với mật khẩu hiện tại.';
+  }
+
+  // Confirm password
+  if (!values.confirmPassword || String(values.confirmPassword).trim().length === 0) {
+    errors.confirmPassword = 'Vui lòng xác nhận lại mật khẩu mới.';
+  } else if (values.newPassword && values.confirmPassword !== values.newPassword) {
+    errors.confirmPassword = 'Mật khẩu xác nhận không khớp với mật khẩu mới.';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Ánh xạ lỗi trả về từ API đổi mật khẩu sang thông điệp tiếng Việt thân thiện
+ * @param {any} error 
+ * @returns {string}
+ */
+export function getPasswordChangeErrorMessage(error) {
+  if (!error) return 'Đổi mật khẩu thất bại.';
+
+  const data = error.response?.data;
+  const status = error.response?.status;
+  const errorKey = data?.errorKey || data?.title;
+  const serverMsg = data?.message || data?.detail;
+
+  if (errorKey === 'invalidcurrentpassword' || (typeof serverMsg === 'string' && serverMsg.toLowerCase().includes('mật khẩu hiện tại không chính xác'))) {
+    return 'Mật khẩu hiện tại không chính xác. Vui lòng kiểm tra lại.';
+  }
+
+  if (errorKey === 'samepassword' || (typeof serverMsg === 'string' && serverMsg.toLowerCase().includes('không được trùng'))) {
+    return 'Mật khẩu mới không được trùng với mật khẩu hiện tại.';
+  }
+
+  if (errorKey === 'notloggedin' || status === 401) {
+    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  }
+
+  if (errorKey === 'usernotfound' || status === 404) {
+    return 'Không tìm thấy thông tin tài khoản người dùng.';
+  }
+
+  if (status === 403) {
+    return 'Bạn không có quyền thực hiện thao tác này.';
+  }
+
+  if (data?.fieldErrors && Array.isArray(data.fieldErrors) && data.fieldErrors.length > 0) {
+    const firstErr = data.fieldErrors[0];
+    const fieldName = firstErr.field === 'currentPassword'
+      ? 'Mật khẩu hiện tại'
+      : firstErr.field === 'newPassword'
+      ? 'Mật khẩu mới'
+      : firstErr.field;
+    return `${fieldName}: ${firstErr.message || 'Dữ liệu không hợp lệ.'}`;
+  }
+
+  if (status >= 500) {
+    return serverMsg || 'Máy chủ gặp sự cố khi xử lý đổi mật khẩu. Vui lòng thử lại sau.';
+  }
+
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền mạng.';
+  }
+
+  return serverMsg || error.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+}
+
