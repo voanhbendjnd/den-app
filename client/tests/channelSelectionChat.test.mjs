@@ -5,10 +5,11 @@ import {
   resolveActiveChannel,
   getChannelTopic,
   normalizeRealtimeMessage,
+  isMessageForActiveChannel,
   handleIncomingRealtimeMessage,
   sortMessagesChronological,
 } from '../src/utils/channelMessages.js';
-import { DESTINATIONS } from '../src/services/webSocketService.js';
+import webSocketService, { DESTINATIONS } from '../src/services/webSocketService.js';
 
 test('resolveActiveChannel handles empty and invalid channel inputs safely', () => {
   assert.equal(resolveActiveChannel([]), null);
@@ -72,7 +73,7 @@ test('getChannelTopic constructs correct STOMP destination strings', () => {
   assert.equal(getChannelTopic(''), '');
 });
 
-test('DESTINATIONS provides confirmed channel destinations', () => {
+test('DESTINATIONS provides confirmed channel destinations (3.01)', () => {
   assert.equal(DESTINATIONS.subscribeChannel(10), '/topic/channels/10');
   assert.equal(DESTINATIONS.subscribeChannelMessages(10), '/topic/channels/10/messages');
   assert.equal(DESTINATIONS.publishChannelMessage(10), '/app/channels/10/send');
@@ -97,7 +98,30 @@ test('normalizeRealtimeMessage unwraps message payloads properly', () => {
   assert.equal(normalizeRealtimeMessage({ notAMessage: true }), null);
 });
 
-test('handleIncomingRealtimeMessage ignores messages belonging to other channels', () => {
+test('isMessageForActiveChannel validates matching channel and rejects other channels (3.06)', () => {
+  const activeChannelId = 101;
+
+  // Matching numeric and string channelId
+  assert.equal(isMessageForActiveChannel({ id: 1, channelId: 101, content: 'hi' }, activeChannelId), true);
+  assert.equal(isMessageForActiveChannel({ id: 2, channelId: '101', content: 'hi' }, activeChannelId), true);
+
+  // Mismatched channelId (from previous channel or another channel) -> MUST RETURN FALSE
+  assert.equal(isMessageForActiveChannel({ id: 3, channelId: 999, content: 'old channel msg' }, activeChannelId), false);
+  assert.equal(isMessageForActiveChannel({ id: 4, channelId: '102', content: 'other channel' }, activeChannelId), false);
+
+  // Wrapped format from WebSocket broker
+  const wrappedMatch = { type: 'MESSAGE_CREATED', data: { id: 5, channelId: 101, content: 'wrapped match' } };
+  assert.equal(isMessageForActiveChannel(wrappedMatch, activeChannelId), true);
+
+  const wrappedOld = { type: 'MESSAGE_CREATED', data: { id: 6, channelId: 999, content: 'wrapped old' } };
+  assert.equal(isMessageForActiveChannel(wrappedOld, activeChannelId), false);
+
+  // Invalid inputs
+  assert.equal(isMessageForActiveChannel(null, activeChannelId), false);
+  assert.equal(isMessageForActiveChannel({ id: 7 }, null), false);
+});
+
+test('handleIncomingRealtimeMessage strictly ignores messages belonging to other channels (3.06)', () => {
   const current = [
     { id: 1, content: 'msg 1', channelId: 10, createdAt: '2026-10-30T10:00:00Z' },
   ];
@@ -106,9 +130,35 @@ test('handleIncomingRealtimeMessage ignores messages belonging to other channels
   const result = handleIncomingRealtimeMessage(current, foreignMessage, 10);
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 1);
+  assert.equal(result, current); // Preserves exact array reference when ignored
 });
 
-test('handleIncomingRealtimeMessage appends and orders messages for active channel', () => {
+test('channel switching flow ensures complete cross-channel isolation (3.06)', () => {
+  // Step 1: User is on Channel A (id: 101)
+  let channelAMessages = [
+    { id: 1, channelId: 101, content: 'Message in channel A', createdAt: '2026-10-30T10:00:00Z' },
+  ];
+
+  // Step 2: User switches to Channel B (id: 102) -> New state initialized
+  let channelBMessages = [];
+
+  // Step 3: Delayed message from Channel A arrives via WebSocket
+  const delayedMessageA = { id: 2, channelId: 101, content: 'Late message from Channel A', createdAt: '2026-10-30T10:01:00Z' };
+
+  // Attempting to inject delayed message A into Channel B MUST be rejected
+  const afterLateA = handleIncomingRealtimeMessage(channelBMessages, delayedMessageA, 102);
+  assert.equal(afterLateA.length, 0); // No message added!
+
+  // Step 4: Real-time message for Channel B arrives
+  const messageB = { id: 3, channelId: 102, content: 'First message in Channel B', createdAt: '2026-10-30T10:02:00Z' };
+  channelBMessages = handleIncomingRealtimeMessage(channelBMessages, messageB, 102);
+
+  assert.equal(channelBMessages.length, 1);
+  assert.equal(channelBMessages[0].id, 3);
+  assert.equal(channelBMessages[0].content, 'First message in Channel B');
+});
+
+test('handleIncomingRealtimeMessage appends and orders messages for active channel (3.01)', () => {
   const current = [
     { id: 1, content: 'msg 1', channelId: 10, createdAt: '2026-10-30T10:00:00Z' },
   ];
@@ -140,4 +190,25 @@ test('handleIncomingRealtimeMessage updates edited messages with same id', () =>
   const result = handleIncomingRealtimeMessage(current, edited, 10);
   assert.equal(result.length, 1);
   assert.equal(result[0].content, 'updated content');
+});
+
+test('webSocketService channel helper methods operate safely (3.01 & 3.06)', () => {
+  // Safe calls when disconnected
+  assert.doesNotThrow(() => {
+    const unsub = webSocketService.subscribeChannel(null, () => {});
+    assert.equal(typeof unsub, 'function');
+    unsub();
+  });
+
+  assert.doesNotThrow(() => {
+    webSocketService.unsubscribeChannel(null);
+    webSocketService.publishChannelMessage(null, {});
+  });
+
+  // Connection listener management
+  let called = false;
+  const listener = (status) => { called = true; };
+  const remove = webSocketService.addConnectionListener(listener);
+  assert.equal(typeof remove, 'function');
+  remove();
 });
