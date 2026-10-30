@@ -26,6 +26,7 @@ import com.denhub.security.CustomUserDetails;
 import com.denhub.service.AuthService;
 import com.denhub.service.MailService;
 import com.denhub.service.UserService;
+import com.denhub.service.dto.ChangePasswordDTO;
 import com.denhub.service.dto.GoogleLoginReqDTO;
 import com.denhub.service.dto.RegisterReqDTO;
 import com.denhub.service.dto.ResLoginDTO;
@@ -192,6 +193,14 @@ public class AccountResource {
     /*
     * vm: username, password
     * */
+    @PostMapping(path = "/account/change-password")
+    @Operation(summary = "Đổi mật khẩu tài khoản", description = "Thay đổi mật khẩu của tài khoản đang đăng nhập.")
+    @ApiMessage("Đổi mật khẩu thành công")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto) {
+        userService.changePassword(dto);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Đăng nhập", description = "Xác thực người dùng và nhận về Access Token cùng Refresh Token (cookie).")
     public ResponseEntity<ResLoginDTO> loginWithEmail(@Valid @RequestBody LoginVM vm) {

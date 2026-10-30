@@ -25,6 +25,10 @@ const authApi = {
     return axiosClient.get('/v1/users/profile');
   },
 
+  changePassword(data) {
+    return axiosClient.post('/v1/users/change-password', data);
+  },
+
   updateProfile(data) {
     return axiosClient.put('/v1/users/profile', data);
   },

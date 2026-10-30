@@ -281,3 +281,92 @@ export function getProfileUpdateErrorMessage(error, username = '') {
   return serverMsg || error.message || 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.';
 }
 
+/**
+ * Kiểm tra tính hợp lệ của dữ liệu đổi mật khẩu
+ * @param {object} values { currentPassword, newPassword, confirmPassword }
+ * @returns {{ isValid: boolean, errors: Record<string, string> }}
+ */
+export function validatePasswordChange(values = {}) {
+  const errors = {};
+
+  // Current password
+  if (!values.currentPassword || String(values.currentPassword).trim().length === 0) {
+    errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại.';
+  }
+
+  // New password
+  if (!values.newPassword || String(values.newPassword).trim().length === 0) {
+    errors.newPassword = 'Vui lòng nhập mật khẩu mới.';
+  } else if (values.newPassword.length < 4 || values.newPassword.length > 100) {
+    errors.newPassword = 'Mật khẩu mới phải có độ dài từ 4 đến 100 ký tự.';
+  } else if (values.currentPassword && values.newPassword === values.currentPassword) {
+    errors.newPassword = 'Mật khẩu mới không được trùng với mật khẩu hiện tại.';
+  }
+
+  // Confirm password
+  if (!values.confirmPassword || String(values.confirmPassword).trim().length === 0) {
+    errors.confirmPassword = 'Vui lòng xác nhận lại mật khẩu mới.';
+  } else if (values.newPassword && values.confirmPassword !== values.newPassword) {
+    errors.confirmPassword = 'Mật khẩu xác nhận không khớp với mật khẩu mới.';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Ánh xạ lỗi trả về từ API đổi mật khẩu sang thông điệp tiếng Việt thân thiện
+ * @param {any} error 
+ * @returns {string}
+ */
+export function getPasswordChangeErrorMessage(error) {
+  if (!error) return 'Đổi mật khẩu thất bại.';
+
+  const data = error.response?.data;
+  const status = error.response?.status;
+  const errorKey = data?.errorKey || data?.title;
+  const serverMsg = data?.message || data?.detail;
+
+  if (errorKey === 'invalidcurrentpassword' || (typeof serverMsg === 'string' && serverMsg.toLowerCase().includes('mật khẩu hiện tại không chính xác'))) {
+    return 'Mật khẩu hiện tại không chính xác. Vui lòng kiểm tra lại.';
+  }
+
+  if (errorKey === 'samepassword' || (typeof serverMsg === 'string' && serverMsg.toLowerCase().includes('không được trùng'))) {
+    return 'Mật khẩu mới không được trùng với mật khẩu hiện tại.';
+  }
+
+  if (errorKey === 'notloggedin' || status === 401) {
+    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  }
+
+  if (errorKey === 'usernotfound' || status === 404) {
+    return 'Không tìm thấy thông tin tài khoản người dùng.';
+  }
+
+  if (status === 403) {
+    return 'Bạn không có quyền thực hiện thao tác này.';
+  }
+
+  if (data?.fieldErrors && Array.isArray(data.fieldErrors) && data.fieldErrors.length > 0) {
+    const firstErr = data.fieldErrors[0];
+    const fieldName = firstErr.field === 'currentPassword'
+      ? 'Mật khẩu hiện tại'
+      : firstErr.field === 'newPassword'
+      ? 'Mật khẩu mới'
+      : firstErr.field;
+    return `${fieldName}: ${firstErr.message || 'Dữ liệu không hợp lệ.'}`;
+  }
+
+  if (status >= 500) {
+    return serverMsg || 'Máy chủ gặp sự cố khi xử lý đổi mật khẩu. Vui lòng thử lại sau.';
+  }
+
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền mạng.';
+  }
+
+  return serverMsg || error.message || 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+}
+
