@@ -332,7 +332,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | Module                       |     FE      |     BE      |                  DB                  |      Integration      |     Test     |               Status               | Last Update |
 | :--------------------------- | :---------: | :---------: | :----------------------------------: | :-------------------: | :----------: | :--------------------------------: | :---------: |
 | **Authentication**           | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |      IN_PROGRESS      |    TESTED    |            IN_PROGRESS             | 2026-10-11  |
-| **Server & Invite**          |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-14  |
+| **Server & Invite (Task 3.24)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-27  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
 | **Member & Role**            | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |         DONE          |     PASS     |            IN_PROGRESS             | 2026-10-26  |
@@ -977,6 +977,81 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - **Docs & Roadmaps Updated:**
   - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
   - Cập nhật các bảng tiến độ Giai đoạn 2 (6/7) và tổng thể (12/28).
+
+---
+
+### [2026-10-30] FEAT-USER-CHANGE-PASSWORD-API — Làm API Đổi Mật Khẩu & Tests (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng API `POST /api/v1/users/change-password` (kèm các alias `/api/v1/users/password` và `/api/account/change-password`) cho phép người dùng đang đăng nhập đổi mật khẩu tài khoản an toàn, xác thực mật khẩu cũ bằng BCrypt, chống đặt trùng mật khẩu hiện tại, mã hóa mật khẩu mới và dọn dẹp cache người dùng.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/dto/ChangePasswordDTO.java`:
+    - Tạo DTO request nhận: `currentPassword` (@NotBlank), `newPassword` (@NotBlank, @Size min=4, max=100).
+  - `server/src/main/java/com/denhub/service/UserService.java`:
+    - Bổ sung method `@Transactional public void changePassword(ChangePasswordDTO dto)`:
+      - Xác thực người dùng hiện tại từ Spring Security Context (`SecurityUtils.getCurrentUserLogin()`), ném lỗi `notloggedin` nếu chưa xác thực.
+      - Truy vấn entity người dùng từ DB, ném lỗi `usernotfound` nếu không tìm thấy.
+      - Kiểm tra mật khẩu hiện tại với `passwordEncoder.matches`, ném lỗi `invalidcurrentpassword` nếu sai.
+      - Kiểm tra mật khẩu mới không được trùng mật khẩu cũ (`samepassword`).
+      - Mã hóa mật khẩu mới qua `passwordEncoder.encode`, lưu vào DB và gọi `clearUserCaches(user)`.
+  - `server/src/main/java/com/denhub/web/rest/UserProfileResource.java`:
+    - Bổ sung 2 endpoints:
+      - `POST /api/v1/users/change-password`: Endpoint chính thức đổi mật khẩu.
+      - `POST /api/v1/users/password`: Endpoint alias theo chuẩn RESTful.
+  - `server/src/main/java/com/denhub/web/rest/AccountResource.java`:
+    - Bổ sung endpoint `POST /api/account/change-password`: Endpoint alias tương thích theo chuẩn Spring Security / JHipster.
+- **Tests Added:**
+  - `server/src/test/java/com/denhub/service/UserServiceTest.java`:
+    - `changePassword_Success`: Đổi mật khẩu thành công và lưu mã băm mới.
+    - `changePassword_Fail_WhenCurrentPasswordIncorrect`: Bắt lỗi `invalidcurrentpassword` khi mật khẩu cũ sai.
+    - `changePassword_Fail_WhenNewPasswordSameAsCurrent`: Bắt lỗi `samepassword` khi mật khẩu mới trùng mật khẩu cũ.
+    - `changePassword_Fail_WhenNotLoggedIn`: Bắt lỗi `notloggedin`.
+    - `changePassword_Fail_WhenUserNotFound`: Bắt lỗi `usernotfound`.
+  - `server/src/test/java/com/denhub/web/rest/UserProfileResourceTest.java`:
+    - `changePassword_Success`: MockMvc POST `/api/v1/users/change-password` trả về HTTP 200.
+    - `changePassword_Alias_Success`: MockMvc POST `/api/v1/users/password` trả về HTTP 200.
+    - `changePassword_Fail_WhenValidationFails`: Trả về HTTP 400 khi payload không hợp lệ (< 4 ký tự).
+    - `changePassword_Fail_WhenCurrentPasswordIncorrect`: Trả về HTTP 400 Problem Details với `errorKey: "invalidcurrentpassword"`.
+    - `changePassword_Fail_WhenNewPasswordSameAsCurrent`: Trả về HTTP 400 Problem Details với `errorKey: "samepassword"`.
+    - `changePassword_Fail_WhenNotLoggedIn`: Trả về HTTP 400 Problem Details với `errorKey: "notloggedin"`.
+- **Verification:**
+  - `.\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.UserProfileResourceTest"`: PASS 100% (32 tests).
+- **Docs & Architecture Updated:**
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Bổ sung endpoint `POST /api/v1/users/change-password` vào bảng REST API chuẩn (`CONFIRMED`).
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Ghi nhận hoàn thành công việc.
+
+---
+
+### [2026-10-30] FEAT-USER-CHANGE-PASSWORD-UI — Làm UI Đổi Mật Khẩu & Kết Nối API (Kỳ Anh)
+
+- **Mục tiêu:** Xây dựng modal đổi mật khẩu chuẩn Cyber Dark, kiểm tra validation tức thời (mật khẩu hiện tại, mật khẩu mới, xác nhận mật khẩu), kết nối API backend `POST /api/v1/users/change-password` và tích hợp hoàn chỉnh vào trang Profile.
+- **Frontend Changes:**
+  - `client/src/api/userApi.js` & `client/src/api/authApi.js`:
+    - Bổ sung method `changePassword(data)` gửi request POST tới `/v1/users/change-password`.
+  - `client/src/utils/profileUtils.js`:
+    - Xây dựng `validatePasswordChange(values)` kiểm tra đầy đủ mật khẩu hiện tại, độ dài mật khẩu mới (4-100 ký tự), kiểm tra trùng với mật khẩu cũ và khớp với mật khẩu xác nhận.
+    - Xây dựng `getPasswordChangeErrorMessage(error)` ánh xạ các mã lỗi `invalidcurrentpassword`, `samepassword`, `notloggedin`, `usernotfound`, lỗi Bean validation `fieldErrors` và lỗi kết nối mạng sang thông báo tiếng Việt.
+  - `client/src/components/common/ChangePasswordModal.jsx`:
+    - Tạo Modal đổi mật khẩu Cyber Dark với card bo góc 18px, viền neon gradient `#6366F1` &rarr; `#00F2FE`.
+    - Hộp nhắc nhở bảo mật an toàn (Security Advice Banner).
+    - Các trường mật khẩu dạng ẩn với icon khóa, eye toggle bật/tắt hiển thị mật khẩu.
+    - Hộp Alert báo lỗi tự động khi sai mật khẩu hiện tại hoặc trùng mật khẩu cũ.
+    - Nút Đổi mật khẩu gradient có trạng thái loading chống click đúp.
+  - `client/src/pages/profile/ProfilePage.jsx`:
+    - Tích hợp `ChangePasswordModal`, quản lý state `isChangePasswordModalOpen`.
+    - Kết nối nút "Đổi mật khẩu" ở Toolbar và Quick Actions Footer.
+- **Tests Added:**
+  - `client/tests/userProfile.test.mjs`:
+    - `validatePasswordChange validates correct matching password input`: Dữ liệu hợp lệ.
+    - `validatePasswordChange flags errors when currentPassword is missing or whitespace only`: Bắt lỗi mật khẩu hiện tại rỗng.
+    - `validatePasswordChange flags errors when newPassword is too short, too long, or same as currentPassword`: Bắt lỗi mật khẩu mới quá ngắn, quá dài hoặc trùng mật khẩu cũ.
+    - `validatePasswordChange flags errors when confirmPassword does not match newPassword`: Bắt lỗi mật khẩu xác nhận không khớp.
+    - `getPasswordChangeErrorMessage maps business error keys and validation details`: Kiểm tra ánh xạ lỗi kinh doanh và lỗi mạng.
+- **Verification:**
+  - `node --test tests/userProfile.test.mjs`: PASS 18/18 tests (100%).
+  - `npm run build`: Vite build production hoàn tất thành công 100% trong 41.91s.
+- **Docs & Roadmaps Updated:**
+  - Cập nhật hoàn thành Giai đoạn 2 (7/7 nhiệm vụ - 100%).
+  - Cập nhật tiến độ Giai đoạn 3 (1/5 nhiệm vụ) và tổng thể (14/28 nhiệm vụ).
 
 ---
 
@@ -3013,7 +3088,48 @@ Commit:
 
 ---
 
+### [2026-10-27] TASK-3.24 — Kiểm tra mã mời và quyền thành viên (Server Invitation & Member Permissions Verification)
+
+Implemented & Verified:
+- Audit toàn diện 12 trường hợp kiểm thử luồng mã mời và phân quyền thành viên Server:
+  1. Người có quyền tạo mã mời: Server Owner tạo mã 8 ký tự Base62 thành công (HTTP 201).
+  2. Người không có quyền tạo mã mời: Thành viên thường, người ngoài và tài khoản admin hệ thống không phải Server Owner bị từ chối (HTTP 403 Forbidden).
+  3. Mã mời hợp lệ: Outsider tham gia thành công bằng mã mời (HTTP 200, ServerResponseDTO).
+  4. Mã mời sai: Mã không tồn tại (HTTP 404), mã rỗng/khoảng trắng (HTTP 400).
+  5. Mã mời hết hạn: Mã có expiresAt < now() bị từ chối (HTTP 400).
+  6. Mã mời hết lượt sử dụng: Khảo sát thực tế schema bảng `invites` không có `usage_limit` / `use_count` (MVP không hỗ trợ, ghi nhận đúng thực tế).
+  7. Mã mời bị vô hiệu hóa: Mã có status != ACTIVE (ví dụ REVOKED) bị từ chối (HTTP 400).
+  8. Người tham gia thành công: Tạo `ServerMember` trong DB, hiển thị ngay trong danh sách thành viên (`GET /api/v1/servers/{serverId}/members`) với role MEMBER.
+  9. Người đã là member dùng lại mã: Bị từ chối với HTTP 400 (bảo vệ 2 lớp: application check + unique constraint `ux_server_member`).
+  10. Người chưa xác thực sử dụng mã: Bị từ chối HTTP 401 Unauthorized Problem Details.
+  11. Người không còn là member truy cập tài nguyên: Bị từ chối HTTP 403 trên Server detail, member list, channel list.
+  12. Quyền REST và WebSocket: REST endpoint kiểm tra ServerMember nghiêm ngặt; WebSocket inbound STOMP chỉ dùng cho chat 1-1 và feed, channel messaging dùng REST.
+- Backend Tests:
+  - Bổ sung 4 integration tests biên trong `ServerSecurityIT.java`:
+    - `joinServerByInviteCode_BlankOrWhitespaceCode_Returns400`
+    - `joinServerByInviteCode_ServerDeletedAfterInvite_Returns404`
+    - `createServerInvite_GlobalAdminNotOwner_Returns403`
+    - `joinServerByInviteCode_ImmediateAccessToChannelsAndMembersAfterJoin`
+  - Kết quả: `ServerSecurityIT` (92 tests) PASS 100%, `ServerServiceTest` PASS 100%.
+- Frontend Tests:
+  - Bổ sung 2 tests trong `client/tests/serverInvite.test.mjs` xác minh chuẩn hóa trim whitespace và phân loại lỗi `inviteexpired`, `inviterevoked`, `alreadymember`.
+  - Kết quả: 105/105 tests PASS 100%, client production build PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Section 10 Progress, Section 11 Log, Section 12 Handoff).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Section 18 Task 3.24 Audit & Invitation Matrix).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff hiện tại — Task 3.24: Kiểm tra mã mời và quyền thành viên (2026-10-27)
+
+- Task 3.24 hoàn thành xuất sắc toàn bộ 12 ca kiểm thử theo yêu cầu.
+- Mã mời và quyền thành viên được kiểm soát chặt chẽ ở cả tầng ứng dụng và cơ sở dữ liệu.
+- Toàn bộ backend integration & service tests PASS 100%.
+- Toàn bộ frontend unit tests (105 tests) và production build PASS 100%.
+- Sẵn sàng chuyển tiếp sang Task 4.04 sau khi người dùng xác nhận.
 
 ### Handoff — Tự mở Server vừa tạo (2026-10-27)
 

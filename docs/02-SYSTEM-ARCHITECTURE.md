@@ -161,6 +161,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
 | **User Profile** | `GET` | `/api/v1/users/profile` (alias `/api/v1/users/me`) | Lấy thông tin chi tiết hồ sơ cá nhân của người dùng đang đăng nhập | `CONFIRMED` |
 | **User Profile** | `PUT` | `/api/v1/users/profile` (alias `/api/v1/users/me`) | Cập nhật thông tin hồ sơ cá nhân (name, username, avatar) của người dùng đang đăng nhập | `CONFIRMED` |
+| **User Profile** | `POST` | `/api/v1/users/change-password` (alias `/api/v1/users/password`, `/api/account/change-password`) | Đổi mật khẩu của người dùng đang đăng nhập | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/login` | Đăng nhập và lấy Access Token JWT | `TBD` |
 | **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tương user hiện tại qua token | `TBD` |
@@ -1009,3 +1010,26 @@ Ngay sau khi thành viên bị loại thành công:
 - `filterActiveServersAfterRemoval(serverList, removedServerId)`: Cập nhật state loại bỏ Server ra khỏi sidebar.
 - `resolveRemovalRedirectPath(currentServerId, removedServerId, remainingServers)`: Tự động điều hướng an toàn người dùng sang Server kế tiếp hoặc trang `/servers` để tránh crash UI.
 
+---
+
+## 20. QUY TẮC KIỂM TRA MÃ MỜI VÀ QUYỀN THÀNH VIÊN (TASK 3.24)
+
+### 20.1 Endpoints & Luồng mã mời
+- **Tạo mã mời**: `POST /api/v1/servers/{serverId}/invites`
+  - Phân quyền: Duy nhất Server Owner (`server.ownerId == currentUser.id`). Thành viên thường, người ngoài, hoặc tài khoản có `ROLE_ADMIN` hệ thống nhưng không phải chủ sở hữu Server đều bị từ chối với HTTP `403 Forbidden`.
+  - Cơ chế sinh mã: 8 ký tự Base62 ngẫu nhiên an toàn qua `SecureRandom`, kiểm tra chống trùng lặp tối đa 5 lần.
+  - Thời hạn: Cho phép truyền `expiresAt` trong tương lai; từ chối `expiresAt` trong quá khứ với HTTP `400 Bad Request`. Mặc định `null` là vĩnh viễn.
+  - Giới hạn số lượt dùng (`usage_limit`): Trong schema MVP hiện tại, bảng `invites` chỉ quản lý trạng thái (`status`) và thời hạn (`expires_at`), chưa hỗ trợ `max_uses` hay `use_count`.
+- **Tham gia bằng mã mời**: `POST /api/v1/servers/join-invite/{code}`
+  - Yêu cầu: Đăng nhập (`Bearer JWT`), tài khoản `activated == true`.
+  - Xác thực mã: Mã không tồn tại $\rightarrow$ `404 Not Found`; mã hết hạn $\rightarrow$ `400 Bad Request`; mã bị vô hiệu hóa (`status != ACTIVE`) $\rightarrow$ `400 Bad Request`.
+  - Server liên kết bị xóa: Nếu Server đã bị xóa sau khi tạo mã $\rightarrow$ `404 Not Found` ("Không tìm thấy Server liên kết với mã mời").
+  - Chống trùng 2 lớp: Nếu người dùng đã là thành viên $\rightarrow$ từ chối ngay với HTTP `400 Bad Request` ("Bạn đã là thành viên của Server này rồi").
+- **Kích hoạt quyền tức thì (Immediate Permission Activation)**:
+  - Ngay khi gọi `POST /api/v1/servers/join-invite/{code}` thành công, bản ghi `ServerMember` được lưu xuống DB với role `MEMBER`.
+  - Người dùng ngay lập tức có quyền đọc chi tiết Server (`GET /api/v1/servers/{serverId}`), xem danh sách thành viên (`GET /api/v1/servers/{serverId}/members`), và truy cập danh sách kênh (`GET /api/v1/servers/{serverId}/channels`).
+  - Khi chưa tham gia (Outsider): Bị chặn `403 Forbidden` trên Server và thành viên, chặn `400 Bad Request (channel forbidden)` trên kênh.
+
+### 20.2 Ranh giới REST và WebSocket/STOMP đối với Member
+- Phân quyền Server Member được áp dụng nhất quán trên toàn bộ REST endpoints (Server, Member, Channel, Channel Message).
+- Inbound STOMP WebSocket (`/ws`) trong kiến trúc DenHub chỉ phục vụ tin nhắn riêng 1-1 (`/app/conversations/send`) và bảng tin bài viết (`/app/post`). Gửi tin nhắn kênh chat Server sử dụng REST POST (`/api/channels/{channelId}/messages`), tại đây `MessageService` bắt buộc kiểm tra sự tồn tại của membership qua `serverMemberRepository.existsByServerIdAndUserId`.

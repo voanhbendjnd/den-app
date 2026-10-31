@@ -6,11 +6,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.denhub.service.UserService;
+import com.denhub.service.dto.ChangePasswordDTO;
 import com.denhub.service.dto.UpdateUserProfileDTO;
 import com.denhub.service.dto.UserProfileResponseDTO;
 import com.denhub.util.anotation.ApiMessage;
@@ -83,5 +85,33 @@ public class UserProfileResource {
     public ResponseEntity<UserProfileResponseDTO> updateUserProfileMe(@Valid @RequestBody UpdateUserProfileDTO dto) {
         UserProfileResponseDTO updatedProfile = userService.updateUserProfile(dto);
         return ResponseEntity.ok(updatedProfile);
+    }
+
+    /**
+     * {@code POST  /api/v1/users/change-password} : Thay đổi mật khẩu người dùng hiện tại.
+     *
+     * @param dto DTO chứa mật khẩu hiện tại và mật khẩu mới.
+     * @return {@link ResponseEntity} với status {@code 200 (OK)}.
+     */
+    @PostMapping("/change-password")
+    @Operation(summary = "Đổi mật khẩu", description = "Thay đổi mật khẩu đăng nhập của người dùng hiện tại.")
+    @ApiMessage("Đổi mật khẩu thành công")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto) {
+        userService.changePassword(dto);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * {@code POST  /api/v1/users/password} : Endpoint tương thích (alias) để đổi mật khẩu.
+     *
+     * @param dto DTO chứa mật khẩu hiện tại và mật khẩu mới.
+     * @return {@link ResponseEntity} với status {@code 200 (OK)}.
+     */
+    @PostMapping("/password")
+    @Operation(summary = "Đổi mật khẩu (alias)", description = "Thay đổi mật khẩu đăng nhập của người dùng hiện tại.")
+    @ApiMessage("Đổi mật khẩu thành công")
+    public ResponseEntity<Void> changePasswordAlias(@Valid @RequestBody ChangePasswordDTO dto) {
+        userService.changePassword(dto);
+        return ResponseEntity.ok().build();
     }
 }

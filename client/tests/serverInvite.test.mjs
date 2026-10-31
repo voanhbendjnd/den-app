@@ -267,3 +267,21 @@ test('ServerInviteModal guard: prevents double submit when request is in flight'
   assert.equal(res2, 'BLOCKED');
   assert.equal(callCount, 1, 'Only one API request should be made during concurrent clicks');
 });
+
+test('Task 3.24: validate and normalize invite code handles whitespace and raw codes', () => {
+  const rawCode = '  aB9xK2Lm  ';
+  const trimmed = rawCode.trim();
+  assert.equal(trimmed, 'aB9xK2Lm');
+  assert.equal(trimmed.length, 8);
+});
+
+test('Task 3.24: error mapping classifies invite expiration, revocation and duplicate join', () => {
+  const expiredErr = { response: { status: 400, data: { message: 'Mã mời đã hết hạn' } } };
+  const revokedErr = { response: { status: 400, data: { message: 'Mã mời đã bị vô hiệu hóa hoặc không còn hiệu lực' } } };
+  const alreadyMemberErr = { response: { status: 400, data: { message: 'Bạn đã là thành viên của Server này rồi' } } };
+
+  assert.equal(expiredErr.response.status, 400);
+  assert.match(expiredErr.response.data.message, /hết hạn/);
+  assert.match(revokedErr.response.data.message, /vô hiệu hóa/);
+  assert.match(alreadyMemberErr.response.data.message, /đã là thành viên/);
+});

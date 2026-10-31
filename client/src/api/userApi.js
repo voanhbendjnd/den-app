@@ -31,6 +31,15 @@ const userApi = {
    * @param {Object} data { name?: string, username?: string, avatar?: string }
    * @returns {Promise<any>}
    */
+  /**
+   * Đổi mật khẩu người dùng hiện tại
+   * @param {Object} data { currentPassword: string, newPassword: string }
+   * @returns {Promise<any>}
+   */
+  changePassword(data) {
+    return axiosClient.post('/v1/users/change-password', data);
+  },
+
   updateMe(data) {
     return axiosClient.put('/v1/users/me', data);
   },

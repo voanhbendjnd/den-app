@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import userApi from '../../api/userApi';
 import EditProfileModal from '../../components/common/EditProfileModal';
+import ChangePasswordModal from '../../components/common/ChangePasswordModal';
 import {
   extractProfileData,
   formatJoinDate,
@@ -41,6 +42,7 @@ export default function ProfilePage() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
 
   // Gọi API lấy thông tin hồ sơ người dùng
   const fetchProfile = useCallback(async (isManualRefresh = false) => {
@@ -198,6 +200,18 @@ export default function ProfilePage() {
                   >
                     Chỉnh sửa hồ sơ
                   </Button>
+                  <Button
+                    icon={<KeyOutlined />}
+                    onClick={() => setIsChangePasswordModalOpen(true)}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.12)',
+                      borderColor: 'rgba(99, 102, 241, 0.4)',
+                      color: '#818CF8',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Đổi mật khẩu
+                  </Button>
                   <Tooltip title="Tải lại thông tin từ hệ thống">
                     <Button
                       icon={<ReloadOutlined spin={refreshing} />}
@@ -325,7 +339,7 @@ export default function ProfilePage() {
                 </Button>
                 <Button
                   icon={<KeyOutlined />}
-                  onClick={() => message.info('Chức năng Đổi mật khẩu sẽ sẵn sàng ở giai đoạn tiếp theo!')}
+                  onClick={() => setIsChangePasswordModalOpen(true)}
                   style={{
                     background: 'rgba(99, 102, 241, 0.12)',
                     borderColor: 'rgba(99, 102, 241, 0.4)',
@@ -346,6 +360,12 @@ export default function ProfilePage() {
           onClose={() => setIsEditModalOpen(false)}
           onSuccess={handleEditSuccess}
           currentProfile={displayData}
+        />
+
+        {/* Modal Đổi Mật Khẩu */}
+        <ChangePasswordModal
+          open={isChangePasswordModalOpen}
+          onClose={() => setIsChangePasswordModalOpen(false)}
         />
       </div>
     </div>
