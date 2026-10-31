@@ -335,7 +335,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Server & Invite (Task 3.24)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-27  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
-| **Member & Role**            | IMPLEMENTED | IMPLEMENTED |             IMPLEMENTED              |         DONE          |     PASS     |            IN_PROGRESS             | 2026-10-26  |
+| **Member & Role (Task 4.04)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-28  |
 | **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
 | **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-25  |
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
@@ -3121,6 +3121,36 @@ Docs Updated:
 
 ---
 
+### [2026-10-28] TASK-4.04 — Kiểm tra tham gia và rời Server (Server Join & Leave Verification)
+
+Implemented & Verified:
+- Audit toàn diện 12 ca kiểm thử bắt buộc cho luồng Join & Leave Server:
+  1. User hợp lệ tham gia Server: `POST /api/v1/servers/{serverId}/join` trả về HTTP 204 No Content.
+  2. Membership được ghi đúng: Bản ghi `ServerMember` được lưu với đúng `serverId`, `userId`, `role=MEMBER`.
+  3. Server xuất hiện trong danh sách Server của user: `GET /api/v1/servers` của joiner phản ánh đúng Server vừa tham gia.
+  4. User xuất hiện trong danh sách thành viên: `GET /api/v1/servers/{serverId}/members` trả về danh sách chứa joiner với role MEMBER.
+  5. User rời Server thành công: `POST /api/v1/servers/{serverId}/leave` (hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`) trả về HTTP 204 No Content.
+  6. Server biến mất khỏi danh sách Server của user: `GET /api/v1/servers` của leaver không còn chứa server vừa rời.
+  7. Server khác của user vẫn xuất hiện: User sở hữu/tham gia server khác thì server đó vẫn tồn tại nguyên vẹn.
+  8. User không phải member bị chặn API: Trước khi join và sau khi leave, user bị chặn khi gọi Server detail (403), members list (403), channels (400).
+  9. Join thất bại không tạo membership giả: Khi API join gặp lỗi (400 alreadymember, 404, network), frontend giữ nguyên state, không hiển thị server giả.
+  10. Leave thất bại không xóa Server giả: Khi API leave gặp lỗi (400 ownerCannotLeave, network), frontend không xóa server khỏi danh sách.
+  11. Refresh trang phản ánh đúng membership: Gọi lại API danh sách server và thành viên xác nhận trạng thái nhất quán từ cơ sở dữ liệu.
+  12. Quy tắc Owner (BR-SRV-01): Chủ sở hữu gọi API rời Server bị từ chối với HTTP 400 `owner_cannot_leave`; frontend `canLeaveServer` khóa nút rời server.
+- Backend Tests:
+  - Bổ sung integration test tích hợp `joinAndLeaveServer_CompleteLifecycle_MembershipAndResourceAccessVerified` trong `ServerSecurityIT.java`.
+  - Kết quả: `ServerSecurityIT` (93 tests) PASS 100%, `ServerServiceTest` PASS 100%.
+- Frontend Tests:
+  - Tạo mới `client/tests/serverJoinLeaveIntegration.test.mjs` (6 tests) kiểm thử toàn diện state synchronization, error guards và quy tắc BR-SRV-01.
+  - Cập nhật `client/package.json` script test bao gồm file mới.
+  - Kết quả: 111/111 tests PASS 100%, client production build PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Section 10 Progress, Section 11 Log, Section 12 Handoff).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Section 21 Server Join & Leave System Contract).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
 ### Handoff hiện tại — Task 3.24: Kiểm tra mã mời và quyền thành viên (2026-10-27)
@@ -3590,3 +3620,21 @@ Luôn ghi: `Not pushed — AI agents are not allowed to push DenHub.`
   - Thiết kế giao diện Đăng nhập (`LoginPage.jsx`) và Đăng ký (`RegisterPage.jsx`) chuẩn Cyberpunk / Discord Glassmorphism: Divider phân cách, lưới nút đăng nhập Google & GitHub đồng bộ, Modal xác thực GitHub Token cho nhà phát triển và người dùng.
   - Build frontend `npm run build` PASS thành công 100%.
 
+
+---
+
+## 22. Cập nhật ngày 2026-10-31: Xử lý GitHub Private Email Fallback & Hỗ trợ Callback URL
+
+- **Backend:**
+  - Cập nhật `UserService.java`: Khi tài khoản GitHub có email ở chế độ ẩn (Private) hoặc Fine-grained Personal Access Token không có quyền đọc `/user/emails` (403 Forbidden), backend tự động fallback sang định dạng email chuẩn của GitHub: `{githubId}+{username}@users.noreply.github.com` (hoặc `{username}@users.noreply.github.com`).
+  - Đảm bảo tính duy nhất, định dạng hợp lệ thỏa mãn ràng buộc `@Email` và `@NotNull` trong cơ sở dữ liệu `User`.
+- **Frontend:**
+  - Bổ sung route alias `/api/auth/callback/github` trỏ tới `LoginPage` trong `AppRoutes.jsx`, tương thích hoàn toàn với Redirect URI mặc định trên GitHub Developer Settings.
+  - Chuẩn hóa URL redirect GitHub OAuth trong `LoginPage.jsx` và `RegisterPage.jsx`.
+- **Kiểm thử:**
+  - Chạy toàn bộ test backend: `cd server; .\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.AccountResourceIT"` -> **PASS 100% (BUILD SUCCESSFUL)**.
+  - Chạy build frontend: `cd client; npm run build` -> **PASS 100% (built in 1.39s)**.
+
+- **Database & Entity Fix (Lỗi SQL 2628 truncation):**
+  - Đồng bộ cột `refresh_token` trong bảng `users` sang kiểu `NVARCHAR(MAX)` theo đúng đặc tả `docs/03-DATABASE-DESIGN.md` mục 3.1.
+  - Cập nhật entity `User.java`: Thêm `columnDefinition = "NVARCHAR(MAX)"` cho trường `refreshToken` để lưu trữ an toàn các JWT refresh token có payload/claims dài mà không bị tràn bộ nhớ đệm SQL Server.

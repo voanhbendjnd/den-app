@@ -1033,3 +1033,28 @@ Ngay sau khi thành viên bị loại thành công:
 ### 20.2 Ranh giới REST và WebSocket/STOMP đối với Member
 - Phân quyền Server Member được áp dụng nhất quán trên toàn bộ REST endpoints (Server, Member, Channel, Channel Message).
 - Inbound STOMP WebSocket (`/ws`) trong kiến trúc DenHub chỉ phục vụ tin nhắn riêng 1-1 (`/app/conversations/send`) và bảng tin bài viết (`/app/post`). Gửi tin nhắn kênh chat Server sử dụng REST POST (`/api/channels/{channelId}/messages`), tại đây `MessageService` bắt buộc kiểm tra sự tồn tại của membership qua `serverMemberRepository.existsByServerIdAndUserId`.
+
+---
+
+## 21. QUY TẮC THAM GIA VÀ RỜI SERVER (TASK 4.04)
+
+### 21.1 Endpoints & Luồng nghiệp vụ
+- **Tham gia Server trực tiếp**: `POST /api/v1/servers/{serverId}/join`
+  - Yêu cầu: Đăng nhập (`Bearer JWT`), tài khoản `activated == true`.
+  - Kết quả thành công: Trả về HTTP `204 No Content`. Bản ghi `ServerMember` được lưu với vai trò `MEMBER`.
+  - Chống trùng lặp (2 lớp): Nếu user đã là thành viên $\rightarrow$ từ chối ngay với HTTP `400 Bad Request` (`BadRequestAlertException("User is already a member of this server", "server", "alreadymember")`).
+  - Đồng bộ danh sách: Server xuất hiện ngay trong danh sách Server của user (`GET /api/v1/servers`); user xuất hiện trong danh sách thành viên của Server (`GET /api/v1/servers/{serverId}/members`).
+- **Tự rời khỏi Server**: `POST /api/v1/servers/{serverId}/leave` (hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`)
+  - Yêu cầu: Đăng nhập (`Bearer JWT`), đang là thành viên của Server.
+  - Kết quả thành công: Trả về HTTP `204 No Content`. Bản ghi trong `server_member` bị xóa.
+  - Quy tắc Chủ sở hữu (BR-SRV-01): Server Owner không được tự rời Server của mình. Nếu Owner gọi API $\rightarrow$ bị từ chối với HTTP `400 Bad Request` (`BadRequestAlertException("Chủ sở hữu không thể tự rời khỏi Server", "server", "owner_cannot_leave")`).
+  - Kiểm tra thành viên: Nếu người dùng không phải là thành viên của Server $\rightarrow$ từ chối với HTTP `400 Bad Request` (`BadRequestAlertException("Bạn không phải là thành viên của Server này", "server", "not_a_member")`).
+  - Đồng bộ danh sách: Server biến mất khỏi danh sách Server của user (`GET /api/v1/servers`); các Server khác của user vẫn được bảo toàn nguyên vẹn.
+  - Thu hồi quyền: Ngay sau khi leave, user bị chặn khi gọi chi tiết Server (`403 Forbidden`), danh sách thành viên (`403 Forbidden`) và danh sách kênh chat (`400 Bad Request - forbidden`).
+
+### 21.2 Cơ chế đồng bộ trạng thái ở Frontend
+- **Ngăn ngừa hiển thị trạng thái giả (False State Prevention)**:
+  - Khi gọi `join` thất bại (400, 404, network error): Frontend giữ nguyên state, tuyệt đối không thêm Server vào sidebar hoặc thêm user vào danh sách thành viên.
+  - Khi gọi `leave` thất bại (400, network error): Frontend không xóa Server khỏi state.
+- **Tuân thủ phân quyền giao diện (UI Protection)**:
+  - Helper `canLeaveServer(server, currentUser)` kiểm tra `server.ownerId == currentUser.id`. Nếu là Owner, thuộc tính `canLeave` trả về `false` kèm lý do ("Chủ sở hữu không thể tự rời Server. Hãy chuyển quyền sở hữu hoặc xóa Server"), nút rời Server trên giao diện bị ẩn hoặc disable.

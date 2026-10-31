@@ -85,7 +85,7 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
     @Column(name ="session_id")
     private String sessionId;
     @JsonIgnore
-    @Column(name = "refresh_token")
+    @Column(name = "refresh_token", columnDefinition = "NVARCHAR(MAX)")
     private String refreshToken;
     private String type;
     @JsonIgnore

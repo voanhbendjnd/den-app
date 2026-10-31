@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/channelDelete.test.mjs tests/channelEdit.test.mjs tests/channelMessages.test.mjs tests/createPost.test.mjs tests/discordAuth.test.mjs tests/messageInput.test.mjs tests/postLike.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs tests/serverLeave.test.mjs tests/serverRemoveMember.test.mjs tests/serverMemberListAfterJoin.test.mjs tests/serverListAfterLeave.test.mjs tests/serverAccessAfterRemoval.test.mjs"
+    "test": "node --test tests/channelDelete.test.mjs tests/channelEdit.test.mjs tests/channelMessages.test.mjs tests/createPost.test.mjs tests/discordAuth.test.mjs tests/messageInput.test.mjs tests/postLike.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs tests/serverLeave.test.mjs tests/serverRemoveMember.test.mjs tests/serverMemberListAfterJoin.test.mjs tests/serverListAfterLeave.test.mjs tests/serverAccessAfterRemoval.test.mjs tests/serverJoinLeaveIntegration.test.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",

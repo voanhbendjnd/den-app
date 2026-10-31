@@ -107,8 +107,8 @@ export function AuthProvider({ children }) {
     return normalizedUser;
   }, []);
 
-  const loginWithSocial = useCallback(async ({ accessToken, type }) => {
-    const res = await authApi.socialLogin({ accessToken, type });
+  const loginWithSocial = useCallback(async ({ accessToken, code, type }) => {
+    const res = await authApi.socialLogin({ accessToken, code, type });
     const payload = res.data?.data || res.data;
     const newAccessToken = payload?.accessToken;
     const refreshToken = payload?.refreshToken;
