@@ -100,7 +100,7 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 | **CHANNEL** | Kênh `#general` có thể bị xóa không? | `CONFIRMED` | Không được xóa riêng khi Server còn tồn tại. Khi Owner xóa toàn bộ Server, `general` được dọn cùng Server (2026-10-21). |
 | **MEMBER** | Ma trận quyền hạn Server? | `CONFIRMED` | Phân cấp `OWNER > ADMIN > MEMBER` với Hierarchy Kick Shield (BR-MEM-02). |
 | **MEMBER** | Admin có được kick Admin / Owner không? | `CONFIRMED` | Không. Admin chỉ được kick `MEMBER`. Chỉ Owner mới được kick Admin. |
-| **MESSAGE** | Message lưu trữ ở đâu? | `CONFIRMED` | Lưu trữ trong Microsoft SQL Server (bảng `messages`), xóa mềm (`deleted_at`). |
+| **MESSAGE** | Message lưu trữ ở đâu? | `CONFIRMED` | Lưu trữ trong Microsoft SQL Server (bảng `messages`). *Ghi nhận mâu thuẫn tài liệu:* Mục này ghi nhận xóa mềm (`deleted_at`), nhưng thực tế kiến trúc và mã nguồn (`Message.java`, `MessageService.java`) đang sử dụng xóa cứng (`messageRepository.delete(message)`). Dự án giữ nguyên cơ chế xóa cứng và schema hiện tại theo yêu cầu bàn giao, không tự ý thay đổi DB schema. |
 | **MESSAGE** | Ai được gửi tin nhắn Channel? | `CONFIRMED` | Người dùng đã xác thực và là thành viên của Server chứa Channel. Danh tính người gửi lấy từ cơ chế Authentication hiện có. |
 | **MESSAGE** | Nội dung gửi trong Task 1.07? | `CONFIRMED` | Tin nhắn văn bản; không null, rỗng hoặc toàn khoảng trắng, không vượt giới hạn database đã xác nhận. |
 | **MESSAGE** | Ai được quyền sửa tin nhắn? | `CONFIRMED` | Duy nhất tác giả tin nhắn (BR-MSG-02). |

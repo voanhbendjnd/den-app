@@ -465,12 +465,21 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - Tests Added / Updated:
   - Backend:
     - `MessageServiceTest.java`: Bổ sung test phân trang nhiều trang với dữ liệu cố định `getMessages_Success_MultiPageFixedData` (3 trang liên tiếp không trùng lặp, không sót tin); cập nhật test `deleteMessage_Fail_WhenServerOwnerNotAuthor` kỳ vọng 403 Forbidden và verify không gọi repository delete.
-    - `MessageSecurityIT.java`: Cập nhật `deleteMessageForbiddenWhenServerOwnerNotAuthor` (Server Owner cố xóa tin nhắn của member nhận HTTP 403 và tin nhắn trong database H2 vẫn tồn tại nguyên vẹn).
+    - `MessageResourceIT.java`: Bổ sung 4 MockMvc tests cho endpoint `DELETE /api/messages/{messageId}` (204, 400, 404, 403).
+    - `MessageSecurityIT.java`: Cập nhật `deleteMessageForbiddenWhenServerOwnerNotAuthor` (Server Owner cố xóa tin nhắn của member nhận HTTP 403 và tin nhắn trong database H2 vẫn tồn tại nguyên vẹn); bổ sung các tests phân trang, cô lập kênh và kiểm tra biên limit.
   - Frontend:
     - `client/tests/channelMessages.test.mjs`: Bổ sung 5 unit tests mới kiểm thử `canDeleteMessage`, `canEditMessage`, `calculateScrollAfterPrepend`, mô phỏng phân trang 3 trang liên tiếp (`mergeMessagePages`), và bảo toàn state khi lỗi tải thêm.
+    - `client/tests/group-chat.browser.test.mjs`: Bổ sung 6 browser interaction tests hoàn chỉnh với Playwright:
+      1. Khởi tạo tải tin nhắn, hiển thị banner chào mừng `#channel-welcome-title` khi `hasMore = false`.
+      2. Cuộn lên đầu (`scrollTop < 60`) kích hoạt gọi API với `before` và `limit=30`, ghép tin cũ phía trên và chống gọi trùng lặp khi đang tải.
+      3. Khi API phân trang gặp lỗi: hiển thị banner lỗi `.group-messages-load-more-error` với nút "Thử lại", tin nhắn và cursor không bị mất; bấm "Thử lại" tải tiếp thành công.
+      4. Phân quyền Sửa/Xóa: Tác giả có action bar với nút Edit và Delete; Server Owner không có action bar trên tin nhắn của thành viên khác.
+      5. Thao tác inline edit: Click Sửa -> hiện TextArea -> bấm Escape hủy / bấm Enter lưu -> gọi PATCH -> cập nhật nội dung và nhãn `(đã chỉnh sửa)`.
+      6. Thao tác xóa tin nhắn: Click Xóa -> hiện Popconfirm -> click Xác nhận xóa -> gọi DELETE 204 -> tin nhắn biến mất khỏi danh sách.
 - Verification:
-  - Backend tests: PASS 100% (bao gồm `MessageServiceTest`, `MessageResourceIT`, `MessageSecurityIT`).
-  - Frontend tests: `npm test` PASS 114/114 (100%).
+  - Backend tests: `gradlew.bat test` PASS 100% (bao gồm `MessageServiceTest`, `MessageResourceIT`, `MessageSecurityIT`).
+  - Frontend unit tests: `npm test` PASS 114/114 (100%).
+  - Frontend browser tests: `node --test --test-concurrency=1` PASS 100% (6/6 tests tin nhắn channel mới).
   - Frontend build: `npm run build` PASS (0 errors, 3219 modules).
 - Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
 
