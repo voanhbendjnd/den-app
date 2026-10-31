@@ -1,6 +1,9 @@
 import axiosClient from './axiosClient';
 
 const serverApi = {
+  discover({ q = '', page = 0, size = 20 } = {}, signal) {
+    return axiosClient.get('/v1/servers/discover', { params: { q, page, size }, signal });
+  },
   create(data) {
     return axiosClient.post('/v1/servers', data);
   },

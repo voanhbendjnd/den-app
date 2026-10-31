@@ -1,0 +1,30 @@
+.discovery-page { max-width: 960px; margin: 0 auto; padding: 36px 40px; }
+.discovery-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+.discovery-header h1 { font-size: 28px; margin: 0 0 8px; }
+.discovery-header p, .discovery-hint, .discovery-server-info span { color: var(--color-text-muted); }
+.discovery-header p { margin: 0; }
+.discovery-page > label { display: block; font-weight: 600; margin-bottom: 8px; }
+.discovery-hint { font-size: 13px; margin: 10px 0 28px; }
+.discovery-page > .ant-alert { margin-bottom: 20px; }
+.discovery-results { list-style: none; padding: 0; margin: 0 0 24px; }
+.discovery-results li { display: flex; align-items: center; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--border-subtle); }
+.discovery-server-info { min-width: 0; flex: 1; display: grid; gap: 6px; }
+.discovery-server-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.discovery-server-info span { font-size: 13px; }
+.discovery-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--border-subtle); color: var(--color-text-muted); }
+.discovery-page a:focus-visible, .discovery-layout .main-primary-dock a:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 4px; }
+@media (max-width: 991px) {
+  .discovery-layout > .main-secondary-sidebar { display: none !important; }
+  .discovery-layout > .main-workspace { margin-left: 72px !important; }
+  .discovery-page { padding: 24px 20px; }
+}
+@media (max-width: 600px) {
+  .discovery-layout > .main-primary-dock { width: 56px !important; min-width: 56px !important; max-width: 56px !important; flex-basis: 56px !important; }
+  .discovery-layout > .main-workspace { margin-left: 56px !important; }
+  .discovery-page { padding: 24px 12px; }
+  .discovery-header { align-items: flex-start; flex-direction: column; }
+  .discovery-header h1 { font-size: 24px; }
+  .discovery-results li { gap: 10px; flex-wrap: wrap; }
+  .discovery-server-info { flex-basis: calc(100% - 58px); }
+  .discovery-results li > button { margin-left: 58px; }
+}

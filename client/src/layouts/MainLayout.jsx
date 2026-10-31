@@ -11,6 +11,7 @@ import {
     MessageOutlined,
     CompassOutlined,
     TeamOutlined,
+    SearchOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import CreateServerModal from '../components/common/CreateServerModal';
@@ -206,7 +207,7 @@ export default function MainLayout() {
     ];
 
     return (
-        <Layout className={isGroupPage ? 'group-layout' : isHomePage ? 'home-layout' : undefined} style={{ minHeight: '100vh', background: 'var(--color-bg-base)' }}>
+        <Layout className={isGroupPage ? 'group-layout' : isHomePage ? 'home-layout' : location.pathname === '/discover' ? 'discovery-layout' : undefined} style={{ minHeight: '100vh', background: 'var(--color-bg-base)' }}>
             {/* =========================================================
           Primary Dock (Far-Left Server Launcher)
          ========================================================= */}
@@ -347,6 +348,15 @@ export default function MainLayout() {
                             );
                         })}
 
+                        <Tooltip title="Tìm server" placement="right">
+                            <Link to="/discover" aria-label="Tìm server" aria-current={location.pathname === '/discover' ? 'page' : undefined}
+                                style={{ display: 'grid', placeItems: 'center', width: 48, height: 48, borderRadius: 16,
+                                    background: location.pathname === '/discover' ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                                    color: 'var(--color-text-main)', fontSize: 20 }}>
+                                <SearchOutlined />
+                            </Link>
+                        </Tooltip>
+
                         {/* Quick Action: Add Server */}
                         <Tooltip title="Tạo Không Gian Mới (Server)" placement="right">
                             <div
@@ -384,7 +394,7 @@ export default function MainLayout() {
                         </Tooltip>
 
                         {/* Quick Action: Join Server */}
-                        <Tooltip title="Tham Gia Server (ID)" placement="right">
+                        <Tooltip title="Nhập mã mời / ID" placement="right">
                             <div
                                 onClick={() => setIsJoinModalOpen(true)}
                                 style={{
