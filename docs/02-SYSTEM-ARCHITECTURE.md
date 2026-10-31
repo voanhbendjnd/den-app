@@ -178,7 +178,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
 | **Message** | `GET` | `/api/channels/{channelId}/messages?before={id}&limit=30` | Lấy lịch sử Message (Cursor pagination) | `CONFIRMED` |
 | **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message server cũ | `TBD` |
-| **Message** | `DELETE`| `/api/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
+| **Message** | `DELETE`| `/api/messages/{messageId}` | Xóa Message (duy nhất tác giả tin nhắn; trả `204 No Content`) | `IMPLEMENTED` |
 | **Channel** | `POST` | `/api/v1/channels` | Tạo mới một Channel trong Server (yêu cầu là Owner/Member) | `CONFIRMED` |
 | **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `CONFIRMED` |
 | **Channel** | `PUT` | `/api/v1/channels/{channelId}` | Cập nhật thông tin (tên, thứ tự) Channel | `CONFIRMED` |
@@ -233,7 +233,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/channels/{channelId}/messages?before={id}&limit=30`: Lịch sử tin nhắn
 - `POST /api/channels/{channelId}/messages`: Gửi tin nhắn mới
 - `PATCH /api/messages/{messageId}`: Chỉnh sửa tin nhắn (tác giả)
-- `DELETE /api/messages/{messageId}`: Xóa mềm tin nhắn
+- `DELETE /api/messages/{messageId}`: Xóa tin nhắn (duy nhất tác giả tin nhắn; trả `204 No Content`)
 - `POST /api/messages/{messageId}/reactions`: Thả emoji reaction
 - `DELETE /api/messages/{messageId}/reactions/{emoji}`: Gỡ emoji reaction
 
@@ -522,6 +522,28 @@ Endpoint: `PATCH /api/messages/{messageId}` & `PUT /api/messages/{messageId}`
   - `MessageServiceTest`: 9 unit tests kiểm thử sửa thành công, chặn invalid ID, blank content, content > 4000 ký tự, chưa đăng nhập, message không tồn tại, user khác sửa (403), server owner sửa (403).
   - `MessageResourceIT`: 5 MockMvc tests kiểm thử PATCH & PUT trả 200 kèm envelope, 400 khi blank content, 404 khi not found, 403 khi forbidden.
   - `MessageSecurityIT`: 7 SpringBootTest integration tests với JWT token thật và database H2 thật kiểm thử sửa qua PATCH và PUT thành công và cập nhật `lastModifiedDate`, chặn 403 khi member khác sửa, chặn 403 khi server owner sửa, chặn 401 khi không token, chặn 400 khi blank, chặn 404 khi tin nhắn không tồn tại.
+
+### 7.9 API Xóa tin nhắn — Delete Message (`IMPLEMENTED`)
+
+- **Mục đích:** Xóa vĩnh viễn một tin nhắn khỏi Channel.
+- **Quyền hạn truy cập:**
+  - **Duy nhất tác giả tin nhắn (`authorId == currentUser.id`)**.
+  - Server Owner, Admin hoặc thành viên khác không được quyền xóa tin nhắn của người khác chỉ nhờ vai trò (bị từ chối `403 Forbidden`).
+- **Endpoint:** `DELETE /api/messages/{messageId}`
+- **Authentication:** Bắt buộc JWT Bearer token qua header `Authorization: Bearer <token>`.
+- **Validation Constraints:**
+  - `messageId` (path variable): kiểu Long, phải lớn hơn 0 (<= 0 trả `400 Bad Request`).
+- **Response Format (Thành công 204 No Content):**
+  - Trả về mã HTTP `204 No Content` với body rỗng (chuẩn REST cho thao tác DELETE trong DenHub).
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `messageId` null hoặc <= 0.
+  - `401 Unauthorized`: Chưa đăng nhập hoặc token không hợp lệ / tài khoản inactive.
+  - `403 Forbidden`: Người gửi request không phải tác giả của tin nhắn (`"Bạn không có quyền xóa tin nhắn này"`).
+  - `404 Not Found`: Không tìm thấy tin nhắn với `messageId`.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 6 unit tests (tác giả xóa 204, server owner cố xóa bị 403, other member cố xóa bị 403, invalid id 400, unauthenticated 401, not found 404).
+  - `MessageResourceIT`: 4 MockMvc tests (DELETE 204, 400, 404, 403).
+  - `MessageSecurityIT`: 5 SpringBootTest integration tests với token JWT thật và database H2 (tác giả xóa thành công 204, server owner bị 403 và DB còn nguyên, member khác bị 403 và DB còn nguyên, 401 không token, 404 not found).
 
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 
