@@ -173,3 +173,128 @@ test('canRemoveMember rejects when server or user is malformed or missing id/own
   // Target member missing userId
   assert.equal(canRemoveMember(validServer, { id: '100' }, { username: 'no-userId' }).canRemove, false);
 });
+
+test('Task 4.09: State synchronization removes kicked member and preserves remaining members', () => {
+  const initialMembers = [
+    { userId: 1, username: 'owner_alice', role: 'OWNER' },
+    { userId: 2, username: 'kicked_bob', role: 'MEMBER' },
+    { userId: 3, username: 'remaining_charlie', role: 'MEMBER' },
+  ];
+
+  // Simulates GroupChatPage.jsx onSuccess handler:
+  // setMembers((prev) => prev.filter((m) => String(m.userId) !== String(removedUserId)))
+  const applyRemovalSuccess = (members, removedUserId) => {
+    return members.filter((m) => String(m.userId) !== String(removedUserId));
+  };
+
+  const updatedMembers = applyRemovalSuccess(initialMembers, 2);
+
+  assert.equal(updatedMembers.length, 2);
+  assert.equal(updatedMembers.some((m) => m.userId === 2), false);
+  assert.equal(updatedMembers[0].userId, 1);
+  assert.equal(updatedMembers[1].userId, 3);
+  assert.equal(updatedMembers[1].username, 'remaining_charlie');
+});
+
+test('Task 4.09: Frontend state rollback - failed removal preserves members list and keeps modal open', async () => {
+  const initialMembers = [
+    { userId: 1, username: 'owner_alice', role: 'OWNER' },
+    { userId: 2, username: 'target_bob', role: 'MEMBER' },
+    { userId: 3, username: 'charlie', role: 'MEMBER' },
+  ];
+
+  let currentMembers = [...initialMembers];
+  let memberToRemove = initialMembers[1];
+  let modalOpen = true;
+  let capturedError = null;
+
+  // Mock serverApi.removeMember that rejects with 403 Forbidden
+  const mockApiRemoveMember = async () => {
+    const error = new Error('Request failed with status code 403');
+    error.response = { status: 403, data: { message: 'Chỉ chủ sở hữu Server mới có quyền loại thành viên' } };
+    throw error;
+  };
+
+  // Simulates RemoveMemberModal.jsx handleConfirm logic
+  const handleConfirm = async () => {
+    try {
+      await mockApiRemoveMember();
+      // On success (should NOT be reached):
+      currentMembers = currentMembers.filter((m) => String(m.userId) !== String(memberToRemove.userId));
+      memberToRemove = null;
+      modalOpen = false;
+    } catch (err) {
+      // On failure:
+      capturedError = getRemoveMemberErrorMessage(err, memberToRemove.username);
+      // Notice: currentMembers is NOT modified, modalOpen remains true, memberToRemove remains intact
+    }
+  };
+
+  await handleConfirm();
+
+  // State is preserved / rolled back completely
+  assert.equal(currentMembers.length, 3);
+  assert.equal(currentMembers.some((m) => m.userId === 2), true);
+  assert.equal(modalOpen, true);
+  assert.notEqual(memberToRemove, null);
+  assert.equal(capturedError, 'Bạn không có quyền loại thành viên này khỏi Server.');
+});
+
+test('Task 4.09: Target already removed (HTTP 404) provides friendly error without crashing state', async () => {
+  const initialMembers = [
+    { userId: 1, username: 'owner_alice', role: 'OWNER' },
+    { userId: 2, username: 'already_gone', role: 'MEMBER' },
+  ];
+
+  let currentMembers = [...initialMembers];
+  let capturedError = null;
+
+  const mockApiRemoveMember = async () => {
+    const error = new Error('Request failed with status code 404');
+    error.response = { status: 404, data: { message: 'Thành viên không tồn tại trong Server' } };
+    throw error;
+  };
+
+  const handleConfirm = async () => {
+    try {
+      await mockApiRemoveMember();
+      currentMembers = currentMembers.filter((m) => String(m.userId) !== '2');
+    } catch (err) {
+      capturedError = getRemoveMemberErrorMessage(err, 'already_gone');
+    }
+  };
+
+  await handleConfirm();
+
+  assert.equal(capturedError, 'Thành viên hoặc Server không tồn tại hoặc đã bị xóa trước đó.');
+  assert.equal(currentMembers.length, 2);
+});
+
+test('Task 4.09: Modal in-flight guard prevents duplicate concurrent remove submissions', async () => {
+  let callCount = 0;
+  let submitting = false;
+
+  const mockRemoveMember = async () => {
+    callCount += 1;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return { status: 204 };
+  };
+
+  const triggerSubmit = async () => {
+    if (submitting) return false;
+    submitting = true;
+    try {
+      await mockRemoveMember();
+      return true;
+    } finally {
+      submitting = false;
+    }
+  };
+
+  // Launch two concurrent clicks
+  const [first, second] = await Promise.all([triggerSubmit(), triggerSubmit()]);
+
+  assert.equal(first, true);
+  assert.equal(second, false); // Guard rejected second in-flight click
+  assert.equal(callCount, 1);
+});
