@@ -64,7 +64,7 @@ export function getAuthorInfo(senderId, members = [], currentUser = null, server
   const isOwner = serverOwnerId != null && String(senderId) === String(serverOwnerId);
 
   const member = Array.isArray(members)
-    ? members.find((m) => m && String(m.id) === String(senderId))
+    ? members.find((m) => m && (String(m.id) === String(senderId) || String(m.userId) === String(senderId)))
     : null;
 
   let name = 'Thành viên';
@@ -89,4 +89,105 @@ export function getAuthorInfo(senderId, members = [], currentUser = null, server
     isOwn,
     isOwner,
   };
+}
+
+/**
+ * Resolves which channel should be active given the available channels list,
+ * the currently active channel ID, and an optional preferred channel ID (e.g., from URL params).
+ * Priority:
+ * 1. preferredChannelId (matching channel in list)
+ * 2. currentActiveId (if still exists in list)
+ * 3. Channel named 'general' (case-insensitive)
+ * 4. First channel in list
+ * 5. null if list is empty
+ */
+export function resolveActiveChannel(channels = [], currentActiveId = null, preferredChannelId = null) {
+  if (!Array.isArray(channels) || channels.length === 0) return null;
+
+  if (preferredChannelId != null) {
+    const matchPreferred = channels.find((ch) => ch && String(ch.id) === String(preferredChannelId));
+    if (matchPreferred) return matchPreferred;
+  }
+
+  if (currentActiveId != null) {
+    const matchCurrent = channels.find((ch) => ch && String(ch.id) === String(currentActiveId));
+    if (matchCurrent) return matchCurrent;
+  }
+
+  const general = channels.find((ch) => ch && ch.name && ch.name.toLowerCase() === 'general');
+  if (general) return general;
+
+  return channels[0] || null;
+}
+
+/**
+ * Builds the STOMP destination topic for a channel.
+ */
+export function getChannelTopic(channelId) {
+  if (channelId == null || channelId === '') return '';
+  return `/topic/channels/${channelId}`;
+}
+
+/**
+ * Normalizes incoming WebSocket message payloads.
+ * Unwraps `{ type, data }`, `{ event, payload }` or returns raw message object.
+ */
+export function normalizeRealtimeMessage(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+
+  // Wrapped format: { type: 'MESSAGE_CREATED', data: { ... } }
+  if (payload.data && typeof payload.data === 'object' && payload.data.id != null) {
+    return payload.data;
+  }
+
+  // Wrapped format: { payload: { ... } }
+  if (payload.payload && typeof payload.payload === 'object' && payload.payload.id != null) {
+    return payload.payload;
+  }
+
+  // Direct message object
+  if (payload.id != null) {
+    return payload;
+  }
+
+  return null;
+}
+
+/**
+ * Verifies whether an incoming message belongs to the active channel.
+ * Returns false if incoming message belongs to another channel, preventing cross-channel message leakage.
+ */
+export function isMessageForActiveChannel(incoming, activeChannelId) {
+  if (incoming == null || activeChannelId == null) return false;
+  const normalized = normalizeRealtimeMessage(incoming);
+  if (!normalized) return false;
+  if (normalized.channelId == null) return true;
+  return String(normalized.channelId) === String(activeChannelId);
+}
+
+/**
+ * Handles incoming real-time message by verifying it belongs to activeChannelId,
+ * preventing duplicates, and maintaining chronological order.
+ */
+export function handleIncomingRealtimeMessage(currentMessages = [], incoming = null, activeChannelId = null) {
+  const current = Array.isArray(currentMessages) ? currentMessages : [];
+  if (!isMessageForActiveChannel(incoming, activeChannelId)) return current;
+  const normalized = normalizeRealtimeMessage(incoming);
+  if (!normalized) return current;
+
+  // Check if message is already in list
+  const existingIndex = current.findIndex((m) => m && String(m.id) === String(normalized.id));
+  if (existingIndex >= 0) {
+    // If identical, return existing array unchanged
+    const existing = current[existingIndex];
+    if (existing.content === normalized.content && existing.updatedAt === normalized.updatedAt) {
+      return current;
+    }
+    const updated = [...current];
+    updated[existingIndex] = { ...existing, ...normalized };
+    return updated;
+  }
+
+  // Append new message and ensure order
+  return sortMessagesChronological([...current, normalized]);
 }

@@ -626,4 +626,55 @@ class MessageServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         verify(messageRepository, never()).save(any());
     }
+
+    @Test
+    void sendMessage_BroadcastsToChannelTopicWhenMessagingTemplatePresent() {
+        org.springframework.messaging.simp.SimpMessagingTemplate mockTemplate =
+                mock(org.springframework.messaging.simp.SimpMessagingTemplate.class);
+        messageService.setMessagingTemplate(mockTemplate);
+
+        authenticate(EMAIL);
+        stubSender();
+        stubChannel(true);
+        when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
+
+        Message saved = new Message();
+        saved.setId(105L);
+        saved.setChannelId(CHANNEL_ID);
+        saved.setAuthorId(SENDER_ID);
+        saved.setContent("Broadcast test");
+        saved.setCreatedDate(CREATED_AT);
+        when(messageRepository.save(any(Message.class))).thenReturn(saved);
+
+        MessageResponse response = messageService.sendMessage(CHANNEL_ID, new SendMessageRequest("Broadcast test"));
+
+        assertNotNull(response);
+        assertEquals("Broadcast test", response.content());
+        verify(mockTemplate, times(1)).convertAndSend(eq("/topic/channels/" + CHANNEL_ID), eq(response));
+    }
+
+    @Test
+    void sendMessage_SucceedsEvenIfMessagingTemplateFails() {
+        org.springframework.messaging.simp.SimpMessagingTemplate mockTemplate =
+                mock(org.springframework.messaging.simp.SimpMessagingTemplate.class);
+        doThrow(new RuntimeException("Simulated broker down")).when(mockTemplate).convertAndSend(anyString(), any(Object.class));
+        messageService.setMessagingTemplate(mockTemplate);
+
+        authenticate(EMAIL);
+        stubSender();
+        stubChannel(true);
+        when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
+
+        Message saved = new Message();
+        saved.setId(106L);
+        saved.setChannelId(CHANNEL_ID);
+        saved.setAuthorId(SENDER_ID);
+        saved.setContent("Resilient test");
+        saved.setCreatedDate(CREATED_AT);
+        when(messageRepository.save(any(Message.class))).thenReturn(saved);
+
+        MessageResponse response = messageService.sendMessage(CHANNEL_ID, new SendMessageRequest("Resilient test"));
+        assertNotNull(response);
+        assertEquals(106L, response.id());
+    }
 }

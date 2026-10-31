@@ -50,6 +50,7 @@ export default function AppRoutes() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/servers/:serverId" element={<GroupChatPage />} />
+          <Route path="/servers/:serverId/channels/:channelId" element={<GroupChatPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
           <Route path="/rooms/:roomSlug" element={<ChatPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />

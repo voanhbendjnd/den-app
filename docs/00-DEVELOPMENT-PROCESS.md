@@ -927,6 +927,74 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 
 ---
 
+### [2026-10-30] FEAT-CONNECT-CHANNEL-CHAT — Kết Nối Chọn Channel Với Khung Chat & WebSocket (Kỳ Anh)
+
+- **Mục tiêu:** Kết nối chọn channel trong Sidebar với khung chat (MessageArea) và khung soạn thảo (MessageInput), đồng bộ hóa Route URL với `/servers/:serverId/channels/:channelId`, tự động nhận diện channel khi truy cập trực tiếp từ URL, fallback an toàn về `#general`, và kích hoạt kết nối WebSocket STOMP real-time topic `/topic/channels/{channelId}` nhận tin nhắn tức thời.
+- **Frontend Changes:**
+  - `client/src/services/webSocketService.js`:
+    - Bổ sung các destination: `subscribeChannel(channelId)`, `subscribeChannelMessages(channelId)`, `publishChannelMessage(channelId)` vào `DESTINATIONS`.
+    - Nâng cấp `subscribe` và bổ sung `subscribeTopic` hỗ trợ multi-subscriptions cho nhiều topics đồng thời, trả về hàm cleanup `unsubscribe()` độc lập.
+    - An toàn hóa `import.meta.env` khi chạy dưới Node test runner.
+  - `client/src/utils/channelMessages.js`:
+    - Bổ sung `resolveActiveChannel(channels, currentActiveId, preferredChannelId)`: phân giải kênh kích hoạt theo thứ tự ưu tiên (URL param -> kênh đang chọn -> kênh general -> kênh đầu tiên trong danh sách).
+    - Bổ sung `getChannelTopic(channelId)` trả về `/topic/channels/{channelId}`.
+    - Bổ sung `normalizeRealtimeMessage(payload)` giải nén an toàn các dạng payload WebSocket bọc (`MESSAGE_CREATED`, `payload`) hoặc object trực tiếp.
+    - Bổ sung `handleIncomingRealtimeMessage(currentMessages, incoming, activeChannelId)`: cô lập dữ liệu theo `channelId`, chống trùng lặp tin nhắn và duy trì thứ tự thời gian.
+  - `client/src/routes/AppRoutes.jsx`:
+    - Bổ sung route `/servers/:serverId/channels/:channelId` trỏ về `GroupChatPage`.
+  - `client/src/pages/chat/GroupChatPage.jsx`:
+    - Trích xuất `channelId` từ `useParams()` và truyền vào `ServerWorkspace`.
+    - Đồng bộ `activeChannel` tự động khi tải danh sách kênh hoặc khi route param thay đổi.
+    - Cập nhật `handleSelectChannel`: cập nhật active channel, đóng drawer trên mobile và đồng bộ route `/servers/:serverId/channels/:channelId`.
+    - Tích hợp effect đăng ký WebSocket lắng nghe `/topic/channels/{channelId}`, tiếp nhận tin nhắn real-time và cuộn mượt xuống cuối nếu đang ở gần đáy.
+    - Hủy đăng ký an toàn khi chuyển kênh hoặc rời server.
+- **Tests Added:**
+  - `client/tests/channelSelectionChat.test.mjs`:
+    - 12 unit tests kiểm thử phân giải kênh, STOMP topic format, chuẩn hóa tin nhắn WebSocket, phân lập kênh chat, chống trùng lặp và cập nhật tin nhắn sửa.
+  - `client/package.json`:
+    - Bổ sung `tests/channelSelectionChat.test.mjs` và `tests/userProfile.test.mjs` vào script `"test"`.
+- **Verification:**
+  - `npm test`: PASS 133/133 tests (100%).
+  - `npm run build`: Vite build production hoàn tất thành công 100% (3220 modules transformed).
+- **Docs & Roadmaps Updated:**
+  - Cập nhật tiến độ Giai đoạn 3 (2/5 nhiệm vụ - 40%) và tổng thể (15/28 nhiệm vụ - 53.6%).
+
+---
+
+### [2026-10-30] FEAT-CHANNEL-WEBSOCKET-REALTIME-AND-ISOLATION — Sprint 3: Kết Nối WebSocket & Cách Ly Tin Nhắn Kênh (Kỳ Anh)
+
+- **Mục tiêu:** 
+  - Nhiệm vụ 3.01: Kết nối WebSocket STOMP tới broker theo Channel đang chọn (`/topic/channels/{channelId}`), nhận tin nhắn phát sóng thời gian thực và tự động tái kết nối.
+  - Nhiệm vụ 3.06: Chuyển Channel thì hủy ngay lập tức subscription của Channel cũ, không nhận tin nhắn của Channel cũ, chặn rò rỉ tin nhắn giữa các kênh qua session guard và bộ lọc strict channel ID.
+- **Backend Changes:**
+  - `server/src/main/java/com/denhub/service/MessageService.java`:
+    - Inject `SimpMessagingTemplate` (hỗ trợ `@Autowired(required = false)` và setter `setMessagingTemplate`).
+    - Trong `sendMessage`: Tự động phát sóng `MessageResponse` tới `/topic/channels/{channelId}`. Bảo vệ transaction HTTP an toàn nếu broker gặp sự cố.
+    - Trong `updateMessage`: Tự động phát sóng `MessageResponse` đã cập nhật tới `/topic/channels/{channelId}`.
+- **Frontend Changes:**
+  - `client/src/services/webSocketService.js`:
+    - Bổ sung `subscribeChannel(channelId, callback)`, `unsubscribeChannel(channelId)`, `publishChannelMessage(channelId, body)`.
+    - Bổ sung cơ chế lắng nghe trạng thái kết nối `addConnectionListener(callback)` / `removeConnectionListener(callback)` hỗ trợ tự động tái đăng ký kênh active khi reconnect.
+  - `client/src/utils/channelMessages.js`:
+    - Bổ sung `isMessageForActiveChannel(incoming, activeChannelId)`: Kiểm tra nghiêm ngặt `channelId` của tin nhắn khớp với kênh đang xem, trả về `false` đối với tin nhắn từ kênh khác.
+    - Cập nhật `handleIncomingRealtimeMessage`: Từ chối triệt để tin nhắn kênh cũ, chống rò rỉ tin nhắn chéo kênh.
+  - `client/src/pages/chat/GroupChatPage.jsx`:
+    - Sử dụng `webSocketService.subscribeChannel(channelId, handleRealtimePayload)`.
+    - Khi chuyển kênh: Hủy đăng ký topic kênh cũ ngay lập tức, tăng `channelSession.current`, hủy bỏ các tin nhắn/lịch sử/request cũ đến trễ, đăng ký kênh mới.
+- **Tests Added & Verified:**
+  - Backend: `server/src/test/java/com/denhub/service/MessageServiceTest.java`:
+    - `sendMessage_BroadcastsToChannelTopicWhenMessagingTemplatePresent`: Xác minh gọi `convertAndSend` tới `/topic/channels/{channelId}`.
+    - `sendMessage_SucceedsEvenIfMessagingTemplateFails`: Xác minh HTTP lưu message thành công ngay cả khi WebSocket broker lỗi.
+    - Toàn bộ backend test suite `MessageServiceTest` + `MessageResourceIT` PASS 100%.
+  - Frontend: `client/tests/channelSelectionChat.test.mjs`:
+    - Bổ sung test kiểm thử `isMessageForActiveChannel`: xác nhận lọc tin kênh cũ (Task 3.06).
+    - Bổ sung test mô phỏng luồng chuyển kênh A -> B không nhận tin kênh A (Task 3.06).
+    - Bổ sung test các helper `subscribeChannel`, `unsubscribeChannel`, `addConnectionListener` (Task 3.01).
+  - Toàn bộ `npm test`: PASS **136/136 tests (100%)**.
+  - `npm run build`: Hoàn tất thành công (3220 modules transformed).
+
+---
+
 ### [2026-10-25] FEAT-SERVER-LEAVE-FE — Xây dựng UI Rời Server và Kết Nối API
 
 - **Mục tiêu:** Xây dựng giao diện cho phép thành viên tự rời khỏi Server (`Leave Server`), kết nối với API backend `POST /api/v1/servers/{serverId}/leave`, hiển thị modal xác nhận, xử lý loading/success/error, chống double-click, và điều hướng an toàn về trang chủ.
