@@ -406,6 +406,9 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.12 / khung Group và ô nhập độc lập                                         | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
 | Task 1.08 — API lấy lịch sử tin nhắn + test                                       | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
 | Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test                                 | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
+| Task 1.13 — UI sửa tin nhắn (Inline Editing) + Kết nối API                         | DONE                                                       | `client/src/api/messageApi.js` (`updateMessage`), `GroupChatPage.jsx` (inline editing textarea, action bar hover chỉ tác giả BR-MSG-02, phím tắt Enter/Escape, nhãn `(đã chỉnh sửa)`), `group-chat.css`, `channelMessages.js` (`updateMessageInList`, `isMessageEdited`). Unit tests 10/10 PASS, full client unit tests 53/53 PASS, build PASS. |
+| Task 1.14 — API xóa tin nhắn (DELETE) + test                                      | DONE                                                       | `DELETE /api/messages/{messageId}`; duy nhất tác giả có quyền xóa (BR-MSG-03, từ chối Server Owner/Admin 403); trả về 204 No Content; MessageServiceTest, MessageResourceIT, MessageSecurityIT. Toàn bộ tests PASS 100%. |
+| Task 1.15 — UI xóa tin nhắn (DELETE) + Tải thêm tin nhắn cũ                        | DONE                                                       | `GroupChatPage.jsx` (nút Xóa hover chỉ tác giả, Popconfirm; cuộn giữ vị trí đọc chuẩn `calculateScrollAfterPrepend`, hiển thị loading, hết lịch sử, thông báo lỗi tải thêm kèm nút Thử lại, chống rò rỉ phiên kênh). 114 client unit tests PASS, build PASS. |
 | Công việc                                                                         | Trạng thái                                                 | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                      |
 | :---                                                                              | :---                                                       | :---                                                                                                                                                                                                                                                                                                                           |
 | Đọc chi tiết phần vỏ Server + FE                                                  | DONE trong phạm vi code/H2/FE mock                         | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
@@ -419,6 +422,9 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.12 / khung Group và ô nhập độc lập                                         | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
 | Task 1.08 — API lấy lịch sử tin nhắn + test                                       | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
 | Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test                                 | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
+| Task 1.13 — UI sửa tin nhắn (Inline Editing) + Kết nối API                         | DONE                                                       | `client/src/api/messageApi.js` (`updateMessage`), `GroupChatPage.jsx` (inline editing textarea, action bar hover chỉ tác giả BR-MSG-02, phím tắt Enter/Escape, nhãn `(đã chỉnh sửa)`), `group-chat.css`, `channelMessages.js` (`updateMessageInList`, `isMessageEdited`). Unit tests 10/10 PASS, full client unit tests 53/53 PASS, build PASS. |
+| Task 1.14 — API xóa tin nhắn (DELETE) + test                                      | DONE                                                       | `DELETE /api/messages/{messageId}`; duy nhất tác giả có quyền xóa (BR-MSG-03, từ chối Server Owner/Admin 403); trả về 204 No Content; MessageServiceTest, MessageResourceIT, MessageSecurityIT. Toàn bộ tests PASS 100%. |
+| Task 1.15 — UI xóa tin nhắn (DELETE) + Tải thêm tin nhắn cũ                        | DONE                                                       | `GroupChatPage.jsx` (nút Xóa hover chỉ tác giả, Popconfirm; cuộn giữ vị trí đọc chuẩn `calculateScrollAfterPrepend`, hiển thị loading, hết lịch sử, thông báo lỗi tải thêm kèm nút Thử lại, chống rò rỉ phiên kênh). 114 client unit tests PASS, build PASS. |
 | FEAT-FRIEND-REQUEST-UI — UI danh sách lời mời kết bạn + Realtime                  | DONE                                                       | 5 file FE: `friendApi.js` bổ sung `getFriendRequests`; `useFriendRequests.js` STOMP + cursor pagination; `FriendRequestPage.jsx` UI đầy đủ; route `/friends`; menu Bạn Bè. `npm run build` PASS 3192 modules. Không thay backend.                                                                                              |
 | FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE)        | DONE                                                       | `friendApi.js` (accept/remove endpoints); `useFriendRequests.js` (`acceptRequest`, `removeRequest`, `actionLoading`); `FriendRequestPage.jsx` (Nút Đồng ý Indigo Gradient, Từ chối Dark Glass, spin loading độc lập, toast thông báo). `npm run build` PASS 3192 modules.                                                      |
 | FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) + Sửa query Friendship (BE)    | DONE                                                       | Sửa typo `:status <> 'PENDING'` trong `FriendshipRepository`; `friendApi.js` (`getAllFriends`); `useFriends.js` (cursor pagination, filter search); `FriendRequestPage.jsx` (Tabs Tất cả / Chờ xử lý, FriendCard, nút Nhắn tin Direct Message); `npm run build` PASS 3193 modules.                                             |
@@ -439,6 +445,119 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-10-31] FEAT-CHANNEL-MESSAGES-COMPLETE — Kiểm tra, chuẩn hóa và hoàn thiện tính năng tin nhắn Channel (BE & FE)
+
+- Người dùng duyệt kế hoạch qua "ok". Đã rà soát, chuẩn hóa và hoàn thiện toàn diện tính năng tin nhắn Channel cả Backend và Frontend:
+- Implemented:
+  - **Backend Phân quyền Xóa tin nhắn (`MessageService.java` & `MessageResource.java`):**
+    - Siết chặt quy tắc quyền: **Duy nhất tác giả tin nhắn mới có quyền xóa tin nhắn của mình (`BR-MSG-03`)**. Bãi bỏ ngoại lệ cho phép Server Owner xóa tin nhắn người khác (nếu cố xóa sẽ bị chặn ngay với `403 Forbidden` `"Bạn không có quyền xóa tin nhắn này"`, và bản ghi trong DB giữ nguyên).
+    - Cập nhật Swagger annotation `@Operation` tại `MessageResource.java` phản ánh đúng quyền tác giả duy nhất.
+  - **Frontend Phân quyền & UI Tải thêm tin nhắn cũ (`GroupChatPage.jsx`, `group-chat.css`, `channelMessages.js`):**
+    - Sửa phân quyền Action Bar hover: `canDelete = author.isOwn`. Server Owner không thấy nút Sửa và nút Xóa trên tin nhắn người khác.
+    - Hoàn thiện UI tải thêm:
+      - Bổ sung state `loadMoreError` hiển thị banner lỗi tải thêm Cyber Dark Glassmorphism phía trên danh sách tin nhắn kèm nút **Thử lại** (`ReloadOutlined`).
+      - Khi lỗi: Giữ nguyên danh sách tin nhắn đang hiển thị và con trỏ `nextCursor` hiện tại để có thể thử lại an toàn.
+      - Bảo toàn vị trí cuộn: Lưu cả `prevScrollTop` và `prevScrollHeight`; tính toán vị trí cuộn mới qua helper `calculateScrollAfterPrepend(prevScrollTop, prevScrollHeight, newScrollHeight) = prevScrollTop + (newScrollHeight - prevScrollHeight)`.
+      - Cô lập phiên kênh/server: Reset `loadMoreError = null`, hủy cờ loading và vô hiệu hóa các response trễ từ request cũ qua các counter ref (`channelSession`, `activeChannelId`, `messagesRequest`, `moreRequest`).
+  - **Utils (`client/src/utils/channelMessages.js`):**
+    - Thêm các pure functions: `canDeleteMessage`, `canEditMessage`, `calculateScrollAfterPrepend`.
+- Tests Added / Updated:
+  - Backend:
+    - `MessageServiceTest.java`: Bổ sung test phân trang nhiều trang với dữ liệu cố định `getMessages_Success_MultiPageFixedData` (3 trang liên tiếp không trùng lặp, không sót tin); cập nhật test `deleteMessage_Fail_WhenServerOwnerNotAuthor` kỳ vọng 403 Forbidden và verify không gọi repository delete.
+    - `MessageSecurityIT.java`: Cập nhật `deleteMessageForbiddenWhenServerOwnerNotAuthor` (Server Owner cố xóa tin nhắn của member nhận HTTP 403 và tin nhắn trong database H2 vẫn tồn tại nguyên vẹn).
+  - Frontend:
+    - `client/tests/channelMessages.test.mjs`: Bổ sung 5 unit tests mới kiểm thử `canDeleteMessage`, `canEditMessage`, `calculateScrollAfterPrepend`, mô phỏng phân trang 3 trang liên tiếp (`mergeMessagePages`), và bảo toàn state khi lỗi tải thêm.
+- Verification:
+  - Backend tests: PASS 100% (bao gồm `MessageServiceTest`, `MessageResourceIT`, `MessageSecurityIT`).
+  - Frontend tests: `npm test` PASS 114/114 (100%).
+  - Frontend build: `npm run build` PASS (0 errors, 3219 modules).
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-31] FEAT-MESSAGE-DELETE-UI — Làm UI xóa tin nhắn (DELETE) & Kết nối API (FE)
+
+- Người dùng duyệt kế hoạch qua "lam đi giong nhu discord". Đã triển khai UI xóa tin nhắn trong kênh nhóm theo trải nghiệm tương tự Discord kết hợp Cyber Dark Glassmorphism của DenHub và tích hợp API `DELETE /api/messages/{messageId}`.
+- Implemented:
+  - Cập nhật `client/src/api/messageApi.js`:
+    - Bổ sung phương thức `deleteMessage: (messageId) => axiosClient.delete('/messages/' + messageId)`.
+  - Cập nhật `client/src/utils/channelMessages.js`:
+    - Bổ sung `removeMessageFromList(messages, messageId)`: hàm thuần lọc bỏ tin nhắn theo ID khỏi mảng state và giữ nguyên thứ tự/các tin nhắn khác.
+  - Cập nhật `client/src/pages/chat/group-chat.css`:
+    - Bổ sung style `.group-message-action-btn--delete:hover`: chuyển sang đỏ neon (`#ef4444`, background `rgba(239, 68, 68, .15)`), tạo điểm nhấn cảnh báo nguy hiểm trực quan.
+  - Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
+    - Nhập `Popconfirm` từ `antd` và `removeMessageFromList` từ `channelMessages.js`.
+    - Quản lý state `deletingMessageId`, reset khi đổi kênh.
+    - Phân quyền hiển thị Action Bar hover:
+      - `canEdit = author.isOwn`: Chỉ tác giả mới có nút Sửa (`EditOutlined`).
+      - `canDelete = author.isOwn || isOwner`: Tác giả tin nhắn HOẶC Chủ Server (Server Owner) có nút Xóa (`DeleteOutlined`).
+      - Thành viên thông thường không thấy nút Sửa và nút Xóa trên tin nhắn người khác.
+    - Hộp thoại Popconfirm xác nhận:
+      - Tiêu đề: "Xóa tin nhắn?"
+      - Nội dung: "Bạn có chắc chắn muốn xóa tin nhắn này không? Hành động này không thể hoàn tác."
+      - Nút "Xóa" danger style với trạng thái loading khi đang xóa.
+    - Handler `handleDeleteMessage(messageId)`:
+      - Gọi API `messageApi.deleteMessage(messageId)`.
+      - Cập nhật loại bỏ tin nhắn khỏi state `messages` qua `removeMessageFromList`.
+      - Nếu tin nhắn đang được chỉnh sửa (`editingMessageId === messageId`), tự động hủy/đóng khung sửa tin nhắn.
+      - Hiển thị toast thông báo `antMessage.success('Đã xóa tin nhắn.')` hoặc `antMessage.error` theo mã lỗi chuẩn.
+- Tests Added:
+  - `client/tests/channelMessages.test.mjs`: Thêm 3 unit tests mới cho `removeMessageFromList` (xóa đúng ID, nhận diện ID số hoặc chuỗi, xử lý mảng rỗng và input không hợp lệ an toàn) -> Suite `channelMessages.test.mjs` đạt 13/13 tests PASS (100%).
+- Verification:
+  - `node --test tests/channelMessages.test.mjs`: PASS 13/13.
+  - `node --test tests/channelEdit.test.mjs tests/discordAuth.test.mjs tests/messageInput.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs tests/channelMessages.test.mjs`: PASS 56/56.
+  - `npm run build`: BUILD SUCCESSFUL (3219 modules transformed, 0 error).
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-30] FEAT-MESSAGE-DELETE-API — Làm API xóa tin nhắn (DELETE /api/messages/{messageId}) + Tests (BE)
+
+- Người dùng duyệt kế hoạch qua "ok". Đã triển khai API xóa tin nhắn kênh nhóm trong backend theo phân quyền: Tác giả tin nhắn HOẶC Chủ Server (Server Owner) có quyền xóa (403 nếu thành viên khác cố xóa, 401 nếu chưa đăng nhập, 404 nếu không tìm thấy, 400 nếu ID <= 0). Trả về HTTP 204 No Content sau khi xóa cứng (hard delete).
+- Implemented:
+  - Cập nhật `server/src/main/java/com/denhub/service/MessageService.java`:
+    - Bổ sung phương thức `@Transactional void deleteMessage(Long messageId)`:
+      - Kiểm tra validation: `messageId == null || messageId <= 0` -> BadRequestAlertException (`idinvalid`, 400).
+      - Kiểm tra authentication & active: lấy người dùng hiện tại từ SecurityUtils, kiểm tra `activated == true` -> Unauthorized / BadRequest (`inactiveuser`, 400/401).
+      - Tìm tin nhắn: `messageRepository.findById(messageId)` -> NotFoundAlertException (`messagenotfound`, 404) nếu không tồn tại.
+      - Phân quyền xóa: kiểm tra `isAuthor = currentUserId.equals(authorId)`. Nếu không phải tác giả, tra cứu `channelRepository.findById(channelId)` -> `serverRepository.findById(serverId)` để lấy `server.getOwnerId()`. Nếu `currentUserId.equals(ownerId)`, cho phép xóa. Trường hợp còn lại throw DenHubSecurityException (`deleteforbidden`, 403 Forbidden).
+      - Thực hiện xóa: `messageRepository.delete(message)`.
+  - Cập nhật `server/src/main/java/com/denhub/web/rest/MessageResource.java`:
+    - Bổ sung endpoint `@DeleteMapping("/messages/{messageId}")` trả về `ResponseEntity.noContent().build()` (HTTP 204 No Content).
+- Tests Added:
+  - `server/src/test/java/com/denhub/service/MessageServiceTest.java`: Thêm 6 unit tests mới (`deleteMessage_Success_WhenAuthor`, `deleteMessage_Success_WhenServerOwnerNotAuthor`, `deleteMessage_Fail_WhenInvalidId`, `deleteMessage_Fail_WhenUnauthenticatedOrInactive`, `deleteMessage_Fail_WhenNotFound`, `deleteMessage_Fail_WhenNotAuthorAndNotServerOwner`). Toàn bộ suite 51/51 tests PASS (100%).
+  - `server/src/test/java/com/denhub/web/rest/MessageResourceIT.java`: Thêm 4 MockMvc tests mới (`deleteMessageSuccessReturns204NoContent`, `deleteMessageWhenNotFoundReturns404`, `deleteMessageWhenForbiddenReturns403`, `deleteMessageWhenInvalidIdReturns400`). Toàn bộ suite 20/20 tests PASS (100%).
+  - `server/src/test/java/com/denhub/web/rest/MessageSecurityIT.java`: Thêm 5 integration tests mới (`deleteMessageSuccessByAuthor`, `deleteMessageSuccessByServerOwnerNotAuthor`, `deleteMessageForbiddenWhenOtherMemberTriesToDelete`, `deleteMessageUnauthorizedWhenNoToken`, `deleteMessageNotFoundWhenMessageDoesNotExist`). Toàn bộ suite 43/43 tests PASS (100%).
+- Verification:
+  - `.\gradlew.bat test --tests "com.denhub.service.MessageServiceTest" --tests "com.denhub.web.rest.MessageResourceIT" --tests "com.denhub.web.rest.MessageSecurityIT"`: BUILD SUCCESSFUL in 37.5s, **114/114 tests PASS (100% success rate, 0 failures, 0 skipped)**.
+- Documentation:
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Cập nhật bảng API (line 181: IMPLEMENTED), danh sách endpoint (line 236), mục 7.9 chi tiết contract `DELETE /api/messages/{messageId}`.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật bảng tiến độ Section 10 và log công việc Section 11.
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-30] FEAT-MESSAGE-EDIT-UI — Làm UI sửa tin nhắn (Inline Editing) & Kết nối API (FE)
+
+- Người dùng duyệt kế hoạch qua "ok". Đã triển khai UI sửa tin nhắn nội tuyến trong kênh nhóm theo đúng phong cách Cyber Dark Glassmorphism của DenHub và tích hợp API `PATCH /api/messages/{messageId}`.
+- Implemented:
+  - Cập nhật `client/src/api/messageApi.js`:
+    - Bổ sung phương thức `updateMessage: (messageId, data) => axiosClient.patch('/messages/' + messageId, data)`.
+  - Cập nhật `client/src/utils/channelMessages.js`:
+    - Bổ sung `updateMessageInList(messages, updatedMessage)`: hàm thuần cập nhật tin nhắn trong mảng state và giữ nguyên thứ tự/các tin nhắn khác.
+    - Bổ sung `isMessageEdited(message)`: kiểm tra xem tin nhắn đã qua chỉnh sửa hay chưa dựa trên `updatedAt` / `lastModifiedDate`.
+  - Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
+    - Quản lý state chỉnh sửa tin nhắn: `editingMessageId`, `editContent`, `editLoading`, `editError`, `editInputRef`.
+    - Auto-focus con trỏ chuột vào cuối ô nhập khi kích hoạt chế độ sửa.
+    - Action Bar nổi: Chỉ hiển thị icon bút chì `EditOutlined` khi rê chuột (hover) vào tin nhắn do chính người dùng hiện tại gửi (`author.isOwn === true`), tuân thủ triệt để Business Rule `BR-MSG-02`.
+    - Inline Edit Textarea: Chuyển nội dung tin nhắn thành textarea tự động co giãn (`minRows: 1, maxRows: 8`), giới hạn 4000 ký tự.
+    - Phím tắt tiện lợi: `Enter` để lưu (nếu không nhấn Shift), `Escape` để hủy, `Shift+Enter` để xuống dòng. Kèm 2 nút bấm trực quan "Hủy" và "Lưu thay đổi".
+    - Xử lý thông báo lỗi (400, 403, 404, lỗi mạng) hiển thị trong alert bên dưới form edit.
+    - Hiển thị nhãn `(đã chỉnh sửa)` kèm tooltip thời gian khi tin nhắn đã qua chỉnh sửa.
+  - Cập nhật `client/src/pages/chat/group-chat.css`:
+    - Thêm CSS cho `.group-message-actions`, `.group-message-action-btn`, `.group-message-row--editing`, `.group-message-edit-box`, `.group-message-edit-input`, `.group-message-edit-footer`, `.group-message-edit-hint`, `.group-message-edit-buttons`, `.group-message-edit-cancel-btn`, `.group-message-edit-save-btn`, `.group-message-edit-error`, `.group-message-edited`.
+- Tests Added:
+  - `client/tests/channelMessages.test.mjs`: Thêm 3 unit tests mới cho `updateMessageInList` (cập nhật thành công, xử lý biên an toàn) và `isMessageEdited` (nhận biết `updatedAt`/`lastModifiedDate`) -> Toàn bộ suite 10/10 PASS (100%).
+- Verification:
+  - `node --test tests/channelMessages.test.mjs`: PASS 10/10.
+  - `node --test tests/channelEdit.test.mjs tests/discordAuth.test.mjs tests/messageInput.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs tests/channelMessages.test.mjs`: PASS 53/53.
+  - `npm run build`: BUILD SUCCESSFUL (3219 modules transformed, 0 error).
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-27] FEAT-OPEN-CREATED-SERVER — Tạo Server xong mở ngay Server đó
 

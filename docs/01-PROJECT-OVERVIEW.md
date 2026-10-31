@@ -104,6 +104,7 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 | **MESSAGE** | Ai được gửi tin nhắn Channel? | `CONFIRMED` | Người dùng đã xác thực và là thành viên của Server chứa Channel. Danh tính người gửi lấy từ cơ chế Authentication hiện có. |
 | **MESSAGE** | Nội dung gửi trong Task 1.07? | `CONFIRMED` | Tin nhắn văn bản; không null, rỗng hoặc toàn khoảng trắng, không vượt giới hạn database đã xác nhận. |
 | **MESSAGE** | Ai được quyền sửa tin nhắn? | `CONFIRMED` | Duy nhất tác giả tin nhắn (BR-MSG-02). |
+| **MESSAGE** | Ai được quyền xóa tin nhắn? | `CONFIRMED` (2026-10-31) | Duy nhất tác giả tin nhắn. Server Owner, Admin hoặc thành viên khác không được quyền xóa tin nhắn của người khác chỉ nhờ vai trò (BR-MSG-03). |
 | **MESSAGE** | Cơ chế phân trang lịch sử tin nhắn? | `CONFIRMED` | Phân trang bằng con trỏ (Cursor Pagination) qua `before` và `limit`. |
 | **DIRECT MESSAGE** | Phạm vi Direct Message? | `CONFIRMED` | Duy nhất 1-1. Cặp người dùng duy nhất không phân biệt thứ tự `(user1 < user2)`. |
 | **AUTH** | Xác thực & Phiên làm việc? | `CONFIRMED` | Spring Security + JWT Access Token (24h) + HttpOnly Refresh Token Cookie. |
