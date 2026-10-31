@@ -104,7 +104,7 @@ test('getJoinErrorMessage maps authentication and permission errors', () => {
   assert.equal(getJoinErrorMessage(err401), 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
 
   const err403 = { response: { status: 403, data: {} } };
-  assert.equal(getJoinErrorMessage(err403), 'Bạn không có quyền tham gia Server này.');
+  assert.equal(getJoinErrorMessage(err403), 'Server riêng tư yêu cầu mã mời hợp lệ, hoặc bạn không có quyền tham gia Server này.');
 });
 
 test('getJoinErrorMessage maps network and fallback errors safely', () => {

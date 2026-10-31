@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.denhub.domain.Server;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +15,25 @@ import org.springframework.data.jpa.repository.Lock;
 
 @Repository
 public interface ServerRepository extends JpaRepository<Server, Long> {
+
+    @Query(value = """
+        SELECT s FROM Server s
+        WHERE s.visibility = com.denhub.domain.enums.ServerVisibility.PUBLIC
+          AND s.ownerId <> :userId
+          AND NOT EXISTS (SELECT m.id FROM ServerMember m WHERE m.serverId = s.id AND m.userId = :userId)
+          AND LOWER(s.name) LIKE :pattern ESCAPE '!'
+        ORDER BY CASE WHEN LOWER(s.name) = :term THEN 0
+                      WHEN LOWER(s.name) LIKE :prefix ESCAPE '!' THEN 1 ELSE 2 END,
+                 s.id DESC
+        """, countQuery = """
+        SELECT COUNT(s) FROM Server s
+        WHERE s.visibility = com.denhub.domain.enums.ServerVisibility.PUBLIC
+          AND s.ownerId <> :userId
+          AND NOT EXISTS (SELECT m.id FROM ServerMember m WHERE m.serverId = s.id AND m.userId = :userId)
+          AND LOWER(s.name) LIKE :pattern ESCAPE '!'
+        """)
+    Page<Server> discover(@Param("userId") Long userId, @Param("term") String term, @Param("pattern") String pattern,
+                          @Param("prefix") String prefix, Pageable pageable);
 
     // All server-dependent writes take this lock before checking access or mutating data.
     @Lock(LockModeType.PESSIMISTIC_WRITE)

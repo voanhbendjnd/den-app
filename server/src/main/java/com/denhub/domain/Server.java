@@ -1,16 +1,16 @@
 package com.denhub.domain;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
+import com.denhub.domain.enums.ServerVisibility;
 import org.hibernate.validator.constraints.Length;
-import org.hibernate.annotations.Cache;
 
 import java.io.Serial;
 import java.io.Serializable;
 
 @Entity
 @Table(name = "servers")
-@Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
+// Cached enum instances can belong to an old DevTools restart classloader.
+@Cacheable(false)
 @AttributeOverrides({
     @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", length = 254, updatable = false)),
     @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
@@ -29,6 +29,18 @@ public class Server extends AbstractAuditingEntity<Long> implements Serializable
     private String iconUrl;
     @Column(name = "owner_id",  nullable = false)
     private Long ownerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 7, columnDefinition = "NVARCHAR(7)")
+    private ServerVisibility visibility = ServerVisibility.PRIVATE;
+
+    public ServerVisibility getVisibility() {
+        return visibility;
+    }
+
+    public void setVisibility(ServerVisibility visibility) {
+        this.visibility = visibility;
+    }
 
     @Override
     public Long getId() {

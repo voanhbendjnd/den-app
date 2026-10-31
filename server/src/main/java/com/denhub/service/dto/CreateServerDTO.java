@@ -1,6 +1,8 @@
 package com.denhub.service.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import com.denhub.domain.enums.ServerVisibility;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,4 +20,7 @@ public class CreateServerDTO {
 
     @Size(max = 255, message = "Icon URL must not exceed 255 characters")
     String iconUrl;
+
+    @NotNull
+    ServerVisibility visibility = ServerVisibility.PRIVATE;
 }

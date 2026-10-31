@@ -14,6 +14,7 @@ import com.denhub.service.dto.ServerInviteResponseDTO;
 import com.denhub.service.dto.ServerMemberResponseDTO;
 import com.denhub.service.dto.ServerResponseDTO;
 import com.denhub.service.dto.UpdateServerDTO;
+import com.denhub.service.dto.ServerDiscoveryDTO;
 import com.denhub.util.anotation.ApiMessage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -30,6 +31,15 @@ import java.util.List;
 public class ServerResource {
 
     ServerService serverService;
+
+    @GetMapping("/discover")
+    @Operation(summary = "Tìm Server công khai", description = "Yêu cầu tài khoản active. Chỉ trả thông tin giới thiệu, không cấp quyền đọc nội dung Server.")
+    public ResponseEntity<ServerDiscoveryDTO> discoverServers(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(serverService.discoverServers(q, page, size));
+    }
 
     @DeleteMapping("/{serverId}")
     @Operation(summary = "Xóa vĩnh viễn Server", description = "Chỉ Server Owner đang hoạt động được xóa Server cùng kênh, tin nhắn kênh, mã mời và membership.")
@@ -74,7 +84,7 @@ public class ServerResource {
     }
 
     @PostMapping("/{serverId}/join")
-    @Operation(summary = "Tham gia vào một Server", description = "Cho phép người dùng hiện tại tham gia vào Server thông qua ID. Yêu cầu đăng nhập.")
+    @Operation(summary = "Tham gia Server công khai", description = "Tham gia qua ID chỉ áp dụng cho Server PUBLIC. Server PRIVATE yêu cầu mã mời. Yêu cầu tài khoản active.")
     public ResponseEntity<Void> joinServer(@PathVariable Long serverId) {
         serverService.joinServer(serverId);
         return ResponseEntity.noContent().build();

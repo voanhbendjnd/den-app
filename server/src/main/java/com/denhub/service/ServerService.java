@@ -8,6 +8,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import com.denhub.domain.Channel;
 import com.denhub.domain.Server;
+import com.denhub.domain.enums.ServerVisibility;
+import com.denhub.service.dto.ServerDiscoveryDTO;
+import org.springframework.data.domain.PageRequest;
 import com.denhub.domain.ServerMember;
 import com.denhub.domain.User;
 import com.denhub.domain.Invite;
@@ -58,6 +61,22 @@ public class ServerService {
     ChannelRepository channelRepository;
     MessageRepository messageRepository;
 
+    @Transactional(readOnly = true)
+    public ServerDiscoveryDTO discoverServers(String query, int page, int size) {
+        User user = getActiveCurrentUser();
+        String term = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
+        if (term.length() > 100 || page < 0 || size < 1 || size > 50) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Từ khóa tối đa 100 ký tự, page >= 0 và size từ 1 đến 50");
+        }
+        // Treat LIKE metacharacters as literal user input, including SQL Server's '['.
+        String escaped = term.replace("!", "!!").replace("%", "!%")
+                .replace("_", "!_").replace("[", "![");
+        var result = serverRepository.discover(user.getId(), term, "%" + escaped + "%", escaped + "%", PageRequest.of(page, size));
+        var items = result.getContent().stream().map(server -> new ServerDiscoveryDTO.Item(
+                server.getId(), server.getName(), server.getIconUrl(), false)).toList();
+        return new ServerDiscoveryDTO(items, page, size, result.getTotalElements(), result.getTotalPages());
+    }
+
     public void deleteServer(Long serverId) {
         User currentUser = getActiveCurrentUser();
         if (serverId == null || serverId <= 0) {
@@ -99,6 +118,7 @@ public class ServerService {
         response.setIconUrl(server.getIconUrl());
         response.setOwnerId(server.getOwnerId());
         response.setCreatedDate(server.getCreatedDate());
+        response.setVisibility(server.getVisibility());
         return response;
     }
 
@@ -123,6 +143,7 @@ public class ServerService {
         }
 
         server.setName(dto.getName().strip());
+        if (dto.getVisibility() != null) server.setVisibility(dto.getVisibility());
         String icon = dto.getIconUrl() == null ? null : dto.getIconUrl().strip();
         server.setIconUrl(icon == null || icon.isBlank() ? null : icon);
         // Persist and capture the audit actor before leaving the authenticated request.
@@ -134,6 +155,7 @@ public class ServerService {
         response.setIconUrl(saved.getIconUrl());
         response.setOwnerId(saved.getOwnerId());
         response.setCreatedDate(saved.getCreatedDate());
+        response.setVisibility(saved.getVisibility());
         return response;
     }
 
@@ -201,7 +223,11 @@ public class ServerService {
         User currentUser = getActiveCurrentUser();
 
         // 2. Tạo bản ghi Server mới
+        if (dto.getVisibility() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chế độ Server không hợp lệ");
+        }
         Server server = new Server();
+        server.setVisibility(dto.getVisibility());
         server.setName(dto.getName());
         server.setIconUrl(dto.getIconUrl());
         server.setOwnerId(currentUser.getId());
@@ -232,6 +258,7 @@ public class ServerService {
         response.setIconUrl(server.getIconUrl());
         response.setOwnerId(server.getOwnerId());
         response.setCreatedDate(server.getCreatedDate());
+        response.setVisibility(server.getVisibility());
 
         return response;
     }
@@ -249,6 +276,7 @@ public class ServerService {
             response.setIconUrl(server.getIconUrl());
             response.setOwnerId(server.getOwnerId());
             response.setCreatedDate(server.getCreatedDate());
+            response.setVisibility(server.getVisibility());
             return response;
         }).toList();
     }
@@ -278,6 +306,10 @@ public class ServerService {
 
         Server server = serverRepository.findByIdForUpdate(serverId)
                 .orElseThrow(() -> new BadRequestAlertException("Server not found", "server", "servernotfound"));
+
+        if (server.getVisibility() != ServerVisibility.PUBLIC) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Server riêng tư yêu cầu mã mời hợp lệ");
+        }
 
         if (serverMemberRepository.existsByServerIdAndUserId(serverId, currentUser.getId())) {
             throw new BadRequestAlertException("User is already a member of this server", "server", "alreadymember");
@@ -398,6 +430,7 @@ public class ServerService {
         response.setIconUrl(server.getIconUrl());
         response.setOwnerId(server.getOwnerId());
         response.setCreatedDate(server.getCreatedDate());
+        response.setVisibility(server.getVisibility());
         return response;
     }
 

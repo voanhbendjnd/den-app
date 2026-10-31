@@ -513,6 +513,8 @@ for (const { closeForm, revisit } of [{ closeForm: true }, { closeForm: false },
     await page.goBack({ waitUntil: 'domcontentloaded' });
     await page.waitForURL(`${origin}/servers/12`);
     if (revisit) {
+      // URL changes before React commits a SPA visit; wait for the intermediate workspace.
+      await page.locator('.group-sidebar__identity strong').filter({ hasText: 'DenHub Design' }).waitFor();
       await page.goForward({ waitUntil: 'domcontentloaded' });
       await page.waitForURL(`${origin}/`);
     }
@@ -837,7 +839,7 @@ test('creation waits for icon upload, blocks Enter/form submission, and sends th
   await page.waitForFunction(url => document.querySelector('img[alt=avatar]')?.getAttribute('src') === url, uploadedIcon);
   await dialog.getByRole('button', { name: 'Khởi Tạo Không Gian', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
-  assert.deepEqual(creates, [{ name: 'Không Gian Của Tôi', iconUrl: uploadedIcon }]);
+  assert.deepEqual(creates, [{ name: 'Không Gian Của Tôi', iconUrl: uploadedIcon, visibility: 'PRIVATE' }]);
   assert.equal(requests.filter(request => request.method === 'POST' && request.path === '/api/v1/servers').length, 1);
   await page.waitForURL(`${origin}/servers/33`);
   await page.locator('.group-sidebar__identity strong').filter({ hasText: 'Không Gian Của Tôi' }).waitFor();
