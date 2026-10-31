@@ -68,15 +68,18 @@ public class UserService {
      * Lấy thông tin hồ sơ của người dùng hiện tại đang đăng nhập.
      *
      * @return UserProfileResponseDTO thông tin hồ sơ người dùng
-     * @throws BadRequestAlertException nếu chưa đăng nhập hoặc không tìm thấy người dùng
+     * @throws BadRequestAlertException nếu chưa đăng nhập hoặc không tìm thấy người
+     *                                  dùng
      */
     @Transactional(readOnly = true)
     public UserProfileResponseDTO getUserProfile() {
         String currentUserEmail = SecurityUtils.getCurrentUserLogin()
-                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile",
+                        "notloggedin"));
 
         User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
-                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile",
+                        "usernotfound"));
 
         return UserProfileResponseDTO.fromUser(user);
     }
@@ -84,17 +87,21 @@ public class UserService {
     /**
      * Cập nhật thông tin hồ sơ của người dùng hiện tại đang đăng nhập.
      *
-     * @param dto UpdateUserProfileDTO chứa thông tin cần cập nhật (name, username, avatar)
+     * @param dto UpdateUserProfileDTO chứa thông tin cần cập nhật (name, username,
+     *            avatar)
      * @return UserProfileResponseDTO thông tin hồ sơ người dùng sau khi cập nhật
-     * @throws BadRequestAlertException nếu chưa đăng nhập, không tìm thấy người dùng, hoặc username đã tồn tại
+     * @throws BadRequestAlertException nếu chưa đăng nhập, không tìm thấy người
+     *                                  dùng, hoặc username đã tồn tại
      */
     @Transactional
     public UserProfileResponseDTO updateUserProfile(UpdateUserProfileDTO dto) {
         String currentUserEmail = SecurityUtils.getCurrentUserLogin()
-                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile",
+                        "notloggedin"));
 
         User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
-                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile",
+                        "usernotfound"));
 
         if (dto == null) {
             return UserProfileResponseDTO.fromUser(user);
@@ -116,7 +123,8 @@ public class UserService {
             String normalizedUsername = dto.getUsername().trim().toLowerCase(Locale.ENGLISH);
             if (!normalizedUsername.equals(user.getUsername())) {
                 if (userRepository.existsByUsernameIgnoreCaseAndIdNot(normalizedUsername, user.getId())) {
-                    throw new BadRequestAlertException("Username already in use", "userProfile", "usernamealreadyexists");
+                    throw new BadRequestAlertException("Username already in use", "userProfile",
+                            "usernamealreadyexists");
                 }
                 user.setUsername(normalizedUsername);
                 modified = true;
@@ -148,17 +156,21 @@ public class UserService {
     @Transactional
     public void changePassword(ChangePasswordDTO dto) {
         String currentUserEmail = SecurityUtils.getCurrentUserLogin()
-                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile", "notloggedin"));
+                .orElseThrow(() -> new BadRequestAlertException("User not found in security context", "userProfile",
+                        "notloggedin"));
 
         User user = userRepository.findOneWithAuthoritiesByEmail(currentUserEmail)
-                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile", "usernotfound"));
+                .orElseThrow(() -> new BadRequestAlertException("User not found in database", "userProfile",
+                        "usernotfound"));
 
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
-            throw new BadRequestAlertException("Mật khẩu hiện tại không chính xác", "userProfile", "invalidcurrentpassword");
+            throw new BadRequestAlertException("Mật khẩu hiện tại không chính xác", "userProfile",
+                    "invalidcurrentpassword");
         }
 
         if (passwordEncoder.matches(dto.getNewPassword(), user.getPassword())) {
-            throw new BadRequestAlertException("Mật khẩu mới không được trùng với mật khẩu hiện tại", "userProfile", "samepassword");
+            throw new BadRequestAlertException("Mật khẩu mới không được trùng với mật khẩu hiện tại", "userProfile",
+                    "samepassword");
         }
 
         String encryptedPassword = passwordEncoder.encode(dto.getNewPassword());
@@ -230,11 +242,13 @@ public class UserService {
         if (userOp.isPresent()) {
             User existingUser = userOp.get();
             boolean changed = false;
-            if ((existingUser.getName() == null || existingUser.getName().isBlank()) && name != null && !name.isBlank()) {
+            if ((existingUser.getName() == null || existingUser.getName().isBlank()) && name != null
+                    && !name.isBlank()) {
                 existingUser.setName(name.trim());
                 changed = true;
             }
-            if ((existingUser.getAvatar() == null || existingUser.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+            if ((existingUser.getAvatar() == null || existingUser.getAvatar().isBlank()) && avatar != null
+                    && !avatar.isBlank()) {
                 existingUser.setAvatar(avatar);
                 changed = true;
             }
@@ -259,7 +273,8 @@ public class UserService {
             if (name != null && !name.isBlank()) {
                 newUser.setName(name.trim());
             } else {
-                newUser.setName(username != null && !username.isBlank() ? username.trim() : normalizedEmail.split("@")[0]);
+                newUser.setName(
+                        username != null && !username.isBlank() ? username.trim() : normalizedEmail.split("@")[0]);
             }
             newUser.setType(type != null ? type.toUpperCase(Locale.ENGLISH) : "SOCIAL");
             newUser.setEmail(normalizedEmail);
@@ -276,6 +291,7 @@ public class UserService {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
         headers.set("Accept", "application/json");
+        headers.set("User-Agent", "DenHub-App");
         HttpEntity<String> entity = new HttpEntity<>(headers);
         ResponseEntity<Map> response = restTemplate.exchange(link,
                 HttpMethod.GET,
@@ -289,6 +305,7 @@ public class UserService {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
         headers.set("Accept", "application/json");
+        headers.set("User-Agent", "DenHub-App");
         HttpEntity<String> entity = new HttpEntity<>(headers);
         ResponseEntity<List> response = restTemplate.exchange("https://api.github.com/user/emails",
                 HttpMethod.GET,
@@ -301,13 +318,15 @@ public class UserService {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Accept", "application/json");
+        headers.set("User-Agent", "DenHub-App");
         Map<String, String> body = new HashMap<>();
         body.put("client_id", githubClientId);
         body.put("client_secret", githubClientSecret);
         body.put("code", code);
         HttpEntity<Map<String, String>> entity = new HttpEntity<>(body, headers);
         try {
-            ResponseEntity<Map> response = restTemplate.postForEntity("https://github.com/login/oauth/access_token", entity, Map.class);
+            ResponseEntity<Map> response = restTemplate.postForEntity("https://github.com/login/oauth/access_token",
+                    entity, Map.class);
             if (response.getBody() != null && response.getBody().get("access_token") != null) {
                 return (String) response.getBody().get("access_token");
             }
@@ -327,7 +346,8 @@ public class UserService {
             if ("GITHUB".equalsIgnoreCase(type)) {
                 accessToken = getGithubAccessTokenFromCode(code);
                 if (accessToken == null) {
-                    throw new BadRequestResourceException("Không thể xác thực mã xác thực từ GitHub", "accountManagement", "invalidgithubcode");
+                    throw new BadRequestResourceException("Không thể xác thực mã xác thực từ GitHub",
+                            "accountManagement", "invalidgithubcode");
                 }
             }
         }
@@ -335,7 +355,8 @@ public class UserService {
         if ("GITHUB".equalsIgnoreCase(type)) {
             Map<String, Object> userInfo = this.getUserInfo(accessToken, LINK_GITHUB_USER);
             if (userInfo == null) {
-                throw new BadRequestResourceException("Không thể lấy thông tin người dùng từ GitHub", "accountManagement", "githubuserinfofailed");
+                throw new BadRequestResourceException("Không thể lấy thông tin người dùng từ GitHub",
+                        "accountManagement", "githubuserinfofailed");
             }
             username = userInfo.get("login") != null ? userInfo.get("login").toString() : null;
             name = userInfo.get("name") != null ? userInfo.get("name").toString() : username;
@@ -348,7 +369,8 @@ public class UserService {
                     List<Map<String, Object>> mails = this.getGithubEmails(accessToken);
                     if (mails != null) {
                         email = mails.stream()
-                                .filter(e -> Boolean.TRUE.equals(e.get("primary")) && Boolean.TRUE.equals(e.get("verified")))
+                                .filter(e -> Boolean.TRUE.equals(e.get("primary"))
+                                        && Boolean.TRUE.equals(e.get("verified")))
                                 .map(e -> (String) e.get("email"))
                                 .findFirst()
                                 .orElse(null);
@@ -364,13 +386,23 @@ public class UserService {
                     log.warn("Không thể lấy email từ GitHub emails endpoint: {}", ex.getMessage());
                 }
             }
+            if (email == null || email.isBlank()) {
+                Object githubId = userInfo.get("id");
+                if (githubId != null && username != null && !username.isBlank()) {
+                    email = githubId + "+" + username.trim().toLowerCase(Locale.ENGLISH) + "@users.noreply.github.com";
+                } else if (username != null && !username.isBlank()) {
+                    email = username.trim().toLowerCase(Locale.ENGLISH) + "@users.noreply.github.com";
+                }
+            }
             if (email == null) {
-                throw new BadRequestResourceException("Tài khoản GitHub không cung cấp email hợp lệ", "accountManagement", "emailnull");
+                throw new BadRequestResourceException("Tài khoản GitHub không cung cấp email hợp lệ",
+                        "accountManagement", "emailnull");
             }
         } else if ("GOOGLE".equalsIgnoreCase(type)) {
             Map<String, Object> userInfo = this.getUserInfo(accessToken, LINK_GOOGLE_USER);
             if (userInfo == null) {
-                throw new BadRequestResourceException("Không thể lấy thông tin người dùng từ Google", "accountManagement", "googleuserinfofailed");
+                throw new BadRequestResourceException("Không thể lấy thông tin người dùng từ Google",
+                        "accountManagement", "googleuserinfofailed");
             }
             email = (String) userInfo.get("email");
             avatar = (String) userInfo.get("picture");
@@ -380,10 +412,12 @@ public class UserService {
                     ? (Boolean) userInfo.get("email_verified")
                     : Boolean.parseBoolean(String.valueOf(userInfo.get("email_verified")));
             if (isEmailVerified != null && !isEmailVerified) {
-                throw new BadRequestResourceException("Google mail chưa được xác minh", "accountManagement", "notemailverified");
+                throw new BadRequestResourceException("Google mail chưa được xác minh", "accountManagement",
+                        "notemailverified");
             }
         } else {
-            throw new BadRequestResourceException("Loại đăng nhập mạng xã hội không được hỗ trợ: " + type, "accountManagement", "unsupportedtype");
+            throw new BadRequestResourceException("Loại đăng nhập mạng xã hội không được hỗ trợ: " + type,
+                    "accountManagement", "unsupportedtype");
         }
 
         if (email == null || email.isBlank()) {
@@ -398,11 +432,13 @@ public class UserService {
         if (existingUserOpt.isPresent()) {
             User existingUser = existingUserOpt.get();
             boolean changed = false;
-            if ((existingUser.getName() == null || existingUser.getName().isBlank()) && name != null && !name.isBlank()) {
+            if ((existingUser.getName() == null || existingUser.getName().isBlank()) && name != null
+                    && !name.isBlank()) {
                 existingUser.setName(name.trim());
                 changed = true;
             }
-            if ((existingUser.getAvatar() == null || existingUser.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+            if ((existingUser.getAvatar() == null || existingUser.getAvatar().isBlank()) && avatar != null
+                    && !avatar.isBlank()) {
                 existingUser.setAvatar(avatar);
                 changed = true;
             }
@@ -434,9 +470,10 @@ public class UserService {
         this.clearUserCaches(newUser);
         return newUser;
     }
+
     /*
-    * activated account register from user
-    * */
+     * activated account register from user
+     */
     public Optional<User> activatedRegistration(String key) {
         log.debug("Activating user for activation key {}", key);
         return userRepository.findOneByActivationKey(key).map(existingUser -> {
@@ -447,28 +484,30 @@ public class UserService {
             return existingUser;
         });
     }
+
     public Optional<User> requestPasswordReset(String email) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ENGLISH);
         Instant now = Instant.now();
         return userRepository.findOneByEmail(normalizedEmail).filter(User::getActivated)
-                .filter(user ->{
-                    if(user.getResetDate() != null && user.getResetDate().isAfter(now.minus(60, ChronoUnit.SECONDS))){
+                .filter(user -> {
+                    if (user.getResetDate() != null && user.getResetDate().isAfter(now.minus(60, ChronoUnit.SECONDS))) {
                         return false;
                     }
                     return true;
                 })
-                .map(user ->{
-            user.setResetDate(now);
-            user.setResetKey(RandomUtil.generateResetKey());
-            this.clearUserCaches(user);
-            return user;
-        });
+                .map(user -> {
+                    user.setResetDate(now);
+                    user.setResetKey(RandomUtil.generateResetKey());
+                    this.clearUserCaches(user);
+                    return user;
+                });
 
     }
-    public Optional<User> completePasswordReset(String newPassword, String resetKey){
+
+    public Optional<User> completePasswordReset(String newPassword, String resetKey) {
         return userRepository.findOneByResetKey(resetKey)
                 .filter(existingUser -> existingUser.getResetDate().isAfter(Instant.now().minus(1, ChronoUnit.DAYS)))
-                .map(existingUser ->{
+                .map(existingUser -> {
                     existingUser.setPassword(passwordEncoder.encode(newPassword));
                     existingUser.setResetKey(null);
                     existingUser.setResetDate(null);
@@ -477,8 +516,8 @@ public class UserService {
                 });
     }
 
-    private boolean removeNoneActivatedUser(User existingUser){
-        if(existingUser.getActivated()){
+    private boolean removeNoneActivatedUser(User existingUser) {
+        if (existingUser.getActivated()) {
             return false;
         }
         userRepository.delete(existingUser);
@@ -486,9 +525,10 @@ public class UserService {
         this.clearUserCaches(existingUser);
         return true;
     }
-    private void clearUserCaches(User user){
+
+    private void clearUserCaches(User user) {
         var cacheByEmail = cacheManager.getCache(UserRepository.USERS_BY_EMAIL_CACHE);
-        if(cacheByEmail != null){
+        if (cacheByEmail != null) {
             cacheByEmail.evict(user.getEmail().trim().toLowerCase(Locale.ENGLISH));
         }
     }
@@ -496,10 +536,11 @@ public class UserService {
     /*
      * check after 3 day
      * and check 0 second - 0 minutes - 1 AM - Every day - Every week
-     * */
+     */
     @Scheduled(cron = "0 0 1 * * ?")
-    public void removeNotActivatedUsers(){
-        List<User> currentUsers = userRepository.findAllByActivatedIsFalseAndActivationKeyNotNullAndCreatedDateBefore(Instant.now().minus(3, ChronoUnit.DAYS));
+    public void removeNotActivatedUsers() {
+        List<User> currentUsers = userRepository.findAllByActivatedIsFalseAndActivationKeyNotNullAndCreatedDateBefore(
+                Instant.now().minus(3, ChronoUnit.DAYS));
         List<Long> currentUserIds = currentUsers.stream().map(User::getId).toList();
         userRepository.deleteByIdIn(currentUserIds);
         currentUsers.forEach(this::clearUserCaches);

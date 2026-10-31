@@ -3462,3 +3462,21 @@ Luôn ghi: `Not pushed — AI agents are not allowed to push DenHub.`
   - Thiết kế giao diện Đăng nhập (`LoginPage.jsx`) và Đăng ký (`RegisterPage.jsx`) chuẩn Cyberpunk / Discord Glassmorphism: Divider phân cách, lưới nút đăng nhập Google & GitHub đồng bộ, Modal xác thực GitHub Token cho nhà phát triển và người dùng.
   - Build frontend `npm run build` PASS thành công 100%.
 
+
+---
+
+## 22. Cập nhật ngày 2026-10-31: Xử lý GitHub Private Email Fallback & Hỗ trợ Callback URL
+
+- **Backend:**
+  - Cập nhật `UserService.java`: Khi tài khoản GitHub có email ở chế độ ẩn (Private) hoặc Fine-grained Personal Access Token không có quyền đọc `/user/emails` (403 Forbidden), backend tự động fallback sang định dạng email chuẩn của GitHub: `{githubId}+{username}@users.noreply.github.com` (hoặc `{username}@users.noreply.github.com`).
+  - Đảm bảo tính duy nhất, định dạng hợp lệ thỏa mãn ràng buộc `@Email` và `@NotNull` trong cơ sở dữ liệu `User`.
+- **Frontend:**
+  - Bổ sung route alias `/api/auth/callback/github` trỏ tới `LoginPage` trong `AppRoutes.jsx`, tương thích hoàn toàn với Redirect URI mặc định trên GitHub Developer Settings.
+  - Chuẩn hóa URL redirect GitHub OAuth trong `LoginPage.jsx` và `RegisterPage.jsx`.
+- **Kiểm thử:**
+  - Chạy toàn bộ test backend: `cd server; .\gradlew.bat test --tests "com.denhub.service.UserServiceTest" --tests "com.denhub.web.rest.AccountResourceIT"` -> **PASS 100% (BUILD SUCCESSFUL)**.
+  - Chạy build frontend: `cd client; npm run build` -> **PASS 100% (built in 1.39s)**.
+
+- **Database & Entity Fix (Lỗi SQL 2628 truncation):**
+  - Đồng bộ cột `refresh_token` trong bảng `users` sang kiểu `NVARCHAR(MAX)` theo đúng đặc tả `docs/03-DATABASE-DESIGN.md` mục 3.1.
+  - Cập nhật entity `User.java`: Thêm `columnDefinition = "NVARCHAR(MAX)"` cho trường `refreshToken` để lưu trữ an toàn các JWT refresh token có payload/claims dài mà không bị tràn bộ nhớ đệm SQL Server.
