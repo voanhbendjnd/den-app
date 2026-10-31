@@ -1,6 +1,7 @@
 package com.denhub.domain;
 
 import jakarta.persistence.*;
+import com.denhub.domain.enums.ServerVisibility;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.validator.constraints.Length;
 import org.hibernate.annotations.Cache;
@@ -29,6 +30,18 @@ public class Server extends AbstractAuditingEntity<Long> implements Serializable
     private String iconUrl;
     @Column(name = "owner_id",  nullable = false)
     private Long ownerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 7, columnDefinition = "NVARCHAR(7)")
+    private ServerVisibility visibility = ServerVisibility.PRIVATE;
+
+    public ServerVisibility getVisibility() {
+        return visibility;
+    }
+
+    public void setVisibility(ServerVisibility visibility) {
+        this.visibility = visibility;
+    }
 
     @Override
     public Long getId() {
