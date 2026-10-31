@@ -2,6 +2,7 @@ package com.denhub.service;
 
 import com.denhub.domain.Channel;
 import com.denhub.domain.Message;
+import com.denhub.domain.Server;
 import com.denhub.domain.User;
 import com.denhub.repository.ChannelRepository;
 import com.denhub.repository.MessageRepository;
@@ -326,6 +327,49 @@ class MessageServiceTest {
     }
 
     @Test
+    void getMessages_Success_MultiPageFixedData() {
+        authenticate(EMAIL);
+        stubSender();
+        stubChannel(false);
+        when(serverMemberRepository.existsByServerIdAndUserId(SERVER_ID, SENDER_ID)).thenReturn(true);
+
+        Message m5 = createMockMessage(105L, "Msg 5");
+        Message m4 = createMockMessage(104L, "Msg 4");
+        Message m3 = createMockMessage(103L, "Msg 3");
+        Message m2 = createMockMessage(102L, "Msg 2");
+        Message m1 = createMockMessage(101L, "Msg 1");
+
+        // Page 1: before = null, limit = 2 -> fetch 3: [105, 104, 103]
+        when(messageRepository.findByChannelIdOrderByIdDesc(eq(CHANNEL_ID), any(PageRequest.class)))
+                .thenReturn(List.of(m5, m4, m3));
+        CursorPageResponse<MessageResponse> page1 = messageService.getMessages(CHANNEL_ID, null, 2);
+        assertEquals(2, page1.items().size());
+        assertEquals(105L, page1.items().get(0).id());
+        assertEquals(104L, page1.items().get(1).id());
+        assertTrue(page1.hasMore());
+        assertEquals(104L, page1.nextCursor());
+
+        // Page 2: before = 104L, limit = 2 -> fetch 3: [103, 102, 101]
+        when(messageRepository.findByChannelIdAndIdLessThanOrderByIdDesc(eq(CHANNEL_ID), eq(104L), any(PageRequest.class)))
+                .thenReturn(List.of(m3, m2, m1));
+        CursorPageResponse<MessageResponse> page2 = messageService.getMessages(CHANNEL_ID, 104L, 2);
+        assertEquals(2, page2.items().size());
+        assertEquals(103L, page2.items().get(0).id());
+        assertEquals(102L, page2.items().get(1).id());
+        assertTrue(page2.hasMore());
+        assertEquals(102L, page2.nextCursor());
+
+        // Page 3: before = 102L, limit = 2 -> fetch 1: [101] (last page)
+        when(messageRepository.findByChannelIdAndIdLessThanOrderByIdDesc(eq(CHANNEL_ID), eq(102L), any(PageRequest.class)))
+                .thenReturn(List.of(m1));
+        CursorPageResponse<MessageResponse> page3 = messageService.getMessages(CHANNEL_ID, 102L, 2);
+        assertEquals(1, page3.items().size());
+        assertEquals(101L, page3.items().get(0).id());
+        assertFalse(page3.hasMore());
+        assertNull(page3.nextCursor());
+    }
+
+    @Test
     void getMessages_Success_EmptyChannel() {
         authenticate(EMAIL);
         stubSender();
@@ -626,4 +670,109 @@ class MessageServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         verify(messageRepository, never()).save(any());
     }
+
+    @Test
+    void deleteMessage_Success_WhenAuthor() {
+        authenticate(EMAIL);
+        stubSender(); // User ID 2L
+
+        Message message = new Message();
+        message.setId(101L);
+        message.setChannelId(CHANNEL_ID);
+        message.setAuthorId(SENDER_ID);
+        message.setContent("Message to delete");
+
+        when(messageRepository.findById(101L)).thenReturn(Optional.of(message));
+
+        assertDoesNotThrow(() -> messageService.deleteMessage(101L));
+        verify(messageRepository).delete(message);
+    }
+
+    @Test
+    void deleteMessage_Fail_WhenServerOwnerNotAuthor() {
+        authenticate(EMAIL);
+        stubSender(); // User ID 2L (Server Owner)
+
+        Message message = new Message();
+        message.setId(102L);
+        message.setChannelId(CHANNEL_ID);
+        message.setAuthorId(999L); // Different author!
+        message.setContent("Member message that owner cannot delete");
+
+        when(messageRepository.findById(102L)).thenReturn(Optional.of(message));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(102L));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Bạn không có quyền xóa tin nhắn này"));
+        verify(messageRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteMessage_Fail_WhenInvalidId() {
+        ResponseStatusException ex1 = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(null));
+        assertEquals(HttpStatus.BAD_REQUEST, ex1.getStatusCode());
+
+        ResponseStatusException ex2 = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(0L));
+        assertEquals(HttpStatus.BAD_REQUEST, ex2.getStatusCode());
+
+        ResponseStatusException ex3 = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(-5L));
+        assertEquals(HttpStatus.BAD_REQUEST, ex3.getStatusCode());
+
+        verify(messageRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteMessage_Fail_WhenUnauthenticatedOrInactive() {
+        ResponseStatusException ex1 = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(101L));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex1.getStatusCode());
+
+        authenticate(EMAIL);
+        User inactiveUser = new User();
+        inactiveUser.setId(SENDER_ID);
+        inactiveUser.setEmail(EMAIL);
+        inactiveUser.setActivated(false);
+        when(userRepository.findOneByEmail(EMAIL)).thenReturn(Optional.of(inactiveUser));
+
+        ResponseStatusException ex2 = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(101L));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex2.getStatusCode());
+        verify(messageRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteMessage_Fail_WhenNotFound() {
+        authenticate(EMAIL);
+        stubSender();
+        when(messageRepository.findById(999L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(999L));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(messageRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteMessage_Fail_WhenOtherMemberNotAuthor() {
+        authenticate(EMAIL);
+        stubSender(); // User ID 2L
+
+        Message message = new Message();
+        message.setId(103L);
+        message.setChannelId(CHANNEL_ID);
+        message.setAuthorId(999L); // Author is 999L
+
+        when(messageRepository.findById(103L)).thenReturn(Optional.of(message));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.deleteMessage(103L));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Bạn không có quyền xóa tin nhắn này"));
+        verify(messageRepository, never()).delete(any());
+    }
 }
+

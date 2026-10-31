@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { Link, Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { Avatar, Button, Drawer, Grid, Skeleton, Spin } from 'antd';
+import { Avatar, Button, Drawer, Grid, Input, message as antMessage, Popconfirm, Skeleton, Spin } from 'antd';
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
+  EditOutlined,
   MenuOutlined,
   MessageOutlined,
   PlusOutlined,
@@ -34,6 +35,11 @@ import {
   formatMessageTime,
   formatCompactTime,
   getAuthorInfo,
+  updateMessageInList,
+  isMessageEdited,
+  removeMessageFromList,
+  calculateScrollAfterPrepend,
+  canDeleteMessage,
 } from '../../utils/channelMessages';
 import './group-chat.css';
 
@@ -429,13 +435,23 @@ function ServerWorkspace({ serverId }) {
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(null);
   const chatContainerRef = useRef(null);
   const prevScrollHeightRef = useRef(0);
+  const prevScrollTopRef = useRef(0);
   const activeChannelId = useRef(null);
   const channelSession = useRef(0);
   const messagesRequest = useRef(0);
   const moreRequest = useRef(0);
   const morePending = useRef(false);
+
+  // Edit Message state
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editContent, setEditContent] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const editInputRef = useRef(null);
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
 
   useLayoutEffect(() => {
     activeChannelId.current = activeChannel?.id ?? null;
@@ -446,7 +462,13 @@ function ServerWorkspace({ serverId }) {
     setHasMore(false);
     setNextCursor(null);
     setLoadingMore(false);
+    setLoadMoreError(null);
     morePending.current = false;
+    setEditingMessageId(null);
+    setEditContent('');
+    setEditLoading(false);
+    setEditError(null);
+    setDeletingMessageId(null);
     return () => {
       activeChannelId.current = null;
       channelSession.current += 1;
@@ -455,6 +477,12 @@ function ServerWorkspace({ serverId }) {
       morePending.current = false;
     };
   }, [activeChannel?.id]);
+
+  useEffect(() => {
+    if (editingMessageId && editInputRef.current) {
+      editInputRef.current.focus({ cursor: 'end' });
+    }
+  }, [editingMessageId]);
 
   const fetchChannelMessages = useCallback(async (channelId) => {
     if (!channelId || activeChannelId.current !== channelId || currentServerId.current !== serverId) return;
@@ -515,9 +543,11 @@ function ServerWorkspace({ serverId }) {
     const current = () => currentServerId.current === serverId && channelSession.current === session
       && activeChannelId.current === channelId && messagesRequest.current === history && moreRequest.current === request;
     morePending.current = true;
+    setLoadMoreError(null);
     const container = chatContainerRef.current;
     if (container) {
       prevScrollHeightRef.current = container.scrollHeight;
+      prevScrollTopRef.current = container.scrollTop;
     }
     setLoadingMore(true);
     try {
@@ -531,11 +561,21 @@ function ServerWorkspace({ serverId }) {
       requestAnimationFrame(() => {
         if (current() && container) {
           const newScrollHeight = container.scrollHeight;
-          container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+          container.scrollTop = calculateScrollAfterPrepend(
+            prevScrollTopRef.current,
+            prevScrollHeightRef.current,
+            newScrollHeight
+          );
         }
       });
-    } catch {
-      // Giữ nguyên tin nhắn hiện tại khi tải thêm thất bại
+    } catch (err) {
+      if (current()) {
+        const errMsg =
+          err.response?.data?.detail ||
+          err.response?.data?.message ||
+          'Không thể tải thêm tin nhắn cũ. Vui lòng thử lại.';
+        setLoadMoreError(errMsg);
+      }
     } finally {
       if (current()) {
         morePending.current = false;
@@ -577,6 +617,109 @@ function ServerWorkspace({ serverId }) {
       }
     });
   };
+
+  const handleStartEdit = (msg) => {
+    if (!msg || !msg.id) return;
+    setEditingMessageId(msg.id);
+    setEditContent(msg.content || '');
+    setEditError(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditContent('');
+    setEditError(null);
+    setEditLoading(false);
+  };
+
+  const handleSaveEdit = async (messageId) => {
+    if (!messageId || editLoading) return;
+    const trimmed = editContent.trim();
+    if (!trimmed) {
+      setEditError('Nội dung tin nhắn không được để trống.');
+      return;
+    }
+    if (trimmed.length > 4000) {
+      setEditError('Nội dung tin nhắn không được vượt quá 4000 kí tự.');
+      return;
+    }
+
+    const currentMsg = messages.find((m) => m.id === messageId);
+    if (currentMsg && currentMsg.content === trimmed) {
+      handleCancelEdit();
+      return;
+    }
+
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      const res = await messageApi.updateMessage(messageId, { content: trimmed });
+      const updated = res.data?.data || res.data;
+      if (updated && updated.id) {
+        setMessages((prev) => updateMessageInList(prev, updated));
+      } else {
+        setMessages((prev) =>
+          updateMessageInList(prev, {
+            id: messageId,
+            content: trimmed,
+            updatedAt: new Date().toISOString(),
+          })
+        );
+      }
+      antMessage.success('Chỉnh sửa tin nhắn thành công.');
+      handleCancelEdit();
+    } catch (err) {
+      const status = err.response?.status;
+      const errMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        (status === 403
+          ? 'Bạn không có quyền sửa tin nhắn này.'
+          : status === 404
+          ? 'Tin nhắn không tồn tại hoặc đã bị xóa.'
+          : 'Không thể chỉnh sửa tin nhắn. Vui lòng thử lại.');
+      setEditError(errMsg);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleEditKeyDown = (e, messageId) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelEdit();
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSaveEdit(messageId);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!messageId) return;
+    setDeletingMessageId(messageId);
+    try {
+      await messageApi.deleteMessage(messageId);
+      setMessages((prev) => removeMessageFromList(prev, messageId));
+      if (editingMessageId === messageId) {
+        handleCancelEdit();
+      }
+      antMessage.success('Đã xóa tin nhắn.');
+    } catch (err) {
+      const status = err.response?.status;
+      const errMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        (status === 403
+          ? 'Bạn không có quyền xóa tin nhắn này.'
+          : status === 404
+          ? 'Tin nhắn không tồn tại hoặc đã bị xóa.'
+          : 'Không thể xóa tin nhắn. Vui lòng thử lại.');
+      antMessage.error(errMsg);
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
+
 
   const handleChannelCreated = (newChannel) => {
     if (serverId) {
@@ -784,6 +927,21 @@ function ServerWorkspace({ serverId }) {
                 </div>
               )}
 
+              {loadMoreError && (
+                <div className="group-messages-load-more-error" role="alert">
+                  <span>{loadMoreError}</span>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={handleLoadMore}
+                    className="group-messages-retry-btn"
+                  >
+                    Thử lại
+                  </Button>
+                </div>
+              )}
+
               {messagesLoading && messages.length === 0 ? (
                 <div className="group-messages-loading" role="status" aria-label="Đang tải lịch sử tin nhắn">
                   <Spin size="large" />
@@ -810,13 +968,53 @@ function ServerWorkspace({ serverId }) {
                     const isSameSender = prevMsg && String(prevMsg.senderId) === String(msg.senderId);
                     const isCloseInTime = isSameSender && Math.abs(new Date(msg.createdAt) - new Date(prevMsg.createdAt)) < 300000;
                     const isGrouped = isSameSender && isCloseInTime;
+                    const isEditing = editingMessageId === msg.id;
+                    const canEdit = author.isOwn;
+                    const canDelete = author.isOwn;
 
                     return (
                       <div
                         key={msg.id ?? `msg-${index}`}
-                        className={`group-message-row ${author.isOwn ? 'group-message-row--own' : ''} ${isGrouped ? 'group-message-row--grouped' : ''}`}
+                        className={`group-message-row ${author.isOwn ? 'group-message-row--own' : ''} ${isGrouped ? 'group-message-row--grouped' : ''} ${isEditing ? 'group-message-row--editing' : ''}`}
                         role="listitem"
                       >
+                        {(canEdit || canDelete) && !isEditing && (
+                          <div className="group-message-actions">
+                            {canEdit && (
+                              <button
+                                type="button"
+                                className="group-message-action-btn"
+                                title="Chỉnh sửa tin nhắn"
+                                aria-label="Chỉnh sửa tin nhắn"
+                                onClick={() => handleStartEdit(msg)}
+                              >
+                                <EditOutlined />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <Popconfirm
+                                title="Xóa tin nhắn?"
+                                description="Bạn có chắc chắn muốn xóa tin nhắn này không? Hành động này không thể hoàn tác."
+                                onConfirm={() => handleDeleteMessage(msg.id)}
+                                okText="Xóa"
+                                cancelText="Hủy"
+                                okButtonProps={{ danger: true, loading: deletingMessageId === msg.id }}
+                                placement="topRight"
+                              >
+                                <button
+                                  type="button"
+                                  className="group-message-action-btn group-message-action-btn--delete"
+                                  title="Xóa tin nhắn"
+                                  aria-label="Xóa tin nhắn"
+                                  disabled={deletingMessageId === msg.id}
+                                >
+                                  <DeleteOutlined />
+                                </button>
+                              </Popconfirm>
+                            )}
+                          </div>
+                        )}
+
                         {!isGrouped ? (
                           <div className="group-message-avatar-col">
                             <Avatar
@@ -855,9 +1053,78 @@ function ServerWorkspace({ serverId }) {
                               </span>
                             </div>
                           )}
-                          <div className="group-message-content">
-                            {msg.content}
-                          </div>
+                          {!isEditing ? (
+                            <div className="group-message-content">
+                              {msg.content}
+                              {isMessageEdited(msg) && (
+                                <span
+                                  className="group-message-edited"
+                                  title={msg.updatedAt || msg.lastModifiedDate ? `Đã chỉnh sửa lúc ${formatMessageTime(msg.updatedAt || msg.lastModifiedDate)}` : 'Đã chỉnh sửa'}
+                                >
+                                  (đã chỉnh sửa)
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="group-message-edit-box">
+                              <Input.TextArea
+                                ref={editInputRef}
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                onKeyDown={(e) => handleEditKeyDown(e, msg.id)}
+                                disabled={editLoading}
+                                autoSize={{ minRows: 1, maxRows: 8 }}
+                                maxLength={4000}
+                                className="group-message-edit-input"
+                                placeholder="Chỉnh sửa tin nhắn..."
+                              />
+                              <div className="group-message-edit-footer">
+                                <span className="group-message-edit-hint">
+                                  Nhấn <kbd>Escape</kbd> để{' '}
+                                  <button
+                                    type="button"
+                                    className="group-message-edit-link"
+                                    onClick={handleCancelEdit}
+                                  >
+                                    hủy
+                                  </button>{' '}
+                                  • Nhấn <kbd>Enter</kbd> để{' '}
+                                  <button
+                                    type="button"
+                                    className="group-message-edit-link"
+                                    onClick={() => handleSaveEdit(msg.id)}
+                                  >
+                                    lưu
+                                  </button>
+                                </span>
+                                <div className="group-message-edit-buttons">
+                                  <Button
+                                    size="small"
+                                    className="group-message-edit-cancel-btn"
+                                    onClick={handleCancelEdit}
+                                    disabled={editLoading}
+                                  >
+                                    Hủy
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    type="primary"
+                                    className="group-message-edit-save-btn"
+                                    onClick={() => handleSaveEdit(msg.id)}
+                                    loading={editLoading}
+                                    disabled={!editContent.trim()}
+                                  >
+                                    Lưu thay đổi
+                                  </Button>
+                                </div>
+                              </div>
+                              {editError && (
+                                <div className="group-message-edit-error" role="alert">
+                                  {editError}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

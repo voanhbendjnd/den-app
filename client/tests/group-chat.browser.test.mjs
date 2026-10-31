@@ -1319,3 +1319,343 @@ test('server switching reloads members of the selected server', async () => {
   assert.deepEqual(errors, []);
 });
 
+test('channel messages initial load renders messages and shows welcome banner when history ends', async () => {
+  const { page, errors } = await openScopedChat({
+    handler: async (route, pathname) => {
+      if (pathname === '/api/channels/1010/messages') {
+        await route.fulfill({
+          json: {
+            statusCode: 200,
+            data: {
+              items: [scopedMessage(1, 'Initial welcome message')],
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+        return true;
+      }
+      return false;
+    },
+  });
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Initial welcome message', { exact: true }).waitFor();
+  await page.locator('.group-channel-welcome').waitFor();
+  assert.equal(await page.locator('#channel-welcome-title').isVisible(), true);
+  assert.match(await page.locator('#channel-welcome-title').innerText(), /Chào mừng đến với/);
+  assert.match(await page.locator('#channel-welcome-title').innerText(), /#alpha-channel!/);
+  assert.equal(await page.locator('.group-channel-welcome .group-welcome__eyebrow').isVisible(), true);
+  assert.equal(await page.getByText(/Đây là phần khởi đầu của kênh/).isVisible(), true);
+  assert.deepEqual(errors, []);
+});
+
+test('scrolling to top triggers pagination with before and limit=30 and prepends older messages', async t => {
+  const paginationGate = deferred(t);
+  let paginationCallCount = 0;
+  const initialItems = Array.from({ length: 30 }, (_, i) => ({
+    id: 31 + i,
+    channelId: 1010,
+    senderId: 300,
+    content: `Msg batch2 #${31 + i}`,
+    createdAt: new Date(Date.now() - (30 - i) * 60000).toISOString(),
+  }));
+  const olderItems = Array.from({ length: 30 }, (_, i) => ({
+    id: 1 + i,
+    channelId: 1010,
+    senderId: 300,
+    content: `Msg batch1 #${1 + i}`,
+    createdAt: new Date(Date.now() - (60 - i) * 60000).toISOString(),
+  }));
+
+  const { page, errors } = await openScopedChat({
+    handler: async (route, pathname) => {
+      if (pathname === '/api/channels/1010/messages') {
+        const url = new URL(route.request().url());
+        const before = url.searchParams.get('before');
+        const limit = url.searchParams.get('limit');
+        if (!before) {
+          await route.fulfill({
+            json: {
+              data: {
+                items: initialItems,
+                hasMore: true,
+                nextCursor: 31,
+              },
+            },
+          });
+          return true;
+        }
+        paginationCallCount++;
+        assert.equal(before, '31');
+        assert.equal(limit, '30');
+        await paginationGate.promise;
+        await route.fulfill({
+          json: {
+            data: {
+              items: olderItems,
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+        return true;
+      }
+      return false;
+    },
+  });
+
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Msg batch2 #60', { exact: true }).waitFor();
+
+  const scrollContainer = page.getByRole('region', { name: 'Tin nhắn kênh #alpha-channel' });
+  await scrollContainer.evaluate(el => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+
+  await page.getByRole('status', { name: 'Đang tải thêm tin nhắn cũ' }).waitFor();
+
+  // Dispatch another scroll while pending to verify duplicate request prevention
+  await scrollContainer.evaluate(el => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+
+  paginationGate.resolve();
+  await page.getByText('Msg batch1 #1', { exact: true }).waitFor();
+  await settleUI(page);
+
+  assert.equal(paginationCallCount, 1);
+  assert.equal(await page.locator('.group-channel-welcome').isVisible(), true);
+  assert.equal(await page.getByText('Msg batch1 #1', { exact: true }).count(), 1);
+  assert.equal(await page.getByText('Msg batch2 #60', { exact: true }).count(), 1);
+  assert.deepEqual(errors, []);
+});
+
+test('pagination error keeps existing messages and allows retry to succeed', async () => {
+  let attempt = 0;
+  const initialItems = Array.from({ length: 30 }, (_, i) => ({
+    id: 31 + i,
+    channelId: 1010,
+    senderId: 300,
+    content: `Active message #${31 + i}`,
+    createdAt: new Date(Date.now() - (30 - i) * 60000).toISOString(),
+  }));
+  const olderItems = [
+    { id: 1, channelId: 1010, senderId: 300, content: 'Retry older message #1', createdAt: new Date(Date.now() - 100000).toISOString() },
+  ];
+
+  const { page, errors } = await openScopedChat({
+    handler: async (route, pathname) => {
+      if (pathname === '/api/channels/1010/messages') {
+        const url = new URL(route.request().url());
+        const before = url.searchParams.get('before');
+        if (!before) {
+          await route.fulfill({
+            json: {
+              data: {
+                items: initialItems,
+                hasMore: true,
+                nextCursor: 31,
+              },
+            },
+          });
+          return true;
+        }
+        attempt++;
+        if (attempt === 1) {
+          await route.fulfill({
+            status: 500,
+            json: { detail: 'Lỗi tải thêm tin nhắn từ máy chủ' },
+          });
+          return true;
+        }
+        await route.fulfill({
+          json: {
+            data: {
+              items: olderItems,
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+        return true;
+      }
+      return false;
+    },
+  });
+
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Active message #60', { exact: true }).waitFor();
+
+  const scrollContainer = page.getByRole('region', { name: 'Tin nhắn kênh #alpha-channel' });
+  await scrollContainer.evaluate(el => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+
+  await page.locator('.group-messages-load-more-error').waitFor();
+  assert.equal(await page.getByText('Lỗi tải thêm tin nhắn từ máy chủ').isVisible(), true);
+  assert.equal(await page.getByText('Active message #31', { exact: true }).isVisible(), true);
+  assert.equal(await page.getByText('Active message #60', { exact: true }).isVisible(), true);
+
+  const retryBtn = page.locator('.group-messages-retry-btn');
+  await retryBtn.click();
+
+  await page.getByText('Retry older message #1', { exact: true }).waitFor();
+  assert.equal(await page.locator('.group-messages-load-more-error').count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('author has edit and delete action buttons while server owner cannot edit or delete member messages', async () => {
+  const messagesList = [
+    { id: 201, channelId: 1010, senderId: 100, content: 'Own message from current user', createdAt: '2026-10-31T10:00:00Z' },
+    { id: 202, channelId: 1010, senderId: 300, content: 'Member message from another user', createdAt: '2026-10-31T10:05:00Z' },
+  ];
+
+  const { page, errors } = await openScopedChat({
+    owner: true,
+    handler: async (route, pathname) => {
+      if (pathname === '/api/channels/1010/messages') {
+        await route.fulfill({
+          json: {
+            data: {
+              items: messagesList,
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+        return true;
+      }
+      return false;
+    },
+  });
+
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await page.getByText('Own message from current user', { exact: true }).waitFor();
+  await page.getByText('Member message from another user', { exact: true }).waitFor();
+
+  const ownRow = page.locator('.group-message-row').filter({ hasText: 'Own message from current user' });
+  assert.equal(await ownRow.locator('.group-message-actions').count(), 1);
+  await ownRow.hover();
+  assert.equal(await ownRow.locator('button[aria-label="Chỉnh sửa tin nhắn"]').isVisible(), true);
+  assert.equal(await ownRow.locator('button[aria-label="Xóa tin nhắn"]').isVisible(), true);
+
+  const memberRow = page.locator('.group-message-row').filter({ hasText: 'Member message from another user' });
+  assert.equal(await memberRow.locator('.group-message-actions').count(), 0);
+  assert.equal(await memberRow.locator('button[aria-label="Chỉnh sửa tin nhắn"]').count(), 0);
+  assert.equal(await memberRow.locator('button[aria-label="Xóa tin nhắn"]').count(), 0);
+
+  assert.deepEqual(errors, []);
+});
+
+test('inline message edit can be cancelled with Escape and saved with Enter', async () => {
+  const patchCalls = [];
+  const initialMsg = { id: 301, channelId: 1010, senderId: 100, content: 'Before edit text', createdAt: '2026-10-31T10:00:00Z' };
+
+  const { page, errors } = await openScopedChat({
+    handler: async (route, pathname) => {
+      if (route.request().method() === 'PATCH' && pathname === '/api/messages/301') {
+        patchCalls.push(route.request().postDataJSON());
+        await route.fulfill({
+          json: {
+            statusCode: 200,
+            data: {
+              ...initialMsg,
+              content: route.request().postDataJSON().content,
+              updatedAt: '2026-10-31T10:15:00Z',
+            },
+          },
+        });
+        return true;
+      }
+      if (pathname === '/api/channels/1010/messages') {
+        await route.fulfill({
+          json: {
+            data: {
+              items: [initialMsg],
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+        return true;
+      }
+      return false;
+    },
+  });
+
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  const row = page.locator('.group-message-row--own').first();
+  await page.getByText('Before edit text', { exact: true }).waitFor();
+
+  await row.hover();
+  await row.locator('button[aria-label="Chỉnh sửa tin nhắn"]').click();
+
+  const editInput = row.locator('.group-message-edit-input');
+  await editInput.waitFor();
+  assert.equal(await editInput.inputValue(), 'Before edit text');
+
+  await editInput.press('Escape');
+  assert.equal(await row.locator('.group-message-edit-input').count(), 0);
+  assert.equal(await page.getByText('Before edit text', { exact: true }).isVisible(), true);
+
+  await row.hover();
+  await row.locator('button[aria-label="Chỉnh sửa tin nhắn"]').click();
+  const editInputAgain = row.locator('.group-message-edit-input');
+  await editInputAgain.fill('After edit updated text');
+  await editInputAgain.press('Enter');
+
+  await page.getByText('After edit updated text').waitFor();
+  assert.equal(await row.locator('.group-message-edited').isVisible(), true);
+  assert.deepEqual(patchCalls, [{ content: 'After edit updated text' }]);
+  assert.deepEqual(errors, []);
+});
+
+test('message delete shows Popconfirm and removes message on confirmation', async () => {
+  const deleteCalls = [];
+  const initialMsg = { id: 401, channelId: 1010, senderId: 100, content: 'Message to be deleted', createdAt: '2026-10-31T10:00:00Z' };
+
+  const { page, errors } = await openScopedChat({
+    handler: async (route, pathname) => {
+      if (route.request().method() === 'DELETE' && pathname === '/api/messages/401') {
+        deleteCalls.push(pathname);
+        await route.fulfill({ status: 204, body: '' });
+        return true;
+      }
+      if (pathname === '/api/channels/1010/messages') {
+        await route.fulfill({
+          json: {
+            data: {
+              items: [initialMsg],
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+        return true;
+      }
+      return false;
+    },
+  });
+
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  const row = page.locator('.group-message-row').filter({ hasText: 'Message to be deleted' });
+  await row.waitFor();
+
+  await row.hover();
+  await row.locator('button[aria-label="Xóa tin nhắn"]').click();
+
+  const popconfirm = page.locator('.ant-popover').filter({ hasText: 'Xóa tin nhắn?' });
+  await popconfirm.waitFor();
+  const confirmBtn = popconfirm.getByRole('button', { name: 'Xóa', exact: true });
+  await confirmBtn.click();
+
+  await page.getByText('Message to be deleted', { exact: true }).waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.group-message-row').count(), 0);
+  assert.deepEqual(deleteCalls, ['/api/messages/401']);
+  assert.deepEqual(errors, []);
+});
+
+

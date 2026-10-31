@@ -214,4 +214,30 @@ public class MessageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, violations.iterator().next().getMessage());
         }
     }
+
+    @Transactional
+    public void deleteMessage(Long messageId) {
+        if (messageId == null || messageId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID của tin nhắn không hợp lệ");
+        }
+
+        String email = getAuthenticatedEmail();
+        User currentUser = userRepository.findOneByEmail(email)
+                .filter(user -> Boolean.TRUE.equals(user.getActivated()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Không tìm thấy tin nhắn"));
+
+        Long authorId = message.getAuthorId() != null ? message.getAuthorId() : message.getSenderId();
+        if (authorId == null || !authorId.equals(currentUser.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Bạn không có quyền xóa tin nhắn này");
+        }
+
+        messageRepository.delete(message);
+    }
 }
+

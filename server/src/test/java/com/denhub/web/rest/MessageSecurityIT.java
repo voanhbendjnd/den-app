@@ -46,6 +46,7 @@ import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -367,7 +368,98 @@ class MessageSecurityIT {
         problem(mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
                         .param("limit", "150")
                         .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+
+        problem(mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .param("limit", "0")
+                        .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
     }
+
+    @Test
+    void getMessagesMultiPagePaginationAcrossEntireHistory() throws Exception {
+        Message m1 = createMessage(sender, "Message 1");
+        Message m2 = createMessage(sender, "Message 2");
+        Message m3 = createMessage(sender, "Message 3");
+        Message m4 = createMessage(sender, "Message 4");
+        Message m5 = createMessage(sender, "Message 5");
+
+        // Page 1: limit = 2
+        String p1Response = mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .param("limit", "2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].id").value(m5.getId()))
+                .andExpect(jsonPath("$.data.items[1].id").value(m4.getId()))
+                .andExpect(jsonPath("$.data.hasMore").value(true))
+                .andExpect(jsonPath("$.data.nextCursor").value(m4.getId()))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode p1 = mapper.readTree(p1Response);
+        Long cursor1 = p1.path("data").path("nextCursor").asLong();
+        assertEquals(m4.getId(), cursor1);
+
+        // Page 2: before = cursor1, limit = 2
+        String p2Response = mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .param("before", String.valueOf(cursor1))
+                        .param("limit", "2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].id").value(m3.getId()))
+                .andExpect(jsonPath("$.data.items[1].id").value(m2.getId()))
+                .andExpect(jsonPath("$.data.hasMore").value(true))
+                .andExpect(jsonPath("$.data.nextCursor").value(m2.getId()))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode p2 = mapper.readTree(p2Response);
+        Long cursor2 = p2.path("data").path("nextCursor").asLong();
+        assertEquals(m2.getId(), cursor2);
+
+        // Page 3: before = cursor2, limit = 2 (last page)
+        mvc.perform(get("/api/channels/{channelId}/messages", channel.getId())
+                        .param("before", String.valueOf(cursor2))
+                        .param("limit", "2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(m1.getId()))
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").value(nullValue()));
+    }
+
+    @Test
+    void getMessagesEmptyChannelReturnsEmptyArray() throws Exception {
+        Channel emptyChannel = new Channel();
+        emptyChannel.setName("empty-channel");
+        emptyChannel.setServerId(channel.getServerId());
+        emptyChannel = channels.saveAndFlush(emptyChannel);
+
+        mvc.perform(get("/api/channels/{channelId}/messages", emptyChannel.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items.length()").value(0))
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").value(nullValue()));
+    }
+
+    @Test
+    void getMessagesChannelIsolationCannotReadMessagesFromOtherServerChannel() throws Exception {
+        Server otherServer = new Server();
+        otherServer.setName("Another Server");
+        otherServer.setOwnerId(sender.getId() + 9999L);
+        otherServer = servers.saveAndFlush(otherServer);
+
+        Channel otherChannel = new Channel();
+        otherChannel.setName("secret-channel");
+        otherChannel.setServerId(otherServer.getId());
+        otherChannel = channels.saveAndFlush(otherChannel);
+
+        // sender is NOT a member of otherServer
+        problem(mvc.perform(get("/api/channels/{channelId}/messages", otherChannel.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+    }
+
 
     @Test
     void updateMessageSuccessWhenAuthor() throws Exception {
@@ -444,6 +536,24 @@ class MessageSecurityIT {
     }
 
     @Test
+    void updateMessageForbiddenWhenServerOwnerTriesToEditMemberMessageViaPut() throws Exception {
+        User member = createAnotherMember();
+        Message memberMsg = createMessage(member, "Tin nhắn của member");
+
+        String updatePayload = mapper.writeValueAsString(Map.of("content", "Server owner sửa bằng PUT"));
+
+        problem(mvc.perform(put("/api/messages/{messageId}", memberMsg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload)), 403);
+
+        entityManager.flush();
+        entityManager.clear();
+        Message unchanged = messages.findById(memberMsg.getId()).orElseThrow();
+        assertEquals("Tin nhắn của member", unchanged.getContent());
+    }
+
+    @Test
     void updateMessageUnauthorizedWhenNoToken() throws Exception {
         Message msg = createMessage(sender, "Tin nhắn");
         String updatePayload = mapper.writeValueAsString(Map.of("content", "Sửa"));
@@ -478,6 +588,63 @@ class MessageSecurityIT {
                         .header(HttpHeaders.AUTHORIZATION, bearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload)), 404);
+    }
+
+    @Test
+    void deleteMessageSuccessByAuthor() throws Exception {
+        User member = createAnotherMember();
+        Message msg = createMessage(member, "Tin nhắn của tác giả");
+
+        mvc.perform(delete("/api/messages/{messageId}", msg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenForUser(member)))
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertTrue(messages.findById(msg.getId()).isEmpty());
+    }
+
+    @Test
+    void deleteMessageForbiddenWhenServerOwnerNotAuthor() throws Exception {
+        User member = createAnotherMember();
+        Message memberMsg = createMessage(member, "Tin nhắn vi phạm của member");
+
+        // sender is Server Owner, but NOT author -> expect 403 Forbidden
+        problem(mvc.perform(delete("/api/messages/{messageId}", memberMsg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer())), 403);
+
+        entityManager.flush();
+        entityManager.clear();
+        assertTrue(messages.findById(memberMsg.getId()).isPresent());
+    }
+
+    @Test
+    void deleteMessageForbiddenWhenOtherMemberTriesToDelete() throws Exception {
+        User member1 = createAnotherMember();
+        User member2 = createAnotherMember();
+        Message member1Msg = createMessage(member1, "Tin nhắn của member 1");
+
+        // member2 tries to delete member1's message
+        problem(mvc.perform(delete("/api/messages/{messageId}", member1Msg.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenForUser(member2))), 403);
+
+        entityManager.flush();
+        entityManager.clear();
+        assertTrue(messages.findById(member1Msg.getId()).isPresent());
+    }
+
+    @Test
+    void deleteMessageUnauthorizedWhenNoToken() throws Exception {
+        Message msg = createMessage(sender, "Tin nhắn");
+
+        mvc.perform(delete("/api/messages/{messageId}", msg.getId()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deleteMessageNotFoundWhenMessageDoesNotExist() throws Exception {
+        problem(mvc.perform(delete("/api/messages/{messageId}", 999999L)
+                        .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
     }
 
     private Message createMessage(User author, String content) {
