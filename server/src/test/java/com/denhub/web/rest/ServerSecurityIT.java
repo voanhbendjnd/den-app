@@ -1632,4 +1632,104 @@ class ServerSecurityIT {
                 .header(HttpHeaders.AUTHORIZATION, joinerToken))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void joinAndLeaveServer_CompleteLifecycle_MembershipAndResourceAccessVerified() throws Exception {
+        addMembership(server.getId());
+
+        // 1. Setup user who already owns another server (Server B)
+        User user = new User();
+        user.setEmail("lifecycle-member-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        user.setPassword("fixture-" + UUID.randomUUID());
+        user.setName("Lifecycle Member");
+        user.setUsername("lifecyclemember");
+        user.setActivated(true);
+        user.setSessionId(UUID.randomUUID().toString());
+        user = users.saveAndFlush(user);
+        String userToken = bearerFor(user);
+
+        Server ownedServer = new Server();
+        ownedServer.setName("User Own Server");
+        ownedServer.setOwnerId(user.getId());
+        ownedServer = servers.saveAndFlush(ownedServer);
+
+        ServerMember ownMembership = new ServerMember();
+        ownMembership.setServerId(ownedServer.getId());
+        ownMembership.setUserId(user.getId());
+        ownMembership.setNickname("Owner");
+        members.saveAndFlush(ownMembership);
+
+        // Verify initial state: user has only 1 server (ownedServer)
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(ownedServer.getId()));
+
+        // Pre-join: user is outsider to server A -> forbidden from detail, members, channels
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, userToken)), 403);
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, userToken)), 403);
+        problem(mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, userToken)), 400);
+
+        // 2. User joins server A
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isNoContent());
+
+        // Verify post-join: server list contains 2 servers (ownedServer + joined server)
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+
+        // Verify post-join: user appears in server A members list as MEMBER
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].userId").value(user.getId()))
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER"));
+
+        // Verify post-join: user can access server A detail and channels
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(server.getId()));
+
+        mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isOk());
+
+        // 3. User attempts duplicate join to server A -> 400 Bad Request
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, userToken)), 400);
+
+        // 4. User leaves server A
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isNoContent());
+
+        // Verify post-leave: server A disappears from user's server list, ownedServer remains
+        mvc.perform(get("/api/v1/servers").header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(ownedServer.getId()));
+
+        // Verify post-leave: user disappears from server A members list (owner still sees 1 member)
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()));
+
+        // Verify post-leave: user is blocked from server A detail, members, channels
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, userToken)), 403);
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, userToken)), 403);
+        problem(mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, userToken)), 400);
+
+        // 5. User attempts duplicate leave from server A -> 400 Bad Request
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, userToken)), 400);
+
+        // 6. Owner attempts to leave server A -> 400 Bad Request (BR-SRV-01)
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
 }
