@@ -90,3 +90,61 @@ export function getAuthorInfo(senderId, members = [], currentUser = null, server
     isOwner,
   };
 }
+
+/**
+ * Updates a specific message in the list with new data.
+ */
+export function updateMessageInList(messages, updatedMessage) {
+  if (!Array.isArray(messages) || !updatedMessage || updatedMessage.id == null) {
+    return Array.isArray(messages) ? messages : [];
+  }
+  return messages.map((msg) =>
+    msg && msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
+  );
+}
+
+/**
+ * Checks whether a message has been edited.
+ */
+export function isMessageEdited(message) {
+  if (!message) return false;
+  return Boolean(message.updatedAt || message.lastModifiedDate);
+}
+
+/**
+ * Removes a specific message from the list by id.
+ */
+export function removeMessageFromList(messages, messageId) {
+  if (!Array.isArray(messages) || messageId == null) {
+    return Array.isArray(messages) ? messages : [];
+  }
+  return messages.filter((msg) => msg && String(msg.id) !== String(messageId));
+}
+
+/**
+ * Checks if the current user has permission to delete a message.
+ * Strictly restricted to original message author only.
+ */
+export function canDeleteMessage(authorId, currentUserId) {
+  if (currentUserId == null || authorId == null) return false;
+  return String(authorId) === String(currentUserId);
+}
+
+/**
+ * Checks if the current user has permission to edit a message.
+ * Strictly restricted to original message author only (BR-MSG-02).
+ */
+export function canEditMessage(authorId, currentUserId) {
+  if (currentUserId == null || authorId == null) return false;
+  return String(authorId) === String(currentUserId);
+}
+
+/**
+ * Calculates new scrollTop after prepending older messages to preserve user's reading position.
+ */
+export function calculateScrollAfterPrepend(prevScrollTop = 0, prevScrollHeight = 0, newScrollHeight = 0) {
+  return Number(prevScrollTop || 0) + (Number(newScrollHeight || 0) - Number(prevScrollHeight || 0));
+}
+
+
+
