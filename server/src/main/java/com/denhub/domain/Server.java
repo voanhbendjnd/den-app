@@ -2,16 +2,15 @@ package com.denhub.domain;
 
 import jakarta.persistence.*;
 import com.denhub.domain.enums.ServerVisibility;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.validator.constraints.Length;
-import org.hibernate.annotations.Cache;
 
 import java.io.Serial;
 import java.io.Serializable;
 
 @Entity
 @Table(name = "servers")
-@Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
+// Cached enum instances can belong to an old DevTools restart classloader.
+@Cacheable(false)
 @AttributeOverrides({
     @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", length = 254, updatable = false)),
     @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
