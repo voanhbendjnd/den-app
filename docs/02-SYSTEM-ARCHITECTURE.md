@@ -1058,3 +1058,39 @@ Ngay sau khi thành viên bị loại thành công:
   - Khi gọi `leave` thất bại (400, network error): Frontend không xóa Server khỏi state.
 - **Tuân thủ phân quyền giao diện (UI Protection)**:
   - Helper `canLeaveServer(server, currentUser)` kiểm tra `server.ownerId == currentUser.id`. Nếu là Owner, thuộc tính `canLeave` trả về `false` kèm lý do ("Chủ sở hữu không thể tự rời Server. Hãy chuyển quyền sở hữu hoặc xóa Server"), nút rời Server trên giao diện bị ẩn hoặc disable.
+
+---
+
+## 22. QUY TẮC VÀ BẢO ĐẢM AN TOÀN KHI LOẠI THÀNH VIÊN (TASK 4.09)
+
+### 22.1 Đặc tả API và Ma trận phân quyền
+- **Endpoint**: `DELETE /api/v1/servers/{serverId}/members/{userId}`
+  - **Quyền hạn bắt buộc**: Chỉ chủ sở hữu Server (`server.ownerId == currentUser.id`).
+  - **Kiểm soát phân quyền nghiêm ngặt (Strict RBAC)**:
+    - Member thường gọi $\rightarrow$ `403 Forbidden` (`"Chỉ chủ sở hữu Server mới có quyền loại thành viên"`).
+    - Outsider (người dùng chưa tham gia Server) $\rightarrow$ `403 Forbidden`.
+    - Quản trị viên toàn cục (`ROLE_ADMIN`) không phải Server Owner $\rightarrow$ `403 Forbidden` (tuân thủ ranh giới chủ quyền Server của DenHub).
+    - Payload giả mạo (`isOwner=true`, query param `role=OWNER`) $\rightarrow$ bị bỏ qua, xác thực hoàn toàn dựa trên JWT Principal và DB entity.
+  - **Quy tắc bảo vệ chủ sở hữu**: Owner không thể tự loại chính mình (`userId == server.ownerId`) $\rightarrow$ `400 Bad Request` (`"Không thể loại chủ sở hữu khỏi Server"`).
+  - **Xác thực tồn tại & Xóa lặp lại (Consecutive Deletion Idempotency)**:
+    - Target member không thuộc server $\rightarrow$ `404 Not Found` (`"Thành viên không tồn tại trong Server"`).
+    - Target member đã bị loại trước đó $\rightarrow$ gọi lại lần 2 trả về `404 Not Found`.
+
+### 22.2 Thu hồi quyền tức thì & Cô lập đa thành viên (Multi-Member Isolation)
+- Ngay sau khi bản ghi `server_member` bị xóa:
+  1. `GET /api/v1/servers/{serverId}` $\rightarrow$ trả về `403 Forbidden`.
+  2. `GET /api/v1/servers/{serverId}/members` $\rightarrow$ trả về `403 Forbidden`.
+  3. `GET /api/v1/servers/{serverId}/channels` $\rightarrow$ trả về `400 Bad Request` (kênh bị cấm).
+  4. `POST /api/channels/{channelId}/messages` $\rightarrow$ trả về `400 Bad Request` (không thể gửi tin nhắn).
+  5. `POST /api/v1/servers/{serverId}/leave` $\rightarrow$ trả về `400 Bad Request` (`"Bạn không phải là thành viên của Server này"`).
+  6. `GET /api/v1/servers` (Server list của target) $\rightarrow$ Server bị loại lập tức biến mất.
+- **Tính độc lập của các thành viên còn lại**:
+  - Việc loại một thành viên không làm ảnh hưởng đến quyền hạn, kênh trò chuyện, lịch sử chat hay danh sách thành viên của các member khác và Server Owner.
+
+### 22.3 Cơ chế đồng bộ trạng thái và Rollback ở Frontend
+- **State Synchronization an toàn (No unverified optimistic mutation)**:
+  - Client chỉ xóa target khỏi danh sách `members` (`setMembers(prev => prev.filter(...))`) khi API `serverApi.removeMember` trả về thành công (HTTP 204).
+  - Khi API trả về lỗi (400, 401, 403, 404, 500, Timeout, Network Error): State `members` được giữ nguyên 100%, modal xác nhận giữ nguyên hiển thị thông báo lỗi để người dùng nắm rõ nguyên nhân hoặc thử lại.
+- **Phòng chống Race Condition & Double Submit**:
+  - `submittingRef` khóa request ngay khi nhấn "Loại thành viên", vô hiệu hóa nút bấm và chặn mọi thao tác click liên tiếp trong lúc request đang xử lý.
+  - Quản lý phiên giao diện (`sessionRef`): Nếu người dùng đóng modal hoặc chuyển sang server khác trong lúc request đang gửi, phản hồi cũ bị huỷ bỏ, tránh rò rỉ cập nhật state sai vị trí.

@@ -1540,6 +1540,113 @@ class ServerSecurityIT {
                 .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
     }
     @Test
+    void removeMember_ConsecutiveDeletion_SecondAttemptReturns404() throws Exception {
+        addMembership(server.getId());
+
+        User targetMember = new User();
+        targetMember.setEmail("consec-kicked-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        targetMember.setPassword("fixture-" + UUID.randomUUID());
+        targetMember.setName("ConsecKicked");
+        targetMember.setActivated(true);
+        targetMember.setSessionId(UUID.randomUUID().toString());
+        targetMember = users.saveAndFlush(targetMember);
+        String targetToken = bearerFor(targetMember);
+
+        // Join server
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isNoContent());
+
+        assertTrue(members.existsByServerIdAndUserId(server.getId(), targetMember.getId()));
+
+        // First remove attempt -> 204 No Content
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertFalse(members.existsByServerIdAndUserId(server.getId(), targetMember.getId()));
+
+        // Second remove attempt on already removed member -> 404 Not Found
+        problem(mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
+    }
+
+    @Test
+    void removeMember_MultiMember_TargetRemoved_RemainingMemberAndOwnerRetainFullAccess() throws Exception {
+        addMembership(server.getId());
+
+        // Target Member A (to be removed)
+        User targetMember = new User();
+        targetMember.setEmail("multikicked-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        targetMember.setPassword("fixture-" + UUID.randomUUID());
+        targetMember.setName("Multi Kicked");
+        targetMember.setActivated(true);
+        targetMember.setSessionId(UUID.randomUUID().toString());
+        targetMember = users.saveAndFlush(targetMember);
+        String targetToken = bearerFor(targetMember);
+
+        // Remaining Member B (retains access)
+        User remainingMember = new User();
+        remainingMember.setEmail("multiremain-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        remainingMember.setPassword("fixture-" + UUID.randomUUID());
+        remainingMember.setName("Multi Remaining");
+        remainingMember.setActivated(true);
+        remainingMember.setSessionId(UUID.randomUUID().toString());
+        remainingMember = users.saveAndFlush(remainingMember);
+        String remainingToken = bearerFor(remainingMember);
+
+        // Both join
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, targetToken))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, remainingToken))
+                .andExpect(status().isNoContent());
+
+        // Check 3 members exist
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3));
+
+        // Owner creates a channel
+        mvc.perform(post("/api/v1/channels")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"general-test\",\"serverId\":" + server.getId() + "}")
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isCreated());
+
+        // Owner removes Target Member A
+        mvc.perform(delete("/api/v1/servers/" + server.getId() + "/members/" + targetMember.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isNoContent());
+
+        // Target Member A is completely blocked
+        problem(mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, targetToken)), 403);
+        problem(mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, targetToken)), 403);
+        problem(mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, targetToken)), 400);
+
+        // Remaining Member B has FULL access
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, remainingToken))
+                .andExpect(status().isOk());
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, remainingToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+        mvc.perform(get("/api/v1/servers/" + server.getId() + "/channels")
+                .header(HttpHeaders.AUTHORIZATION, remainingToken))
+                .andExpect(status().isOk());
+
+        // Owner also has FULL access and sees exactly 2 members
+        mvc.perform(get(detailUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk());
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+    }
+
+    @Test
     void joinServerByInviteCode_BlankOrWhitespaceCode_Returns400() throws Exception {
         mvc.perform(post("/api/v1/servers/join-invite/%20%20%20")
                 .header(HttpHeaders.AUTHORIZATION, bearer()))

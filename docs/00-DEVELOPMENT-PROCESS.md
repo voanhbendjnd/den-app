@@ -335,7 +335,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Server & Invite (Task 3.24)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-27  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
-| **Member & Role (Task 4.04)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-28  |
+| **Member & Role (Task 4.09)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-29  |
 | **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
 | **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-25  |
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
@@ -3151,7 +3151,45 @@ Docs Updated:
 
 ---
 
+### [2026-10-29] TASK-4.09 — Kiểm tra loại thành viên khỏi Server (Server Member Removal Verification)
+
+Implemented & Verified:
+- Audit toàn diện 12 ca kiểm thử bắt buộc cho luồng loại thành viên (Kick / Remove Member) khỏi Server:
+  1. Người có quyền loại member hợp lệ (Owner): Gọi `DELETE /api/v1/servers/{serverId}/members/{userId}` trả về HTTP 204 No Content.
+  2. Người không có quyền bị từ chối: Member thường, outsider và quản trị viên hệ thống (ROLE_ADMIN) không phải owner đều bị chặn với HTTP 403 Forbidden.
+  3. Member mục tiêu thuộc đúng Server: Bản ghi `ServerMember` với đúng `(serverId, targetUserId)` bị xóa sạch khỏi cơ sở dữ liệu.
+  4. Member mục tiêu không thuộc Server: Trả về HTTP 404 Not Found ("Thành viên không tồn tại trong Server").
+  5. Member mục tiêu đã bị loại trước đó (consecutive delete): Gọi lần 1 trả về 204 No Content; gọi tiếp lần 2 trên cùng target trả về HTTP 404 Not Found (đảm bảo tính nhất quán & idempotency an toàn).
+  6. Membership thay đổi đúng trong database: `serverMemberRepository.deleteByServerIdAndUserId` được thực thi, số lượng thành viên giảm chính xác 1, không sót row mồ côi.
+  7. Member bị loại biến mất khỏi danh sách thành viên: `GET /api/v1/servers/{serverId}/members` không còn chứa target member.
+  8. Member bị loại không còn Server trong danh sách của chính họ: `GET /api/v1/servers` của target member phản ánh đúng danh sách (không còn server vừa bị kick).
+  9. Member bị loại không còn truy cập được API yêu cầu membership: Target bị chặn khỏi chi tiết Server (403), danh sách thành viên (403), danh sách kênh chat (400 forbidden), tạo kênh mới (400 forbidden), gửi tin nhắn kênh (400), và gọi leave (400 not_a_member).
+  10. Các member còn lại và Owner vẫn truy cập bình thường: Trong mô hình multi-member (Owner, Target, Remaining Member), sau khi Target bị loại, Remaining Member và Owner vẫn truy cập chi tiết Server, xem danh sách thành viên, đọc kênh và gửi tin nhắn bình thường.
+  11. Owner không thể tự loại chính mình: Gọi `DELETE /api/v1/servers/{serverId}/members/{ownerId}` trả về HTTP 400 Bad Request ("Không thể loại chủ sở hữu khỏi Server").
+  12. Frontend state synchronization & rollback: `members` state chỉ được cập nhật loại bỏ target sau khi API thành công (HTTP 204). Khi API gặp lỗi (400, 401, 403, 404, 500, network error), danh sách thành viên được bảo toàn nguyên vẹn (không optimistic delete thiếu an toàn), modal giữ nguyên hiển thị thông báo lỗi thân thiện, và cơ chế guard `submittingRef` chặn hoàn toàn thao tác nhấn đúp đồng thời.
+- Backend Tests:
+  - Bổ sung `removeMember_ConsecutiveDeletion_SecondAttemptReturns404` và `removeMember_MultiMember_TargetRemoved_RemainingMemberAndOwnerRetainFullAccess` trong `ServerSecurityIT.java`.
+  - Bổ sung `removeMember_FailWhenTargetAlreadyRemoved_ReturnsNotFound` trong `ServerServiceTest.java`.
+  - Kết quả: `ServerSecurityIT` (105 tests) PASS 100%, `ServerServiceTest` (99 tests) PASS 100%.
+- Frontend Tests:
+  - Bổ sung 4 unit/integration test suites trong `client/tests/serverRemoveMember.test.mjs` kiểm tra state sync, error rollback, target already removed, và in-flight double click prevention.
+  - Kết quả: 115/115 tests PASS 100%, client production build PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Section 10 Progress, Section 11 Log, Section 12 Handoff).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Section 22 Server Member Removal Security & State Synchronization Audit).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff hiện tại — Task 4.09: Kiểm tra loại thành viên khỏi Server (2026-10-29)
+
+- Task 4.09 hoàn thành xuất sắc toàn bộ 12 ca kiểm thử theo yêu cầu.
+- Toàn bộ backend integration & service tests (ServerSecurityIT: 105 tests, ServerServiceTest: 99 tests) PASS 100%.
+- Toàn bộ frontend unit tests (115 tests) và client production build PASS 100%.
+- Cơ chế bảo vệ Owner, thu hồi quyền hạn tức thì của thành viên bị loại, idempotency (consecutive removal -> 404), cô lập đa thành viên (multi-member isolation), và state rollback an toàn ở frontend được kiểm chứng trọn vẹn.
+- Sẵn sàng chuyển tiếp sang Task 4.14 (Kiểm tra mã mời sai và tham gia trùng) sau khi người dùng xác nhận.
 
 ### Handoff hiện tại — Task 3.24: Kiểm tra mã mời và quyền thành viên (2026-10-27)
 

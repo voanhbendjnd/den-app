@@ -1423,6 +1423,30 @@ class ServerServiceTest {
     }
 
     @Test
+    void removeMember_FailWhenTargetAlreadyRemoved_ReturnsNotFound() {
+        prepareDetailUser(); // User id = 1L (Owner)
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setOwnerId(1L);
+
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 20L))
+                .thenReturn(true)  // 1st call: member exists
+                .thenReturn(false); // 2nd call: already removed
+
+        // 1st call succeeds
+        serverService.removeMember(10L, 20L);
+        verify(serverMemberRepository, times(1)).deleteByServerIdAndUserId(10L, 20L);
+
+        // 2nd call on the same member fails with 404
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> serverService.removeMember(10L, 20L));
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ex.getReason()).contains("Thành viên không tồn tại trong Server");
+    }
+
+    @Test
     void removeMember_FailWhenUserDeactivated() {
         String email = "deactivated@example.test";
         SecurityContextHolder.getContext().setAuthentication(
