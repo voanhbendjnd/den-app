@@ -127,7 +127,7 @@ export function getJoinErrorMessage(err) {
   }
 
   if (status === 403) {
-    return 'Bạn không có quyền tham gia Server này.';
+    return 'Server riêng tư yêu cầu mã mời hợp lệ, hoặc bạn không có quyền tham gia Server này.';
   }
 
   // Field validation errors

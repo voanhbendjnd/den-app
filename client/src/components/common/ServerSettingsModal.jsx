@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, App, Avatar, Button, Form, Input, Modal, Spin } from 'antd';
+import { Alert, App, Avatar, Button, Form, Input, Modal, Spin, Select } from 'antd';
 import { CameraOutlined, CheckOutlined, SettingOutlined, UploadOutlined } from '@ant-design/icons';
 import serverApi from '../../api/serverApi';
 import fileApi from '../../api/fileApi';
@@ -11,6 +11,7 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved, on
   const [form] = Form.useForm();
   const [name, setName] = useState('');
   const [iconUrl, setIconUrl] = useState(null);
+  const [visibility, setVisibility] = useState('PRIVATE');
   const [baseline, setBaseline] = useState({ name: '', iconUrl: null });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -24,7 +25,7 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved, on
   const uploadPending = useRef(false);
   const savePending = useRef(false);
   const confirmation = useRef(null);
-  const dirty = name.trim() !== baseline.name || (iconUrl || null) !== baseline.iconUrl;
+  const dirty = name.trim() !== baseline.name || (iconUrl || null) !== baseline.iconUrl || visibility !== baseline.visibility;
 
   useEffect(() => {
     session.current += 1;
@@ -38,12 +39,13 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved, on
     setDeleting(false);
     deletePending.current = false;
     if (open && server) {
-      const initial = { name: server.name, iconUrl: server.iconUrl || null };
+      const initial = { name: server.name, iconUrl: server.iconUrl || null, visibility: server.visibility || 'PRIVATE' };
       setBaseline(initial);
       setName(initial.name);
       setIconUrl(initial.iconUrl);
+      setVisibility(initial.visibility);
       form.resetFields();
-      form.setFieldsValue({ name: initial.name });
+      form.setFieldsValue({ name: initial.name, visibility: initial.visibility });
     }
     return () => {
       session.current += 1;
@@ -60,8 +62,9 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved, on
     setUploading(false);
     setName(baseline.name);
     setIconUrl(baseline.iconUrl);
+    setVisibility(baseline.visibility);
     form.resetFields();
-    form.setFieldsValue({ name: baseline.name });
+    form.setFieldsValue({ name: baseline.name, visibility: baseline.visibility });
     setError(null);
   };
 
@@ -71,7 +74,7 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved, on
     const currentSession = session.current;
     confirmation.current = modal.confirm({
       title: 'Bỏ các thay đổi chưa lưu?',
-      content: 'Tên và ảnh Server sẽ giữ nguyên như trước khi chỉnh sửa.',
+      content: 'Tên, ảnh và chế độ Server sẽ giữ nguyên như trước khi chỉnh sửa.',
       okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục chỉnh sửa',
       onOk: () => { if (currentSession === session.current) onClose(); },
       afterClose: () => { confirmation.current = null; },
@@ -119,17 +122,18 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved, on
     setSaving(true);
     setError(null);
     try {
-      const response = await serverApi.update(server.id, { name: draftName.trim(), iconUrl: iconUrl || null });
+      const response = await serverApi.update(server.id, { name: draftName.trim(), iconUrl: iconUrl || null, visibility });
       if (session.current !== currentSession) return;
       const updated = response.data?.data;
       if (!updated || String(updated.id) !== String(server.id) || typeof updated.name !== 'string') {
         throw new Error('Invalid server update response');
       }
-      const saved = { name: updated.name, iconUrl: updated.iconUrl || null };
+      const saved = { name: updated.name, iconUrl: updated.iconUrl || null, visibility: updated.visibility || visibility };
       setBaseline(saved);
       setName(saved.name);
       setIconUrl(saved.iconUrl);
-      form.setFieldsValue({ name: saved.name });
+      setVisibility(saved.visibility);
+      form.setFieldsValue({ name: saved.name, visibility: saved.visibility });
       onSaved(updated);
       message.success('Đã lưu thay đổi Server.');
     } catch (failure) {
@@ -189,6 +193,13 @@ export default function ServerSettingsModal({ open, server, onClose, onSaved, on
             ]}>
               <Input size="large" maxLength={100} showCount disabled={saving}
                 onChange={event => { setName(event.target.value); setError(null); }} />
+            </Form.Item>
+            <Form.Item name="visibility" label="Chế độ Server"
+              extra="Riêng tư: cần mã mời. Công khai: được tìm thấy và tham gia trực tiếp. Đổi chế độ giữ nguyên thành viên và mã mời.">
+              <Select aria-label="Chế độ Server" disabled={saving} onChange={value => { setVisibility(value); setError(null); }} options={[
+                { value: 'PRIVATE', label: 'Riêng tư — tham gia bằng mã mời' },
+                { value: 'PUBLIC', label: 'Công khai — cho phép tìm và tham gia' },
+              ]} />
             </Form.Item>
             <div className="server-settings__preview-label">Xem trước</div>
             <div className="server-settings__preview">

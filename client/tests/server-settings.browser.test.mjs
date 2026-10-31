@@ -259,7 +259,7 @@ test('owner edits the name and synchronizes the server detail and dock', async t
   await dialog.getByLabel('Tên Server', { exact: true }).fill('  Nhóm mới  ');
   await dialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
   await page.getByText('Đã lưu thay đổi Server.', { exact: true }).waitFor();
-  assert.deepEqual(updates, [{ name: 'Nhóm mới', iconUrl: null }]);
+  assert.deepEqual(updates, [{ name: 'Nhóm mới', iconUrl: null, visibility: 'PRIVATE' }]);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
   assert.equal(await page.locator('.group-sidebar__identity strong').textContent(), 'Nhóm mới');
@@ -340,11 +340,11 @@ test('upload blocks save, then saves the returned URL and supports icon removal'
   await dialog.locator('.server-settings__image img').waitFor();
   await dialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
   await dialog.getByRole('button', { name: 'Lưu thay đổi' }).waitFor({ state: 'hidden' });
-  assert.deepEqual(updates, [{ name: 'Có ảnh', iconUrl: url }]);
+  assert.deepEqual(updates, [{ name: 'Có ảnh', iconUrl: url, visibility: 'PRIVATE' }]);
   await dialog.getByRole('button', { name: 'Gỡ ảnh', exact: true }).click();
   await dialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
   await dialog.getByRole('button', { name: 'Lưu thay đổi' }).waitFor({ state: 'hidden' });
-  assert.deepEqual(updates[1], { name: 'Có ảnh', iconUrl: null });
+  assert.deepEqual(updates[1], { name: 'Có ảnh', iconUrl: null, visibility: 'PRIVATE' });
 });
 
 test('discarding an upload prevents its late response from changing a reopened form', async t => {
@@ -363,7 +363,7 @@ test('discarding an upload prevents its late response from changing a reopened f
   await dialog.getByLabel('Tên Server', { exact: true }).fill('Không ảnh cũ');
   await dialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
   await dialog.getByRole('button', { name: 'Lưu thay đổi' }).waitFor({ state: 'hidden' });
-  assert.deepEqual(updates, [{ name: 'Không ảnh cũ', iconUrl: null }]);
+  assert.deepEqual(updates, [{ name: 'Không ảnh cũ', iconUrl: null, visibility: 'PRIVATE' }]);
 });
 
 for (const width of [320, 375, 768, 1440]) {
