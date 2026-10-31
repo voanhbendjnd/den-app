@@ -69,3 +69,13 @@ Use active voice as default. A CTA says exactly what happens when it is used: "S
 Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
 
 Keep the tone conversational: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each written element do exactly one job.
+
+## DenHub — Tìm kiếm Server (2026-10-31)
+
+- Giữ hệ màu tối, font và token có sẵn. Theo điều chỉnh đã duyệt, Home giữ nguyên grid/danh sách Server sở hữu/tham gia, bỏ ô tìm kiếm và nút Khám phá dạng button; chỉ giữ link chữ “Khám phá server” cạnh các thao tác danh sách.
+- Dock có kính lúp với tooltip/accessible name “Tìm server”, dẫn tới `/discover`; link chữ ở Home cùng đích và dùng được bằng bàn phím. Trang khám phá dùng vùng nội dung chính, header nhỏ và ô tìm có label rõ ràng, không dùng modal kết quả hoặc hero lớn.
+- Kết quả chỉ gồm Server công khai chưa tham gia và không thuộc người dùng: icon 48px, tên có ellipsis, nhãn “Server công khai”, nút “Tham gia”. Không có hàng “Đã tham gia”/“Mở server”. Không hiển thị mô tả, số người online hoặc tag khi chưa có contract/dữ liệu. Khi hết cộng đồng phù hợp hiển thị “Chưa có server mới để khám phá”.
+- Có skeleton khi tải, số kết quả khi thành công, thông báo không khớp và nút xóa; tách lỗi mạng cùng nút thử lại khỏi kết quả rỗng. Phân trang 20 hàng; gõ từ khóa mới quay về trang đầu.
+- Form tạo/cài đặt có lựa chọn `PRIVATE`/`PUBLIC`, giải thích: riêng tư cần mã mời; công khai cho phép tìm và tham gia trực tiếp. Mặc định riêng tư. Cài đặt chỉ đổi sau lưu; hủy khôi phục cả chế độ.
+- Trên màn <=991px, khám phá ẩn sidebar phụ; <=600px dùng dock 56px. Mỗi kết quả mobile xếp nút bên dưới thông tin, không tràn ngang. Giữ nhãn input, focus bàn phím, điều hướng về Home và nút nhập mã mời.
+- Nội dung UI dùng “Nhập mã mời / ID”; mô tả giải thích ID chỉ áp dụng cho Server công khai. Không đưa thuật ngữ backend, lỗi SQL hoặc raw exception vào luồng người dùng.
