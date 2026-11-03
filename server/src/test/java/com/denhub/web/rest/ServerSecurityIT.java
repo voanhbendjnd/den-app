@@ -74,6 +74,7 @@ class ServerSecurityIT {
         reader = users.saveAndFlush(reader);
         server = new Server();
         server.setName("Detail server");
+        server.setVisibility(com.denhub.domain.enums.ServerVisibility.PUBLIC);
         server.setOwnerId(reader.getId());
         server.setIconUrl("https://example.test/icon.png");
         server = servers.saveAndFlush(server);

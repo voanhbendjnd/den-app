@@ -398,6 +398,7 @@ class ServerServiceTest {
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
 
         Server server = new Server();
+        server.setVisibility(com.denhub.domain.enums.ServerVisibility.PUBLIC);
         server.setId(10L);
 
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
@@ -425,6 +426,7 @@ class ServerServiceTest {
         User user = prepareDetailUser();
         user.setName(name);
         Server target = new Server();
+        target.setVisibility(com.denhub.domain.enums.ServerVisibility.PUBLIC);
         target.setId(10L);
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(target));
         serverService.joinServer(10L);
@@ -496,6 +498,7 @@ class ServerServiceTest {
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
 
         Server server = new Server();
+        server.setVisibility(com.denhub.domain.enums.ServerVisibility.PUBLIC);
         server.setId(10L);
 
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
@@ -521,6 +524,7 @@ class ServerServiceTest {
         when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(mockUser));
 
         Server server = new Server();
+        server.setVisibility(com.denhub.domain.enums.ServerVisibility.PUBLIC);
         server.setId(10L);
 
         when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));

@@ -292,6 +292,33 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Phát hành — Server discovery / visibility / cache (2026-11-01)
+
+- Người dùng yêu cầu chia commit theo use case/cụm và push. Đã chốt các thay đổi đã duyệt thành cụm backend, form cài đặt, trang Khám phá, sửa cache và tài liệu; source hiện đã nằm trong các commit local, các dòng “chưa commit” trong log cũ phản ánh thời điểm từng lượt trước release.
+- Bốn commit code: `77627ee` backend discovery/visibility/private join và migration; `7929e20` form visibility/invite guidance cùng tests; `ec99eb6` trang Khám phá phân trang, điều hướng/link Home cùng browser tests; `e1c05ad` bỏ Server L2 cache cùng regression. Cụm tài liệu dùng commit `docs(server): synchronize discovery release and handoff`.
+- Kiểm chứng trước commit trong cùng phiên: backend **551/551**, Node **126/126**, browser Home/Group/Discovery **78/78**, FE build PASS; suite Settings **28/28** đã PASS ở lượt tích hợp trước, các form không đổi sau lượt đó. Không chạy lại tests chỉ vì chia Git commit khi source không thay đổi. Đã review cả staged/unstaged diff và file mới, không đưa `.env`, cấu hình credentials, artifact hoặc dependency thay đổi vào commit.
+- **Ủy quyền push riêng của lượt này:** yêu cầu push trực tiếp mới nhất của người dùng được ưu tiên so với chỉ dẫn cấm push trước đó, áp dụng cho `origin/feature/server-search`. Không thay đổi quy tắc AGENTS.md cho các lượt sau. Đồng bộ bằng `git push -u origin feature/server-search`, kiểm tra remote tip trùng HEAD và worktree sạch trong bước release.
+- Việc vận hành còn lại: Stop/Run backend một lần để nạp `@Cacheable(false)`, kiểm HTTP có JWT trên SQL Server sau restart. Không cần migration mới ngoài visibility đã áp dụng local; database khác cần review/apply script trước backend mới.
+
+### Tiến độ riêng — ServerVisibility và cache sau DevTools reload (2026-11-01)
+
+- DONE code/H2: bỏ Hibernate `@Cache` riêng Server, thêm `@Cacheable(false)`; cache Entity khác, schema, API và FE giữ nguyên. Người dùng duyệt kế hoạch bằng “làm đi”.
+- Kiểm chứng mới: `ServerCacheIT` **4/4 PASS**, full backend **551/551 PASS**, compile Java/test Java PASS. Hai ca đọc enum qua transaction riêng đã FAIL với cache cũ trước fix, rồi PASS sau fix; regression JWT/detail/channels/members và quyền truy cập PASS cho PUBLIC/PRIVATE.
+- **Cần làm trên phiên IDE đang chạy:** Stop hẳn backend rồi Run lại một lần để nạp mapping/SessionFactory mới và bỏ cache cũ trong JVM; sau đó mở lại Server. Chưa kiểm HTTP có JWT trên JVM local sau restart. Không chạy lại SQL visibility.
+- Nhánh `feature/server-search`, giữ các thay đổi chưa commit của các lượt trước. Không commit/push. Chi tiết FIX-SERVER-ENUM-L2-CACHE và docs/02 mục 24.
+
+### Tiến độ riêng — Tìm kiếm và Khám phá Server (cập nhật 2026-11-01)
+
+| Phạm vi | FE | BE | DB | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Khám phá Server công khai chưa sở hữu/tham gia; Home giữ danh sách và link chữ; Owner chọn PUBLIC/PRIVATE | IMPLEMENTED | IMPLEMENTED | Giữ schema local đã apply; lượt này không đổi DB | Lượt chỉnh sửa: 547 BE, 126 Node, 78 browser, build PASS; query lọc SQL Server read-only PASS | DONE phạm vi đã duyệt; chưa kiểm HTTP có JWT trên SQL Server thật |
+
+- Người dùng duyệt kế hoạch bằng “triển khai”; nhánh `feature/server-search`, tạo từ `develop` sạch theo yêu cầu chuyển nhánh. Thay đổi chưa stage/commit, không push.
+- Server mới mặc định `PRIVATE`; script đặt Server cũ thành `PRIVATE`. `PUBLIC` mới được tìm và tham gia trực tiếp bằng ID; `PRIVATE` yêu cầu mã mời. Owner bật/tắt trong cài đặt, giữ thành viên và mã mời hiện có.
+- Contract mới: docs/01 mục 8, docs/02 mục 23, docs/03 mục 4.7; bố trí FE tại docs/04. Không thêm WebSocket, dependency hoặc tính năng Discord ngoài phạm vi.
+- **Điều chỉnh đã duyệt:** người dùng chọn “Home về như cũ, bỏ ô tìm kiếm; chỉ giữ link chữ ‘Khám phá server’”. Home đã bỏ tìm kiếm/filter/helper tương ứng. Khám phá loại Owner kể cả thiếu membership và loại membership của đúng User hiện tại ngay trong cả query dữ liệu/count, trước phân trang. Kết quả không có “Đã tham gia”/“Mở server”. Xem FIX-DISCOVERY-ELIGIBILITY-AND-HOME.
+- **Cập nhật áp dụng DB:** sau khi người dùng xác nhận “áp dụng”, đã apply script vào database local `denhubdb`: 2/2 Server cũ là PRIVATE, không mất hàng; cột/default/CHECK và truy vấn SQL Server PASS. File script vẫn mặc định `@ApplyChanges = 0`; backend đang lắng nghe 8080. Xem log APPLY-SERVER-VISIBILITY bên dưới. Database khác vẫn cần review/apply schema riêng; không dựa vào Hibernate update để backfill.
+
 ### Tiến độ riêng — Tự mở Server vừa tạo (2026-10-27)
 
 - DONE trong phạm vi FE/API mock: tạo thành công cập nhật danh sách, đóng modal và mở ngay `/servers/{id}`; không chờ GET danh sách. Response form/route cũ chỉ cập nhật danh sách, không chiếm điều hướng của phiên mới.
@@ -406,6 +433,9 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.12 / khung Group và ô nhập độc lập                                         | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
 | Task 1.08 — API lấy lịch sử tin nhắn + test                                       | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
 | Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test                                 | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
+| Task 1.13 — UI sửa tin nhắn (Inline Editing) + Kết nối API                         | DONE                                                       | `client/src/api/messageApi.js` (`updateMessage`), `GroupChatPage.jsx` (inline editing textarea, action bar hover chỉ tác giả BR-MSG-02, phím tắt Enter/Escape, nhãn `(đã chỉnh sửa)`), `group-chat.css`, `channelMessages.js` (`updateMessageInList`, `isMessageEdited`). Unit tests 10/10 PASS, full client unit tests 53/53 PASS, build PASS. |
+| Task 1.14 — API xóa tin nhắn (DELETE) + test                                      | DONE                                                       | `DELETE /api/messages/{messageId}`; duy nhất tác giả có quyền xóa (BR-MSG-03, từ chối Server Owner/Admin 403); trả về 204 No Content; MessageServiceTest, MessageResourceIT, MessageSecurityIT. Toàn bộ tests PASS 100%. |
+| Task 1.15 — UI xóa tin nhắn (DELETE) + Tải thêm tin nhắn cũ                        | DONE                                                       | `GroupChatPage.jsx` (nút Xóa hover chỉ tác giả, Popconfirm; cuộn giữ vị trí đọc chuẩn `calculateScrollAfterPrepend`, hiển thị loading, hết lịch sử, thông báo lỗi tải thêm kèm nút Thử lại, chống rò rỉ phiên kênh). 114 client unit tests PASS, build PASS. |
 | Công việc                                                                         | Trạng thái                                                 | Bằng chứng / bước còn lại                                                                                                                                                                                                                                                                                                      |
 | :---                                                                              | :---                                                       | :---                                                                                                                                                                                                                                                                                                                           |
 | Đọc chi tiết phần vỏ Server + FE                                                  | DONE trong phạm vi code/H2/FE mock                         | `GET /api/v1/servers/{serverId}`; Owner/Member, wrapper/Problem Details, FE đọc chi tiết độc lập với dock và bỏ response cũ. Lượt API: 128 backend tests, 5 Node tests PASS. Lượt redirect 403 về Home: 15 browser tests và build PASS; không chạy lại BE/Node logic. Không triển khai Channel; chưa kiểm thử SQL Server thật. |
@@ -419,6 +449,9 @@ Bản cập nhật này nằm ngoài các vùng merge conflict có sẵn, không
 | Task 1.12 / khung Group và ô nhập độc lập                                         | DONE                                                       | Route bảo vệ `/servers/:serverId`, chọn nhóm từ dock, loading/error/retry, bố cục desktop/mobile và composer kiểm thử độc lập. Chỉ hoàn tất phạm vi UI đã duyệt, không đánh dấu API/real-time DONE.                                                                                                                            |
 | Task 1.08 — API lấy lịch sử tin nhắn + test                                       | DONE                                                       | `GET /api/channels/{channelId}/messages?before={id}&limit=30`; cursor pagination ID giảm dần, wrapper 200, Problem Details 400/401/403/404. Test: MessageServiceTest (11 tests), MessageResourceIT (4 tests), MessageSecurityIT (5 tests), toàn bộ backend suite pass 100%.                                                    |
 | Task 1.09 — API sửa tin nhắn (PATCH & PUT) + test                                 | DONE                                                       | `PATCH` & `PUT /api/messages/{messageId}`; BR-MSG-02 (chỉ tác giả sửa, 403 cho người khác kể cả Server Owner); validate max 4000 UTF-16; tests: MessageServiceTest (9), MessageResourceIT (5), MessageSecurityIT (7). Toàn bộ test suite PASS 100%.                                                                            |
+| Task 1.13 — UI sửa tin nhắn (Inline Editing) + Kết nối API                         | DONE                                                       | `client/src/api/messageApi.js` (`updateMessage`), `GroupChatPage.jsx` (inline editing textarea, action bar hover chỉ tác giả BR-MSG-02, phím tắt Enter/Escape, nhãn `(đã chỉnh sửa)`), `group-chat.css`, `channelMessages.js` (`updateMessageInList`, `isMessageEdited`). Unit tests 10/10 PASS, full client unit tests 53/53 PASS, build PASS. |
+| Task 1.14 — API xóa tin nhắn (DELETE) + test                                      | DONE                                                       | `DELETE /api/messages/{messageId}`; duy nhất tác giả có quyền xóa (BR-MSG-03, từ chối Server Owner/Admin 403); trả về 204 No Content; MessageServiceTest, MessageResourceIT, MessageSecurityIT. Toàn bộ tests PASS 100%. |
+| Task 1.15 — UI xóa tin nhắn (DELETE) + Tải thêm tin nhắn cũ                        | DONE                                                       | `GroupChatPage.jsx` (nút Xóa hover chỉ tác giả, Popconfirm; cuộn giữ vị trí đọc chuẩn `calculateScrollAfterPrepend`, hiển thị loading, hết lịch sử, thông báo lỗi tải thêm kèm nút Thử lại, chống rò rỉ phiên kênh). 114 client unit tests PASS, build PASS. |
 | FEAT-FRIEND-REQUEST-UI — UI danh sách lời mời kết bạn + Realtime                  | DONE                                                       | 5 file FE: `friendApi.js` bổ sung `getFriendRequests`; `useFriendRequests.js` STOMP + cursor pagination; `FriendRequestPage.jsx` UI đầy đủ; route `/friends`; menu Bạn Bè. `npm run build` PASS 3192 modules. Không thay backend.                                                                                              |
 | FEAT-FRIEND-REQUEST-ACCEPT-REMOVE — Đồng ý và Từ chối lời mời kết bạn (FE)        | DONE                                                       | `friendApi.js` (accept/remove endpoints); `useFriendRequests.js` (`acceptRequest`, `removeRequest`, `actionLoading`); `FriendRequestPage.jsx` (Nút Đồng ý Indigo Gradient, Từ chối Dark Glass, spin loading độc lập, toast thông báo). `npm run build` PASS 3192 modules.                                                      |
 | FEAT-ALL-FRIENDS-UI — Danh sách Tất cả bạn bè (FE) + Sửa query Friendship (BE)    | DONE                                                       | Sửa typo `:status <> 'PENDING'` trong `FriendshipRepository`; `friendApi.js` (`getAllFriends`); `useFriends.js` (cursor pagination, filter search); `FriendRequestPage.jsx` (Tabs Tất cả / Chờ xử lý, FriendCard, nút Nhắn tin Direct Message); `npm run build` PASS 3193 modules.                                             |
@@ -439,6 +472,229 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-11-01] RELEASE-SERVER-DISCOVERY — Chia commit theo cụm và chuẩn bị đồng bộ nhánh feature
+
+- Authorization: người dùng yêu cầu “chia ra nhiều commit theo use case hoặc từng cụm commit và push giúp tôi”. Yêu cầu push trực tiếp mới nhất là ngoại lệ được người dùng cho phép trong lượt này; giữ nguyên AGENTS.md và chỉ đồng bộ nhánh `feature/server-search`.
+- Reviewed: tất cả file thay đổi/new file đều thuộc các task đã duyệt trong phiên. Git index ban đầu rỗng; không stage file ngoài scope, `.env`, credentials hoặc generated files. Remote được kiểm tra đúng `origin` của DenHub; feature branch chưa tồn tại ở thời điểm preflight.
+- Commits:
+  - `77627ee feat(server): add public discovery and private join rules` — Entity/enum/DTO, query loại Owner/member, API, invite/private policy, SQL visibility và BE tests.
+  - `7929e20 feat(client): add server visibility controls and invite guidance` — form tạo/cài đặt, lời nhắc join, các assertions/test liên quan.
+  - `ec99eb6 feat(client): add paginated server discovery and home link` — API adapter, route/dock/Home link, trang/CSS Khám phá và browser tests.
+  - `e1c05ad fix(server): bypass entity cache for visibility enum reloads` — cache mapping Server tách riêng và 4 ca regression.
+  - `docs(server): synchronize discovery release and handoff` — đồng bộ docs/00–04 cùng ghi nhận release. Hash của commit tài liệu lấy từ Git sau commit.
+- Staging: phần visibility và phần cache trong cùng `Server.java` được tách bằng blob/index, không thay working file đã được test. Không tạo commit giả, amend, rebase, reset hoặc đổi nhánh.
+- Verification: đọc lại báo cáo backend **551/551**, Node **126/126**, browser liên quan **78/78**, build PASS của các lệnh đã chạy trong phiên; source không đổi từ sau kiểm chứng cuối. `git diff --check` và `git diff --cached --check` PASS trước commit; staged diff được review theo từng cụm. Không nhận đã chạy thêm test ở lượt Git này.
+- Documentation: các log implementation cũ được giữ theo lịch sử; progress/handoff hiện tại trỏ tới release này. Trạng thái remote được xác minh bằng `git ls-remote` sau lệnh push và báo trong phản hồi cuối, không dùng force push.
+- Remaining: cần restart backend từ IDE để nạp mapping cache mới; chưa kiểm HTTP authenticated trên JVM local sau restart. Migration visibility đã apply local, không thay dữ liệu/schema trong lượt Git.
+
+### [2026-11-01] FIX-SERVER-ENUM-L2-CACHE — Bỏ cache Entity Server gây lỗi enum sau hot reload
+
+- Approval: người dùng cung cấp exception gốc, duyệt kế hoạch bỏ cache riêng Server bằng “làm đi”. Không mở rộng sang cache toàn cục hoặc module khác.
+- Nguyên nhân đã xác định: `findById` assemble `StandardCacheEntryImpl` từ Hibernate second-level cache và không gán được `ServerVisibility` cùng tên vào Entity thuộc restart classloader mới. JVM local có ba bản class Server qua các classloader; metadata/các cột Server, Channel, ServerMember và giá trị exact enum PUBLIC của Server được kiểm tra hợp lệ bằng SQL read-only ở lượt chẩn đoán.
+- Implemented:
+  - `Server.java`: bỏ import/annotation Hibernate `@Cache(NONSTRICT_READ_WRITE)` và thêm JPA `@Cacheable(false)`; giữ mapping enum STRING, tất cả fields/audit/quan hệ, API/DTO/quyền và FE.
+  - Không đổi `spring.cache.type`, không tắt Hibernate L2 toàn cục và không đổi cache Entity khác. First-level cache trong cùng persistence context giữ cơ chế JPA hiện có. Các transaction đọc Server riêng phải truy vấn DB, là đánh đổi đã nêu trong kế hoạch.
+- Tests Added / Updated:
+  - Thêm `server/src/test/java/com/denhub/web/rest/ServerCacheIT.java`, 4 ca parameterized PUBLIC/PRIVATE. Chủ động bật Hibernate L2/statistics trong test và dùng fixture commit qua các transaction riêng, thay vì để một transaction rollback-only che việc hit cache.
+  - Hai ca đọc enum: warm read, đổi visibility bằng JDBC H2 để không invalidate cache ORM cũ, đọc ở transaction mới và kiểm giá trị mới, số SQL read, không thêm cache hit/entry Server. Có guard chỉ mutate H2 và cleanup fixture sau từng ca.
+  - Hai ca API: lặp GET detail/channels/members bằng JWT của Owner/Member, xác minh DTO/visibility/kênh/thành viên; outsider vẫn bị từ chối theo contract hiện có, không nới quyền.
+- Verification thực sự đã chạy từ `server/`:
+  - Trước fix: `.\gradlew.bat test --tests com.denhub.web.rest.ServerCacheIT --no-daemon` chạy 4 ca, **FAIL 2/4** đúng ở assertion enum do cache trả dữ liệu cũ; hai ca quyền/API PASS. Đây là bước xác nhận regression có thể phát hiện cache cũ.
+  - Sau fix: cùng lệnh targeted **PASS 4/4**, 0 failure/error/skip.
+  - `.\gradlew.bat test --no-daemon` **PASS 551/551**, 0 failure/error/skip; compile Java/test Java PASS. Không chạy lại FE tests/build vì lượt này không đổi FE.
+  - `git diff --check` PASS, review diff/status và file test mới; giữ các thay đổi đã có từ lượt trước, không stage/commit/push hoặc ghi DB local.
+- Documentation: cập nhật docs/00 tiến độ/log/handoff và docs/02 mục 24. Đã kiểm tra docs/01, 03, 04: không thay nghiệp vụ, schema hoặc UI nên không cần sửa trong lượt cache.
+- Giới hạn: các tests dùng Hibernate/JCache/H2 thật và JWT/MockMvc, chưa mô phỏng JVM DevTools restart thật hoặc gọi HTTP có JWT trên SQL Server local sau restart. Cần Stop backend trong IDE rồi Run lại một lần để chắc chắn nhận mapping mới. Không cần migration, không benchmark phần SQL read tăng lên.
+- Git: `feature/server-search`, thay đổi local chưa commit. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-11-01] FIX-DISCOVERY-ELIGIBILITY-AND-HOME — Khám phá chỉ hiển thị Server mới và khôi phục Home
+
+- Approval: sau kế hoạch chỉnh sửa, người dùng xác nhận phương án “Home về như cũ, bỏ ô tìm kiếm; chỉ giữ link chữ ‘Khám phá server’”. Tiếp tục trên `feature/server-search`, giữ các thay đổi đã có từ task trước.
+- Implemented:
+  - Repository nhận ID của User active từ Service; query dữ liệu và count cùng loại `ownerId = currentUser.id` và membership của đúng người tìm bằng `NOT EXISTS`. Lọc trước phân trang để tổng kết quả/số trang chính xác, không nhận User ID do client gửi để quyết định danh tính.
+  - Service giữ format response, `joined` luôn false vì Owner/thành viên đã bị loại. Bỏ query lấy membership theo trang và method repository chỉ phục vụ query đó.
+  - Home bỏ ô tìm/state/filter và trạng thái không khớp, khôi phục map trực tiếp danh sách Server; giữ native React Router link chữ “Khám phá server” đến `/discover` với focus bàn phím. Các trạng thái tải/lỗi/rỗng và dock giữ hành vi hiện có.
+  - Gỡ helper `serverSearch.js`, 4 unit tests chỉ phục vụ tìm ở Home và entry test đã không còn dùng. Khám phá chỉ có “Server công khai”/“Tham gia”, thông báo rỗng “Chưa có server mới để khám phá”.
+- Tests Added / Updated:
+  - `ServerDiscoveryIT`: cập nhật kiểm tra query rỗng/có từ khóa, Owner không membership, membership của đúng User, không ẩn Server chỉ vì người khác đã tham gia, page/count đúng, User ID query giả không đổi identity. Thêm lifecycle Join → biến mất → Leave → xuất hiện lại đối với Server công khai.
+  - `server-search.browser.test.mjs`: Home desktop/mobile có danh sách đầy đủ, không có ô tìm/button Khám phá, có link chữ dùng được bằng Enter; kiểm Owner không trong kết quả và sau Join quay lại không còn Server đó, thông báo rỗng và các trạng thái Home lỗi/rỗng.
+- Verification mới thực sự chạy:
+  - Từ `server/`: `.\gradlew.bat test --no-daemon` **PASS 547/547**, 0 failure/error/skip; gồm compile Java và test Java.
+  - Từ `client/`: `npm test` **PASS 126/126**; `npm run build` **PASS**. Số Node tests giảm 4 do bỏ chính tính năng lọc Home cùng các tests tương ứng, không bỏ regression đang còn hành vi.
+  - Với NODE_PATH Playwright như mục 8.2 của docs/02: `node --test --test-concurrency=1 tests/server-search.browser.test.mjs tests/group-chat.browser.test.mjs` **PASS 78/78**, 0 failure/skip, Edge headless. Đã xem screenshot Home 1440/375 và Khám phá 375px, không tràn ngang. Không chạy lại suite Settings riêng vì form/settings không đổi trong lượt này.
+  - SQL Server local: query lọc Owner/NOT EXISTS membership, count và pagination CASE/ESCAPE/OFFSET/FETCH chạy read-only PASS với fixture ID `-1`; chỉ trả aggregate count, không đọc thông tin tài khoản/nội dung chat, không ghi dữ liệu hoặc sửa schema. Đây là smoke test SQL, không phải authenticated HTTP hoặc kiểm semantics bằng dữ liệu người dùng thật.
+  - `git diff --check` PASS; review diff/status và file mới, không stage/commit/push. Không thay `.env`, dependency, script migration hoặc database trong lượt này.
+- Documentation: cập nhật docs/00, 01, 02, 04 theo hành vi mới; docs/03 chỉ đồng bộ ghi chú query, không đổi schema/contract database. Giữ lịch sử các lượt trước ở dưới.
+- Giới hạn: browser dùng API mock, backend dùng H2; chưa kiểm HTTP có JWT trên SQL Server. Warning bundle lớn/Ant Design hiện có còn nguyên. Không cần migration mới cho điều kiện lọc.
+- Git: local chưa commit trên `feature/server-search`. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-31] APPLY-SERVER-VISIBILITY — Áp dụng schema vào SQL Server local
+
+- Approval: người dùng xác nhận “áp dụng” sau khi được trình bày đúng database `denhubdb`, phạm vi thêm visibility/default/CHECK và đặt Server cũ PRIVATE. Các thay đổi local từ task tìm kiếm được giữ nguyên, không commit/push.
+- Trước áp dụng: truy vấn metadata xác nhận `dbo.servers` có 2 hàng, chưa có cột `visibility`; chạy script ở chế độ preview và review SQL. Không đọc nội dung chat hoặc xuất credentials.
+- Sửa script: lượt apply đầu lỗi SQL Server `207/1750` vì CHECK tham chiếu cột được thêm trong cùng dynamic batch. Transaction rollback; kiểm tra lại còn 2 Server, chưa có visibility/default/CHECK. Đã tách ADD COLUMN và ADD CHECK thành hai `sp_executesql` trong cùng transaction, giữ nguyên phạm vi/mặc định preview.
+- Áp dụng thành công bản script đã sửa bằng ADO.NET `SqlClient`, đọc cấu hình local trong bộ nhớ; chỉ thay `@ApplyChanges = 0` thành `1` trong nội dung gửi lên SQL Server. Không lưu credentials vào command line/log và không đổi flag trong file.
+- Verification thực tế:
+  - `sys.columns`/`sys.types`: `visibility` là `NVARCHAR(7)` (14 bytes), `NOT NULL`; default `DF_servers_visibility = N'PRIVATE'`.
+  - `CK_servers_visibility` hiện diện, `is_disabled = false`, `is_not_trusted = false`. `DBCC CHECKCONSTRAINTS ('dbo.servers') WITH ALL_CONSTRAINTS` trả 0 vi phạm.
+  - Count trước/sau đều 2; PRIVATE = 2, PUBLIC = 0, NULL/invalid = 0. Không thêm/xóa Server hoặc đổi các dữ liệu hiện có ngoài giá trị mặc định của cột mới.
+  - Truy vấn discovery dạng LIKE/ESCAPE/CASE/ORDER BY/OFFSET/FETCH chạy trên SQL Server PASS, trả 0 kết quả đúng với toàn bộ Server riêng tư. Projection các cột Server mới bằng `SELECT TOP(0)` PASS, không đọc tên/nội dung thực tế.
+  - Chạy lại file ở chế độ 0 khi cột đã tồn tại là no-op. File vẫn `DECLARE @ApplyChanges bit = 0;`.
+  - `curl.exe --max-time 10 -s -o NUL -w "Server list HTTP status: %{http_code}\n" http://localhost:8080/api/v1/servers` trả `401`; lệnh tương tự với `http://localhost:8080/api/v1/servers/discover?q=&page=0&size=20` trả `401`. Backend đang nhận kết nối và yêu cầu JWT như mong đợi; đây chưa phải kiểm tra HTTP authenticated thành công.
+  - Không khởi động lại tiến trình IDE đang chạy, không sửa Java/FE. Không chạy lại JUnit/Node/browser/build vì lượt này chỉ sửa và áp dụng script; các kết quả lượt code phía dưới là lịch sử, không phải test vừa chạy lại. `git diff --check` PASS sau cập nhật docs.
+- Documentation: cập nhật trạng thái hiện hành tại docs/00–03; docs/04 không có thay đổi UI trong lượt apply.
+- Còn lại: người dùng tải lại trang đã đăng nhập để xác minh API/UI thật; Owner bật PUBLIC nếu muốn Server hiện trong Khám phá. Chưa kiểm chứng đầy đủ collation/locking hoặc lifecycle trên SQL Server. Cảnh báo Ant Design/Google là các vấn đề riêng, không được sửa trong phạm vi áp dụng schema.
+- Git: `feature/server-search`, chưa commit. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-31] FEAT-SERVER-SEARCH — Tìm tại Home và Khám phá Server công khai
+
+- Approval: người dùng yêu cầu “chuyển nhánh và triển khai”, chọn cả Home/Khám phá, sau đó duyệt kế hoạch chi tiết và bộ quy tắc PUBLIC/PRIVATE bằng “triển khai”. Chỉ thực hiện phạm vi đã duyệt, không commit/push.
+- Implemented:
+  - Home có input có label, lọc tên không phân biệt hoa/thường, trim từ khóa, số kết quả và nút xóa; phân biệt danh sách rỗng, không khớp và lỗi tải. Dữ liệu nguồn và dock giữ nguyên.
+  - `/discover` là protected route, mở từ kính lúp dock hoặc Home. Kết quả dạng hàng với icon/tên, “Đã tham gia” hoặc “Server công khai”, nút mở/tham gia; debounce, phân trang backend, abort/counter chặn response cũ, loading/empty/error/retry, mobile và keyboard focus.
+  - `GET /api/v1/servers/discover` trả DTO công khai tối thiểu trong wrapper hiện có. Query chỉ PUBLIC, escape LIKE metacharacters, xếp hạng exact/prefix/contains rồi ID giảm dần, membership lấy theo trang.
+  - Thêm enum/field `visibility`, mặc định PRIVATE; Owner chọn khi tạo và chỉnh sửa. Update bỏ qua/null giữ chế độ hiện có để tương thích client cũ; response create/list/detail/update/invite có visibility.
+  - Direct Join chỉ PUBLIC, kiểm tra dưới khóa Server trước khi ghi membership. Private dùng invite hiện có; chuyển chế độ giữ quan hệ/dữ liệu. Quyền đọc detail/kênh/tin nhắn/member không được mở rộng bởi search.
+  - Join thành công mới cập nhật danh sách chung, refresh nền và mở Server; response sau khi chuyển trang không chiếm điều hướng.
+  - Script SQL thủ công preview-first thêm visibility/default/check và đặt hàng cũ PRIVATE; không chạy trên SQL Server thật hoặc gắn vào startup.
+- Tests Added / Updated:
+  - `ServerDiscoveryIT`: 15 ca JWT/MockMvc/service/JPA/H2 cho metadata riêng tư, quyền đọc, ranking, phân trang, wildcard, tiếng Việt, validation, tài khoản active, mặc định/chọn visibility, invite và chuyển PUBLIC→PRIVATE.
+  - Fixture direct-join trong `ServerServiceTest`/`ServerSecurityIT` đặt PUBLIC rõ ràng, giữ regression chống trùng/nickname/quyền.
+  - `serverSearch.test.mjs`: 4 ca lọc tên, tiếng Việt, clear/empty, dữ liệu thêm/sửa/xóa và không sửa nguồn; đưa vào `npm test`.
+  - `server-search.browser.test.mjs`: 15 ca desktop/mobile Home/Khám phá, response cũ/debounce, phân trang, loading/lỗi, join chống trùng/lỗi/response muộn, form visibility, authentication. Lưu screenshot ngoài repo và đã xem ảnh 1440/375px.
+  - Cập nhật assertion payload create/settings và lỗi private join. Test create Back/Forward chờ workspace trung gian render trước Forward để không nhầm URL đã đổi với React đã commit visit. Không sửa logic chat/pagination hoặc route guard hiện có.
+- Verification cuối, không dùng kết quả cũ:
+  - Từ `server/`: `.\gradlew.bat test --no-daemon` **PASS 545/545**, 0 failure/error/skip; gồm compile Java/test Java. Suite mới đã chạy riêng bằng `.\gradlew.bat test --tests com.denhub.web.rest.ServerDiscoveryIT --no-daemon`, **PASS 15/15**.
+  - Từ `client/`: `npm test` **PASS 130/130**; `npm run build` **PASS**.
+  - Browser, với `$env:NODE_PATH = 'C:/Users/Admin/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'`: `node --test --test-concurrency=1 tests/server-search.browser.test.mjs tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` **PASS 106/106**, 0 failure/skip, Edge headless. Node chạy file tuần tự để không dùng chung Vite optimizer đồng thời.
+  - Lượt regression trước có timeout ở ca retry pagination chat cũ; không sửa module chat, lượt cuối ca này và toàn bộ 106 ca đều PASS. Các lỗi fixture/assertion mới đã được sửa trước lượt kiểm chứng cuối.
+  - `git diff --check` PASS; review status/diff và file mới, không có thay đổi `.env`, dependency lock, generated artifact hoặc stage ngoài task.
+- Documentation: cập nhật docs/00–04 cho tiến độ/handoff, nghiệp vụ, API/DTO/security, schema/script và bố trí FE.
+- Giới hạn: chưa áp dụng/xác minh script, collation/query hoặc locking mới trên SQL Server thật. Cần schema trước backend mới; mặc định Server cũ không tự công khai. Warning bundle >500 kB và cảnh báo Ant Design hiện có vẫn còn. Không coi H2/mock là kiểm thử môi trường triển khai.
+- Git: `feature/server-search`, thay đổi local chưa commit. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-31] FEAT-CHANNEL-MESSAGES-COMPLETE — Kiểm tra, chuẩn hóa và hoàn thiện tính năng tin nhắn Channel (BE & FE)
+
+- Người dùng duyệt kế hoạch qua "ok". Đã rà soát, chuẩn hóa và hoàn thiện toàn diện tính năng tin nhắn Channel cả Backend và Frontend:
+- Implemented:
+  - **Backend Phân quyền Xóa tin nhắn (`MessageService.java` & `MessageResource.java`):**
+    - Siết chặt quy tắc quyền: **Duy nhất tác giả tin nhắn mới có quyền xóa tin nhắn của mình (`BR-MSG-03`)**. Bãi bỏ ngoại lệ cho phép Server Owner xóa tin nhắn người khác (nếu cố xóa sẽ bị chặn ngay với `403 Forbidden` `"Bạn không có quyền xóa tin nhắn này"`, và bản ghi trong DB giữ nguyên).
+    - Cập nhật Swagger annotation `@Operation` tại `MessageResource.java` phản ánh đúng quyền tác giả duy nhất.
+  - **Frontend Phân quyền & UI Tải thêm tin nhắn cũ (`GroupChatPage.jsx`, `group-chat.css`, `channelMessages.js`):**
+    - Sửa phân quyền Action Bar hover: `canDelete = author.isOwn`. Server Owner không thấy nút Sửa và nút Xóa trên tin nhắn người khác.
+    - Hoàn thiện UI tải thêm:
+      - Bổ sung state `loadMoreError` hiển thị banner lỗi tải thêm Cyber Dark Glassmorphism phía trên danh sách tin nhắn kèm nút **Thử lại** (`ReloadOutlined`).
+      - Khi lỗi: Giữ nguyên danh sách tin nhắn đang hiển thị và con trỏ `nextCursor` hiện tại để có thể thử lại an toàn.
+      - Bảo toàn vị trí cuộn: Lưu cả `prevScrollTop` và `prevScrollHeight`; tính toán vị trí cuộn mới qua helper `calculateScrollAfterPrepend(prevScrollTop, prevScrollHeight, newScrollHeight) = prevScrollTop + (newScrollHeight - prevScrollHeight)`.
+      - Cô lập phiên kênh/server: Reset `loadMoreError = null`, hủy cờ loading và vô hiệu hóa các response trễ từ request cũ qua các counter ref (`channelSession`, `activeChannelId`, `messagesRequest`, `moreRequest`).
+  - **Utils (`client/src/utils/channelMessages.js`):**
+    - Thêm các pure functions: `canDeleteMessage`, `canEditMessage`, `calculateScrollAfterPrepend`.
+- Tests Added / Updated:
+  - Backend:
+    - `MessageServiceTest.java`: Bổ sung test phân trang nhiều trang với dữ liệu cố định `getMessages_Success_MultiPageFixedData` (3 trang liên tiếp không trùng lặp, không sót tin); cập nhật test `deleteMessage_Fail_WhenServerOwnerNotAuthor` kỳ vọng 403 Forbidden và verify không gọi repository delete.
+    - `MessageResourceIT.java`: Bổ sung 4 MockMvc tests cho endpoint `DELETE /api/messages/{messageId}` (204, 400, 404, 403).
+    - `MessageSecurityIT.java`: Cập nhật `deleteMessageForbiddenWhenServerOwnerNotAuthor` (Server Owner cố xóa tin nhắn của member nhận HTTP 403 và tin nhắn trong database H2 vẫn tồn tại nguyên vẹn); bổ sung các tests phân trang, cô lập kênh và kiểm tra biên limit.
+  - Frontend:
+    - `client/tests/channelMessages.test.mjs`: Bổ sung 5 unit tests mới kiểm thử `canDeleteMessage`, `canEditMessage`, `calculateScrollAfterPrepend`, mô phỏng phân trang 3 trang liên tiếp (`mergeMessagePages`), và bảo toàn state khi lỗi tải thêm.
+    - `client/tests/group-chat.browser.test.mjs`: Bổ sung 6 browser interaction tests hoàn chỉnh với Playwright:
+      1. Khởi tạo tải tin nhắn, hiển thị banner chào mừng `#channel-welcome-title` khi `hasMore = false`.
+      2. Cuộn lên đầu (`scrollTop < 60`) kích hoạt gọi API với `before` và `limit=30`, ghép tin cũ phía trên và chống gọi trùng lặp khi đang tải.
+      3. Khi API phân trang gặp lỗi: hiển thị banner lỗi `.group-messages-load-more-error` với nút "Thử lại", tin nhắn và cursor không bị mất; bấm "Thử lại" tải tiếp thành công.
+      4. Phân quyền Sửa/Xóa: Tác giả có action bar với nút Edit và Delete; Server Owner không có action bar trên tin nhắn của thành viên khác.
+      5. Thao tác inline edit: Click Sửa -> hiện TextArea -> bấm Escape hủy / bấm Enter lưu -> gọi PATCH -> cập nhật nội dung và nhãn `(đã chỉnh sửa)`.
+      6. Thao tác xóa tin nhắn: Click Xóa -> hiện Popconfirm -> click Xác nhận xóa -> gọi DELETE 204 -> tin nhắn biến mất khỏi danh sách.
+- Verification:
+  - Backend tests: `gradlew.bat test` PASS 100% (bao gồm `MessageServiceTest`, `MessageResourceIT`, `MessageSecurityIT`).
+  - Frontend unit tests: `npm test` PASS 114/114 (100%).
+  - Frontend browser tests: `node --test --test-concurrency=1` PASS 100% (6/6 tests tin nhắn channel mới).
+  - Frontend build: `npm run build` PASS (0 errors, 3219 modules).
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-31] FEAT-MESSAGE-DELETE-UI — Làm UI xóa tin nhắn (DELETE) & Kết nối API (FE)
+
+- Người dùng duyệt kế hoạch qua "lam đi giong nhu discord". Đã triển khai UI xóa tin nhắn trong kênh nhóm theo trải nghiệm tương tự Discord kết hợp Cyber Dark Glassmorphism của DenHub và tích hợp API `DELETE /api/messages/{messageId}`.
+- Implemented:
+  - Cập nhật `client/src/api/messageApi.js`:
+    - Bổ sung phương thức `deleteMessage: (messageId) => axiosClient.delete('/messages/' + messageId)`.
+  - Cập nhật `client/src/utils/channelMessages.js`:
+    - Bổ sung `removeMessageFromList(messages, messageId)`: hàm thuần lọc bỏ tin nhắn theo ID khỏi mảng state và giữ nguyên thứ tự/các tin nhắn khác.
+  - Cập nhật `client/src/pages/chat/group-chat.css`:
+    - Bổ sung style `.group-message-action-btn--delete:hover`: chuyển sang đỏ neon (`#ef4444`, background `rgba(239, 68, 68, .15)`), tạo điểm nhấn cảnh báo nguy hiểm trực quan.
+  - Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
+    - Nhập `Popconfirm` từ `antd` và `removeMessageFromList` từ `channelMessages.js`.
+    - Quản lý state `deletingMessageId`, reset khi đổi kênh.
+    - Phân quyền hiển thị Action Bar hover:
+      - `canEdit = author.isOwn`: Chỉ tác giả mới có nút Sửa (`EditOutlined`).
+      - `canDelete = author.isOwn || isOwner`: Tác giả tin nhắn HOẶC Chủ Server (Server Owner) có nút Xóa (`DeleteOutlined`).
+      - Thành viên thông thường không thấy nút Sửa và nút Xóa trên tin nhắn người khác.
+    - Hộp thoại Popconfirm xác nhận:
+      - Tiêu đề: "Xóa tin nhắn?"
+      - Nội dung: "Bạn có chắc chắn muốn xóa tin nhắn này không? Hành động này không thể hoàn tác."
+      - Nút "Xóa" danger style với trạng thái loading khi đang xóa.
+    - Handler `handleDeleteMessage(messageId)`:
+      - Gọi API `messageApi.deleteMessage(messageId)`.
+      - Cập nhật loại bỏ tin nhắn khỏi state `messages` qua `removeMessageFromList`.
+      - Nếu tin nhắn đang được chỉnh sửa (`editingMessageId === messageId`), tự động hủy/đóng khung sửa tin nhắn.
+      - Hiển thị toast thông báo `antMessage.success('Đã xóa tin nhắn.')` hoặc `antMessage.error` theo mã lỗi chuẩn.
+- Tests Added:
+  - `client/tests/channelMessages.test.mjs`: Thêm 3 unit tests mới cho `removeMessageFromList` (xóa đúng ID, nhận diện ID số hoặc chuỗi, xử lý mảng rỗng và input không hợp lệ an toàn) -> Suite `channelMessages.test.mjs` đạt 13/13 tests PASS (100%).
+- Verification:
+  - `node --test tests/channelMessages.test.mjs`: PASS 13/13.
+  - `node --test tests/channelEdit.test.mjs tests/discordAuth.test.mjs tests/messageInput.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs tests/channelMessages.test.mjs`: PASS 56/56.
+  - `npm run build`: BUILD SUCCESSFUL (3219 modules transformed, 0 error).
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-30] FEAT-MESSAGE-DELETE-API — Làm API xóa tin nhắn (DELETE /api/messages/{messageId}) + Tests (BE)
+
+- Người dùng duyệt kế hoạch qua "ok". Đã triển khai API xóa tin nhắn kênh nhóm trong backend theo phân quyền: Tác giả tin nhắn HOẶC Chủ Server (Server Owner) có quyền xóa (403 nếu thành viên khác cố xóa, 401 nếu chưa đăng nhập, 404 nếu không tìm thấy, 400 nếu ID <= 0). Trả về HTTP 204 No Content sau khi xóa cứng (hard delete).
+- Implemented:
+  - Cập nhật `server/src/main/java/com/denhub/service/MessageService.java`:
+    - Bổ sung phương thức `@Transactional void deleteMessage(Long messageId)`:
+      - Kiểm tra validation: `messageId == null || messageId <= 0` -> BadRequestAlertException (`idinvalid`, 400).
+      - Kiểm tra authentication & active: lấy người dùng hiện tại từ SecurityUtils, kiểm tra `activated == true` -> Unauthorized / BadRequest (`inactiveuser`, 400/401).
+      - Tìm tin nhắn: `messageRepository.findById(messageId)` -> NotFoundAlertException (`messagenotfound`, 404) nếu không tồn tại.
+      - Phân quyền xóa: kiểm tra `isAuthor = currentUserId.equals(authorId)`. Nếu không phải tác giả, tra cứu `channelRepository.findById(channelId)` -> `serverRepository.findById(serverId)` để lấy `server.getOwnerId()`. Nếu `currentUserId.equals(ownerId)`, cho phép xóa. Trường hợp còn lại throw DenHubSecurityException (`deleteforbidden`, 403 Forbidden).
+      - Thực hiện xóa: `messageRepository.delete(message)`.
+  - Cập nhật `server/src/main/java/com/denhub/web/rest/MessageResource.java`:
+    - Bổ sung endpoint `@DeleteMapping("/messages/{messageId}")` trả về `ResponseEntity.noContent().build()` (HTTP 204 No Content).
+- Tests Added:
+  - `server/src/test/java/com/denhub/service/MessageServiceTest.java`: Thêm 6 unit tests mới (`deleteMessage_Success_WhenAuthor`, `deleteMessage_Success_WhenServerOwnerNotAuthor`, `deleteMessage_Fail_WhenInvalidId`, `deleteMessage_Fail_WhenUnauthenticatedOrInactive`, `deleteMessage_Fail_WhenNotFound`, `deleteMessage_Fail_WhenNotAuthorAndNotServerOwner`). Toàn bộ suite 51/51 tests PASS (100%).
+  - `server/src/test/java/com/denhub/web/rest/MessageResourceIT.java`: Thêm 4 MockMvc tests mới (`deleteMessageSuccessReturns204NoContent`, `deleteMessageWhenNotFoundReturns404`, `deleteMessageWhenForbiddenReturns403`, `deleteMessageWhenInvalidIdReturns400`). Toàn bộ suite 20/20 tests PASS (100%).
+  - `server/src/test/java/com/denhub/web/rest/MessageSecurityIT.java`: Thêm 5 integration tests mới (`deleteMessageSuccessByAuthor`, `deleteMessageSuccessByServerOwnerNotAuthor`, `deleteMessageForbiddenWhenOtherMemberTriesToDelete`, `deleteMessageUnauthorizedWhenNoToken`, `deleteMessageNotFoundWhenMessageDoesNotExist`). Toàn bộ suite 43/43 tests PASS (100%).
+- Verification:
+  - `.\gradlew.bat test --tests "com.denhub.service.MessageServiceTest" --tests "com.denhub.web.rest.MessageResourceIT" --tests "com.denhub.web.rest.MessageSecurityIT"`: BUILD SUCCESSFUL in 37.5s, **114/114 tests PASS (100% success rate, 0 failures, 0 skipped)**.
+- Documentation:
+  - `docs/02-SYSTEM-ARCHITECTURE.md`: Cập nhật bảng API (line 181: IMPLEMENTED), danh sách endpoint (line 236), mục 7.9 chi tiết contract `DELETE /api/messages/{messageId}`.
+  - `docs/00-DEVELOPMENT-PROCESS.md`: Cập nhật bảng tiến độ Section 10 và log công việc Section 11.
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
+
+### [2026-10-30] FEAT-MESSAGE-EDIT-UI — Làm UI sửa tin nhắn (Inline Editing) & Kết nối API (FE)
+
+- Người dùng duyệt kế hoạch qua "ok". Đã triển khai UI sửa tin nhắn nội tuyến trong kênh nhóm theo đúng phong cách Cyber Dark Glassmorphism của DenHub và tích hợp API `PATCH /api/messages/{messageId}`.
+- Implemented:
+  - Cập nhật `client/src/api/messageApi.js`:
+    - Bổ sung phương thức `updateMessage: (messageId, data) => axiosClient.patch('/messages/' + messageId, data)`.
+  - Cập nhật `client/src/utils/channelMessages.js`:
+    - Bổ sung `updateMessageInList(messages, updatedMessage)`: hàm thuần cập nhật tin nhắn trong mảng state và giữ nguyên thứ tự/các tin nhắn khác.
+    - Bổ sung `isMessageEdited(message)`: kiểm tra xem tin nhắn đã qua chỉnh sửa hay chưa dựa trên `updatedAt` / `lastModifiedDate`.
+  - Cập nhật `client/src/pages/chat/GroupChatPage.jsx`:
+    - Quản lý state chỉnh sửa tin nhắn: `editingMessageId`, `editContent`, `editLoading`, `editError`, `editInputRef`.
+    - Auto-focus con trỏ chuột vào cuối ô nhập khi kích hoạt chế độ sửa.
+    - Action Bar nổi: Chỉ hiển thị icon bút chì `EditOutlined` khi rê chuột (hover) vào tin nhắn do chính người dùng hiện tại gửi (`author.isOwn === true`), tuân thủ triệt để Business Rule `BR-MSG-02`.
+    - Inline Edit Textarea: Chuyển nội dung tin nhắn thành textarea tự động co giãn (`minRows: 1, maxRows: 8`), giới hạn 4000 ký tự.
+    - Phím tắt tiện lợi: `Enter` để lưu (nếu không nhấn Shift), `Escape` để hủy, `Shift+Enter` để xuống dòng. Kèm 2 nút bấm trực quan "Hủy" và "Lưu thay đổi".
+    - Xử lý thông báo lỗi (400, 403, 404, lỗi mạng) hiển thị trong alert bên dưới form edit.
+    - Hiển thị nhãn `(đã chỉnh sửa)` kèm tooltip thời gian khi tin nhắn đã qua chỉnh sửa.
+  - Cập nhật `client/src/pages/chat/group-chat.css`:
+    - Thêm CSS cho `.group-message-actions`, `.group-message-action-btn`, `.group-message-row--editing`, `.group-message-edit-box`, `.group-message-edit-input`, `.group-message-edit-footer`, `.group-message-edit-hint`, `.group-message-edit-buttons`, `.group-message-edit-cancel-btn`, `.group-message-edit-save-btn`, `.group-message-edit-error`, `.group-message-edited`.
+- Tests Added:
+  - `client/tests/channelMessages.test.mjs`: Thêm 3 unit tests mới cho `updateMessageInList` (cập nhật thành công, xử lý biên an toàn) và `isMessageEdited` (nhận biết `updatedAt`/`lastModifiedDate`) -> Toàn bộ suite 10/10 PASS (100%).
+- Verification:
+  - `node --test tests/channelMessages.test.mjs`: PASS 10/10.
+  - `node --test tests/channelEdit.test.mjs tests/discordAuth.test.mjs tests/messageInput.test.mjs tests/serverInvite.test.mjs tests/serverJoin.test.mjs tests/channelMessages.test.mjs`: PASS 53/53.
+  - `npm run build`: BUILD SUCCESSFUL (3219 modules transformed, 0 error).
+- Nhánh `feature/edit-message-api`. Changes uncommitted để người dùng review. Not pushed — AI agents are not allowed to push DenHub.
 
 ### [2026-10-27] FEAT-OPEN-CREATED-SERVER — Tạo Server xong mở ngay Server đó
 
@@ -3079,11 +3335,35 @@ Implemented & Verified:
 
 Docs Updated:
 - `docs/00-DEVELOPMENT-PROCESS.md` (Section 10 Progress, Section 11 Log, Section 12 Handoff).
-- `docs/02-SYSTEM-ARCHITECTURE.md` (Section 23 Invalid Invite & Duplicate Join Handling).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Section 25 Invalid Invite & Duplicate Join Handling).
 
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff release — Server discovery / visibility / cache (2026-11-01)
+
+- Source đã được chia thành bốn commit `77627ee`, `7929e20`, `ec99eb6`, `e1c05ad`, cùng commit tài liệu `docs(server): synchronize discovery release and handoff`. Xem RELEASE-SERVER-DISCOVERY. Các trạng thái “chưa commit” ở handoff/log phía dưới là lịch sử trước release.
+- Người dùng đã yêu cầu push trực tiếp cho lượt này; target là `origin/feature/server-search`, theo yêu cầu mới nhất thay cho chỉ dẫn cấm push trước đó. Không suy ra ủy quyền push cho lượt tiếp theo. Kiểm tra trạng thái remote thực tế bằng `git branch -vv` và `git ls-remote --heads origin refs/heads/feature/server-search`.
+- Kiểm chứng code trước commit: backend **551/551**, Node **126/126**, browser liên quan **78/78**, build PASS. Lượt Git chỉ chia commit/docs, không đổi hành vi hoặc chạy lại schema. Không có credentials/artifact trong các cụm commit.
+- Bước người vận hành: Stop backend trong IDE, Run lại một lần rồi mở Server để xác minh HTTP có JWT trên SQL Server. Cache Server được tắt riêng, không cần chạy thêm SQL trên local đã migration; các môi trường khác cần script visibility theo quy trình riêng.
+
+### Handoff hiện tại — Server không dùng Hibernate L2 cache (2026-11-01)
+
+- Đã sửa `Server.java` dùng `@Cacheable(false)` thay cho Hibernate `@Cache`; không đổi enum/schema/quyền hoặc cache Entity khác. Xem docs/02 mục 24 và FIX-SERVER-ENUM-L2-CACHE.
+- Targeted cache/API regression **4/4**, full backend **551/551**, compile Java/test Java PASS. Các số 547 backend và FE/browser ở log tìm kiếm bên dưới là kết quả lượt trước, không phải lệnh được chạy lại trong lượt cache.
+- **Bước vận hành còn lại:** Stop hẳn backend đang chạy từ IDE, Run lại, rồi tải lại trang/mở Server để kiểm HTTP có JWT thực tế. Không tự kill tiến trình IDE hoặc giả lập tài khoản/JWT của người dùng. Không cần chạy lại SQL visibility; schema đã được áp dụng trước đó.
+- Không đổi FE hoặc application.properties; không tắt cache toàn cục. Server đọc qua transaction riêng phát sinh SQL; cần benchmark riêng nếu nhóm muốn cache lại với lifecycle/classloader an toàn. Chưa commit/push.
+
+### Handoff hiện tại — Tìm kiếm/Khám phá Server (cập nhật 2026-11-01)
+
+- Lượt điều chỉnh mới nhất đã hoàn tất: backend **547/547**, Node **126/126**, browser liên quan **78/78**, build PASS; SQL filtered query/count/pagination read-only smoke PASS. Branch `feature/server-search`, chưa commit/push. Các số 545/130/106 ở log trước là lịch sử lượt triển khai ban đầu.
+- Home hiện không có ô tìm, chỉ có link chữ “Khám phá server” dẫn `/discover`. Query Khám phá loại Owner và membership của người tìm ở cả dữ liệu/count; DTO giữ format, `joined` luôn false; sau Join không còn thấy Server đó, Leave Server công khai thì tìm được lại. Xem FIX-DISCOVERY-ELIGIBILITY-AND-HOME.
+- Đọc docs/01 mục 8 và docs/02 mục 23 trước khi sửa luồng tham gia: PUBLIC được tìm và tham gia trực tiếp; PRIVATE cần invite. Owner chọn visibility ở form tạo/cài đặt; default PRIVATE. Các log cũ nói Join bằng ID cho mọi Server không còn là quy tắc hiện hành.
+- **Cập nhật DB mới nhất:** người dùng đã duyệt “áp dụng”; script đã được sửa lỗi compile batch của SQL Server và apply thành công vào local `denhubdb`. Cả 2 Server cũ PRIVATE, cột/default/CHECK hợp lệ, row count giữ nguyên, query discovery/projection và DBCC PASS. File vẫn preview `0`; chạy lại khi cột có sẵn không ghi đè dữ liệu.
+- Backend đang lắng nghe 8080; gọi list/discover không JWT trả 401. Cần tải lại trang đã đăng nhập để xác minh HTTP/UI thật; chưa kiểm authenticated request, collation/locking đầy đủ. Với database khác phải review/apply script riêng trước backend mới. Xem APPLY-SERVER-VISIBILITY.
+- Muốn cộng đồng xuất hiện trong Khám phá, Owner chủ động đổi sang công khai sau khi schema/backend sẵn sàng. Không tự public các Server cũ hoặc mở quyền đọc nội dung cho outsider.
+- Giữ các hạng mục/handoff của developer khác bên dưới; approval áp dụng chỉ dành cho local `denhubdb` trong lượt này, không cho phép sửa database khác, commit hoặc push.
 
 ### Handoff hiện tại — Task 4.14: Kiểm tra mã mời sai và tham gia trùng (2026-10-30)
 
@@ -3092,6 +3372,15 @@ Docs Updated:
 - Toàn bộ frontend unit tests (118 tests) và client production build PASS 100%.
 - Cơ chế kiểm soát mã mời sai định dạng, hết hạn, thu hồi, server bị xóa; cơ chế chống tham gia trùng lặp 2 lớp, cross-channel duplicate join, bẫy lỗi tương tranh DataIntegrityViolationException; và state guard ở frontend được kiểm chứng trọn vẹn.
 - Sẵn sàng chuyển tiếp sang Task 4.19 (Sửa các lỗi Member) sau khi người dùng xác nhận.
+
+
+### Handoff hiện tại — Task 4.09: Kiểm tra loại thành viên khỏi Server (2026-10-29)
+
+- Task 4.09 hoàn thành xuất sắc toàn bộ 12 ca kiểm thử theo yêu cầu.
+- Toàn bộ backend integration & service tests (ServerSecurityIT: 105 tests, ServerServiceTest: 99 tests) PASS 100%.
+- Toàn bộ frontend unit tests (115 tests) và client production build PASS 100%.
+- Cơ chế bảo vệ Owner, thu hồi quyền hạn tức thì của thành viên bị loại, idempotency (consecutive removal -> 404), cô lập đa thành viên (multi-member isolation), và state rollback an toàn ở frontend được kiểm chứng trọn vẹn.
+- Sẵn sàng chuyển tiếp sang Task 4.14 (Kiểm tra mã mời sai và tham gia trùng) sau khi người dùng xác nhận.
 
 ### Handoff hiện tại — Task 3.24: Kiểm tra mã mời và quyền thành viên (2026-10-27)
 

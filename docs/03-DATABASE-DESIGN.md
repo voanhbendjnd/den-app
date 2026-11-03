@@ -61,6 +61,7 @@ erDiagram
 | `name` | `NVARCHAR(100)` | `NOT NULL` | Tên Server |
 | `icon_url` | `VARCHAR(500)` | `NULL` | Ảnh biểu tượng server |
 | `owner_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Khóa ngoại người sở hữu |
+| `visibility` | `NVARCHAR(7)` | `NOT NULL`, `DEFAULT 'PRIVATE'`, `CHECK IN ('PUBLIC','PRIVATE')` | Chế độ hiển thị/tham gia, bổ sung được duyệt 2026-10-31; xem mục 4.7 |
 | `created_at` | `DATETIME2` | `NOT NULL`, `DEFAULT SYSUTCDATETIME()` | Thời điểm tạo |
 | `updated_at` | `DATETIME2` | `NULL` | Thời điểm cập nhật cuối |
 
@@ -319,3 +320,14 @@ Duy đã duyệt bổ sung sửa audit bằng yêu cầu “làm tiếp đi” s
 - `messages` dùng chung cho Channel và Direct Conversation. DELETE chọn theo `channel_id` thuộc Channel của đúng Server và `conversation_id IS NULL`; trước đó từ chối nếu tin Channel có conversation_id hoặc được conversations.last_message_id tham chiếu. Không đổi/cắt tin riêng để dọn Server.
 - Xóa theo thứ tự Message Channel → Channel → Invite → ServerMember → Server trong cùng transaction; general được dọn khi xóa cả Server. Giữ User, Server khác, Conversation/tin riêng, ảnh/media vật lý. Dùng bulk JPQL để không nạp toàn bộ tin nhắn vào RAM; Hibernate quản lý invalidation cache theo query.
 - Khóa `PESSIMISTIC_WRITE` trên Server và phối hợp khóa ở các Service ghi liên quan; không dùng cascade JPA với ID scalar. H2 test xác nhận graph cleanup, rollback giao dịch đã thực hiện DELETE con và serialization hai chiều với tạo Channel; chưa chạy DELETE thật hoặc xác minh khóa trên SQL Server.
+
+### 4.7 Visibility của Server và tìm kiếm công khai (2026-10-31)
+
+- Kế hoạch cả Home/Khám phá và quy tắc công khai/riêng tư được người dùng duyệt bằng “triển khai”. `Server.visibility` ánh xạ `NVARCHAR(7) NOT NULL` bằng `@Enumerated(EnumType.STRING)`, enum `ServerVisibility.PUBLIC/PRIVATE`, mặc định Java là `PRIVATE`.
+- Script `server/scripts/sql/2026-10-31-server-visibility.sql` bổ sung riêng cột `dbo.servers.visibility`, default `PRIVATE` với `WITH VALUES` cho các hàng cũ và CHECK chỉ cho `PUBLIC`/`PRIVATE`. Không xóa dữ liệu hoặc thay quan hệ, owner, audit, membership, invite, Channel, Message hay index khác.
+- Mặc định `@ApplyChanges = 0`: chỉ in tên database và SQL dự kiến. Người vận hành chọn đúng database, review rồi mới đặt `1`; DDL nằm trong transaction, lỗi rollback. Nếu đã có cột, script chỉ in metadata và dừng để review, không ghi đè visibility đã cấu hình hoặc tự sửa cột không đúng kiểu.
+- Không gắn script vào startup. Cần apply/review schema trước khi chạy backend mới; không coi Hibernate update là migration dữ liệu cũ thành công.
+- Update visibility và Join bằng ID dùng cùng khóa `PESSIMISTIC_WRITE` trên hàng Server. Invite/member hiện có được giữ khi chuyển chế độ; query Khám phá chỉ đọc `PUBLIC`, loại Owner và membership của người tìm bằng `NOT EXISTS` trước phân trang và khi count. Điều chỉnh lọc này không cần thêm cột hoặc thay schema/index.
+- **Cập nhật áp dụng local sau approval “áp dụng”:** đã chạy script vào `denhubdb`, thêm `visibility NVARCHAR(7) NOT NULL`, default `N'PRIVATE'` và CHECK trusted/enabled. Trước/sau đều 2 Server; cả 2 PRIVATE, 0 PUBLIC, 0 NULL/invalid. DBCC CHECKCONSTRAINTS trả 0 vi phạm; projection cột mới và query discovery LIKE/ESCAPE/CASE/OFFSET/FETCH PASS trên SQL Server thật.
+- Lượt apply đầu gặp lỗi `207/1750` do CHECK tham chiếu cột mới trong cùng batch; transaction đã rollback và được kiểm tra không để lại cột/constraint. Script đã sửa dùng hai `sp_executesql` để ADD COLUMN trước, ADD CHECK sau trong cùng transaction. File vẫn mặc định preview `0`; khi cột tồn tại thì chỉ đọc metadata/no-op.
+- Chưa kiểm HTTP có JWT, collation/ranking với dữ liệu đa dạng hoặc concurrent locking đầy đủ trên SQL Server. Không thay các chênh lệch thiết kế/mapping lịch sử khác. Chi tiết lệnh/verification tại log APPLY-SERVER-VISIBILITY trong docs/00.

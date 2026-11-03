@@ -14,6 +14,7 @@ import RegisterPage from '../pages/auth/RegisterPage';
 
 // Main pages
 import HomePage from '../pages/home/HomePage';
+import DiscoverServersPage from '../pages/servers/DiscoverServersPage';
 import RoomsPage from '../pages/rooms/RoomsPage';
 import ChatPage from '../pages/chat/ChatPage';
 import GroupChatPage from '../pages/chat/GroupChatPage';
@@ -49,6 +50,7 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/discover" element={<DiscoverServersPage />} />
           <Route path="/servers/:serverId" element={<GroupChatPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
           <Route path="/rooms/:roomSlug" element={<ChatPage />} />

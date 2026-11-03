@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
 import java.time.Instant;
+import com.denhub.domain.enums.ServerVisibility;
 
 @Getter
 @Setter
@@ -16,4 +17,5 @@ public class ServerResponseDTO {
     String iconUrl;
     Long ownerId;
     Instant createdDate;
+    ServerVisibility visibility;
 }

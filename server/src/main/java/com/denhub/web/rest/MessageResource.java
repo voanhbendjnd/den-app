@@ -86,4 +86,18 @@ public class MessageResource {
         MessageResponse response = messageService.updateMessage(messageId, request);
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/messages/{messageId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+        summary = "Xóa tin nhắn trong Channel",
+        description = "Xóa tin nhắn vĩnh viễn khỏi Channel. Yêu cầu người thực hiện là chính tác giả tin nhắn."
+    )
+    public ResponseEntity<Void> deleteMessage(
+            @Parameter(description = "ID của tin nhắn", example = "101")
+            @PathVariable("messageId") Long messageId) {
+        messageService.deleteMessage(messageId);
+        return ResponseEntity.noContent().build();
+    }
 }
+

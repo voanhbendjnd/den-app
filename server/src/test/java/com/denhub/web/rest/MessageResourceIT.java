@@ -33,6 +33,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -346,4 +347,60 @@ class MessageResourceIT {
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.detail").value("403 FORBIDDEN \"Bạn không có quyền sửa tin nhắn này\""));
     }
+
+    @Test
+    void deleteMessageSuccessReturns204NoContent() throws Exception {
+        Long messageId = 101L;
+        doNothing().when(messageService).deleteMessage(messageId);
+
+        mockMvc.perform(delete("/api/messages/{messageId}", messageId))
+                .andExpect(status().isNoContent());
+
+        verify(messageService).deleteMessage(messageId);
+    }
+
+    @Test
+    void deleteMessageWhenNotFoundReturns404() throws Exception {
+        Long messageId = 9999L;
+        doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy tin nhắn"))
+                .when(messageService).deleteMessage(messageId);
+
+        mockMvc.perform(delete("/api/messages/{messageId}", messageId))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail").value("404 NOT_FOUND \"Không tìm thấy tin nhắn\""));
+
+        verify(messageService).deleteMessage(messageId);
+    }
+
+    @Test
+    void deleteMessageWhenForbiddenReturns403() throws Exception {
+        Long messageId = 101L;
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xóa tin nhắn này"))
+                .when(messageService).deleteMessage(messageId);
+
+        mockMvc.perform(delete("/api/messages/{messageId}", messageId))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.detail").value("403 FORBIDDEN \"Bạn không có quyền xóa tin nhắn này\""));
+
+        verify(messageService).deleteMessage(messageId);
+    }
+
+    @Test
+    void deleteMessageWhenInvalidIdReturns400() throws Exception {
+        Long messageId = 0L;
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID của tin nhắn không hợp lệ"))
+                .when(messageService).deleteMessage(messageId);
+
+        mockMvc.perform(delete("/api/messages/{messageId}", messageId))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400));
+
+        verify(messageService).deleteMessage(messageId);
+    }
 }
+

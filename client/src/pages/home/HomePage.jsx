@@ -88,7 +88,7 @@ export default function HomePage() {
                 borderColor: 'rgba(255, 255, 255, 0.15)',
               }}
             >
-              Tham Gia Server (ID)
+              Nhập mã mời / ID
             </Button>
           </div>
         </div>
@@ -108,13 +108,14 @@ export default function HomePage() {
             </Text>
           </div>
           <div className="home-servers-actions" style={{ display: 'flex', gap: 8 }}>
+            <Link to="/discover" className="home-discover-link">Khám phá server</Link>
             <Button
               type="link"
               icon={<CompassOutlined />}
               onClick={() => openJoinModal?.()}
               style={{ color: '#818CF8', fontWeight: 600 }}
             >
-              Tham gia bằng ID
+              Nhập mã mời / ID
             </Button>
             <Button
               type="link"
@@ -179,7 +180,7 @@ export default function HomePage() {
                   style={{ fontWeight: 600, background: 'rgba(255, 255, 255, 0.06)', color: '#F1F5F9', borderColor: 'rgba(255, 255, 255, 0.15)' }}
                   onClick={() => openJoinModal?.()}
                 >
-                  Tham Gia Bằng ID
+                  Nhập mã mời / ID
                 </Button>
               </div>
             </Empty>

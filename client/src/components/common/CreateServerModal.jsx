@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Modal, Form, Input, Button, Typography, message, Avatar, Tooltip, Spin } from 'antd';
+import { Modal, Form, Input, Button, Typography, message, Avatar, Tooltip, Spin, Select } from 'antd';
 import { 
   RocketOutlined, 
   BookOutlined, 
@@ -151,6 +151,7 @@ export default function CreateServerModal({ open, onClose, onSuccess, onOpenServ
       form.setFieldsValue({
         name: TEMPLATE_PRESETS[0].defaultName,
         iconUrl: AVATAR_SUGGESTIONS[0],
+        visibility: 'PRIVATE',
       });
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -186,6 +187,7 @@ export default function CreateServerModal({ open, onClose, onSuccess, onOpenServ
       const res = await serverApi.create({
         name: values.name.trim(),
         iconUrl: values.iconUrl?.trim() || avatarUrl || null,
+        visibility: values.visibility || 'PRIVATE',
       });
       const serverData = res.data?.data || res.data;
       // A committed Server belongs in the list even if its form was closed.
@@ -406,6 +408,13 @@ export default function CreateServerModal({ open, onClose, onSuccess, onOpenServ
           }}
         >
           {/* Ẩn input iconUrl ngầm */}
+          <Form.Item name="visibility" label="Chế độ Server" initialValue="PRIVATE"
+            extra="Riêng tư cần mã mời. Công khai xuất hiện trong Khám phá và cho phép tham gia trực tiếp.">
+            <Select aria-label="Chế độ Server" disabled={loading} options={[
+              { value: 'PRIVATE', label: 'Riêng tư — tham gia bằng mã mời' },
+              { value: 'PUBLIC', label: 'Công khai — cho phép tìm và tham gia' },
+            ]} />
+          </Form.Item>
           <Form.Item name="iconUrl" hidden>
             <Input />
           </Form.Item>

@@ -3,6 +3,8 @@
 .home-server-link:focus-visible, .home-mobile-nav a:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 4px; }
 .home-servers-header, .home-servers-actions { flex-wrap: wrap; gap: 12px; }
 .home-list-warning { margin-bottom: 16px; }
+.home-discover-link { align-self: center; font-weight: 600; padding: 4px; }
+.home-discover-link:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 4px; }
 
 /* Keep the compact navigation scoped to Home; chat and other routes retain their layouts. */
 @media (max-width: 991px) {

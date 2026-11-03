@@ -179,7 +179,7 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
 | **Message** | `GET` | `/api/channels/{channelId}/messages?before={id}&limit=30` | Lấy lịch sử Message (Cursor pagination) | `CONFIRMED` |
 | **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message server cũ | `TBD` |
-| **Message** | `DELETE`| `/api/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
+| **Message** | `DELETE`| `/api/messages/{messageId}` | Xóa Message (duy nhất tác giả tin nhắn; trả `204 No Content`) | `IMPLEMENTED` |
 | **Channel** | `POST` | `/api/v1/channels` | Tạo mới một Channel trong Server (yêu cầu là Owner/Member) | `CONFIRMED` |
 | **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `CONFIRMED` |
 | **Channel** | `PUT` | `/api/v1/channels/{channelId}` | Cập nhật thông tin (tên, thứ tự) Channel | `CONFIRMED` |
@@ -213,8 +213,10 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/users/search?q={query}`: Tìm kiếm người dùng theo tên
 
 ### 5.2 Server & Member Management
-- `GET /api/servers`: Lấy danh sách server người dùng tham gia
-- `POST /api/servers`: Tạo server mới (transactional với `#general` channel và Owner)
+- `GET /api/v1/servers`: Lấy danh sách server người dùng sở hữu/tham gia; có `visibility` theo mục 23. Đường dẫn thiết kế cũ `/api/servers` không phải alias hiện có.
+- `POST /api/v1/servers`: Tạo server mới (transactional với `#general` channel và Owner), `visibility` mặc định `PRIVATE`; xem mục 23.
+- `GET /api/v1/servers/discover`: Tìm Server công khai, phân trang; xem mục 23.
+- `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp chỉ khi Server `PUBLIC`; Server `PRIVATE` trả `403`, cần mã mời hợp lệ.
 - `GET /api/v1/servers/{serverId}`: Chi tiết phần vỏ Server theo phạm vi duyệt 2026-10-13 (mục 9); trả DTO Server hiện có. Thiết kế trước đó `/api/servers/{serverId}` kèm danh sách kênh được thu hẹp cho lượt này; dữ liệu Channel thuộc module Channel, không thêm alias `/api/servers/{serverId}`.
 - `PUT /api/v1/servers/{serverId}`: Cập nhật tên/ảnh server (Owner), contract mục 11 được duyệt 2026-10-15; thay thế đề xuất cũ `PATCH /api/servers/{serverId}`, không thêm alias.
 - `DELETE /api/v1/servers/{serverId}`: Owner xóa vĩnh viễn Server theo mục 12 (2026-10-21); thay thế đường dẫn thiết kế `/api/servers/{serverId}`, không thêm alias.
@@ -234,7 +236,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/channels/{channelId}/messages?before={id}&limit=30`: Lịch sử tin nhắn
 - `POST /api/channels/{channelId}/messages`: Gửi tin nhắn mới
 - `PATCH /api/messages/{messageId}`: Chỉnh sửa tin nhắn (tác giả)
-- `DELETE /api/messages/{messageId}`: Xóa mềm tin nhắn
+- `DELETE /api/messages/{messageId}`: Xóa tin nhắn (duy nhất tác giả tin nhắn; trả `204 No Content`)
 - `POST /api/messages/{messageId}/reactions`: Thả emoji reaction
 - `DELETE /api/messages/{messageId}/reactions/{emoji}`: Gỡ emoji reaction
 
@@ -523,6 +525,28 @@ Endpoint: `PATCH /api/messages/{messageId}` & `PUT /api/messages/{messageId}`
   - `MessageServiceTest`: 9 unit tests kiểm thử sửa thành công, chặn invalid ID, blank content, content > 4000 ký tự, chưa đăng nhập, message không tồn tại, user khác sửa (403), server owner sửa (403).
   - `MessageResourceIT`: 5 MockMvc tests kiểm thử PATCH & PUT trả 200 kèm envelope, 400 khi blank content, 404 khi not found, 403 khi forbidden.
   - `MessageSecurityIT`: 7 SpringBootTest integration tests với JWT token thật và database H2 thật kiểm thử sửa qua PATCH và PUT thành công và cập nhật `lastModifiedDate`, chặn 403 khi member khác sửa, chặn 403 khi server owner sửa, chặn 401 khi không token, chặn 400 khi blank, chặn 404 khi tin nhắn không tồn tại.
+
+### 7.9 API Xóa tin nhắn — Delete Message (`IMPLEMENTED`)
+
+- **Mục đích:** Xóa vĩnh viễn một tin nhắn khỏi Channel.
+- **Quyền hạn truy cập:**
+  - **Duy nhất tác giả tin nhắn (`authorId == currentUser.id`)**.
+  - Server Owner, Admin hoặc thành viên khác không được quyền xóa tin nhắn của người khác chỉ nhờ vai trò (bị từ chối `403 Forbidden`).
+- **Endpoint:** `DELETE /api/messages/{messageId}`
+- **Authentication:** Bắt buộc JWT Bearer token qua header `Authorization: Bearer <token>`.
+- **Validation Constraints:**
+  - `messageId` (path variable): kiểu Long, phải lớn hơn 0 (<= 0 trả `400 Bad Request`).
+- **Response Format (Thành công 204 No Content):**
+  - Trả về mã HTTP `204 No Content` với body rỗng (chuẩn REST cho thao tác DELETE trong DenHub).
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `messageId` null hoặc <= 0.
+  - `401 Unauthorized`: Chưa đăng nhập hoặc token không hợp lệ / tài khoản inactive.
+  - `403 Forbidden`: Người gửi request không phải tác giả của tin nhắn (`"Bạn không có quyền xóa tin nhắn này"`).
+  - `404 Not Found`: Không tìm thấy tin nhắn với `messageId`.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 6 unit tests (tác giả xóa 204, server owner cố xóa bị 403, other member cố xóa bị 403, invalid id 400, unauthenticated 401, not found 404).
+  - `MessageResourceIT`: 4 MockMvc tests (DELETE 204, 400, 404, 403).
+  - `MessageSecurityIT`: 5 SpringBootTest integration tests với token JWT thật và database H2 (tác giả xóa thành công 204, server owner bị 403 và DB còn nguyên, member khác bị 403 và DB còn nguyên, 401 không token, 404 not found).
 
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 
@@ -1073,11 +1097,50 @@ Ngay sau khi thành viên bị loại thành công:
   - `submittingRef` khóa request ngay khi nhấn "Loại thành viên", vô hiệu hóa nút bấm và chặn mọi thao tác click liên tiếp trong lúc request đang xử lý.
   - Quản lý phiên giao diện (`sessionRef`): Nếu người dùng đóng modal hoặc chuyển sang server khác trong lúc request đang gửi, phản hồi cũ bị huỷ bỏ, tránh rò rỉ cập nhật state sai vị trí.
 
+## 23. Tìm kiếm Server và chế độ công khai/riêng tư (2026-10-31)
+
+### 23.1 REST và DTO (`CONFIRMED / IMPLEMENTED`)
+
+- `GET /api/v1/servers/discover?q=&page=0&size=20`: yêu cầu Authentication và User active như các API Server hiện có. `page` bắt đầu từ 0; `size` từ 1 đến 50, mặc định 20. `q` sau strip tối đa 100 đơn vị UTF-16, không phân biệt hoa/thường; rỗng liệt kê Server công khai mới nhất. Sai tham số trả `400`; thiếu/sai identity hoặc User inactive trả `401`.
+- Thành công HTTP `200`, một wrapper `RestResponse` theo mục 4.1. `data` là `ServerDiscoveryDTO`: `items`, `page`, `size`, `totalElements`, `totalPages`. Mỗi item chỉ có `id`, `name`, `iconUrl`, `joined`; giữ format DTO, `joined` luôn false vì kết quả đã loại Owner và người có membership. Không trả Entity, owner ID, audit, email, member list, kênh hoặc nội dung chat.
+- Repository chỉ chọn `visibility = PUBLIC`; khớp chuỗi con bằng LIKE có tham số. `%`, `_`, `!`, `[` trong input được escape thành ký tự thường, bao gồm cú pháp bracket của SQL Server. Thứ tự: trùng tên hoàn toàn → bắt đầu bằng từ khóa → chứa từ khóa, sau đó `id DESC`. Không có từ khóa thì dùng `id DESC`. Không bổ sung xử lý bỏ dấu riêng; collation SQL Server thật cần kiểm chứng khi triển khai.
+- Phân trang ở backend; cả query dữ liệu và count đều có `s.ownerId <> :userId` và `NOT EXISTS` membership theo Server/current User. `userId` chỉ lấy từ Authentication qua User active, không nhận danh tính từ query client. Không lọc sau khi phân trang, không query membership riêng từng Server hoặc theo trang nữa.
+- `CreateServerDTO.visibility`: enum `PUBLIC`/`PRIVATE`, bỏ qua thì mặc định `PRIVATE`; explicit null hoặc giá trị không hợp lệ bị từ chối. `UpdateServerDTO.visibility` bỏ qua/null thì giữ chế độ hiện tại để tương thích client cũ; giá trị enum khác bị từ chối. Owner là người duy nhất cập nhật được chế độ.
+- `ServerResponseDTO` thêm `visibility` cho create/list/detail/update/join-invite. Các trường cũ giữ nguyên.
+- `POST /api/v1/servers/{id}/join`: chỉ Server `PUBLIC` được tham gia trực tiếp, thành công `204`. Server `PRIVATE` trả `403`; backend kiểm tra sau `findByIdForUpdate`, trước khi ghi membership. Invite vẫn dùng `/join-invite/{code}` cho cả hai chế độ, giữ kiểm tra hạn/mã thu hồi/chống trùng hiện có.
+- `getServerDetail`, Channel, Message, member list vẫn kiểm Owner/membership; không mở quyền đọc nội dung cho người tìm thấy Server. Không thêm API public detail hoặc destination/payload WebSocket.
+
+### 23.2 Frontend
+
+- Theo điều chỉnh người dùng đã chốt, Home bỏ input/state/filter tìm tên, giữ danh sách do `MainLayout` sở hữu như trước và chỉ thêm link chữ “Khám phá server”. Giữ riêng loading/error/retry/empty của danh sách; không lọc dock. Helper `serverSearch.js` và 4 unit tests chỉ phục vụ tính năng Home đã bỏ được gỡ cùng entry trong npm test.
+- Route `/discover` nằm trong `ProtectedRoute` và `MainLayout`. Dock giữ link kính lúp “Tìm server”; Home dùng React Router `Link` thuần chữ đến `/discover`, có keyboard focus. Kết quả chỉ là Server công khai chưa sở hữu/tham gia, nhãn “Server công khai” và nút “Tham gia”; trạng thái rỗng mặc định là “Chưa có server mới để khám phá”.
+- Truy vấn được debounce 300 ms khi có từ khóa, hủy bằng AbortController và có request counter; input/phân trang vô hiệu hóa response cũ ngay khi thao tác. Có loading, empty, error/retry, phân trang 20 kết quả. Từ khóa mới reset về trang 0.
+- Join khóa ref trước request để chống submit trùng; chỉ sau HTTP thành công mới cập nhật danh sách chung, refresh nền và điều hướng. Kiểm tra visit token cùng URL thực tế trước navigate; response sau khi rời trang chỉ cập nhật danh sách chung. Lỗi được trình bày an toàn với hướng dẫn tải lại/nhập mã mời, không đưa detail hệ thống lên UI.
+- Form tạo mặc định riêng tư; cài đặt dùng draft/baseline và nút lưu/hủy cho cả tên, ảnh, chế độ. Label tham gia được đồng bộ thành “Nhập mã mời / ID”; phần giải thích nêu ID chỉ dùng cho Server công khai.
+- Responsive trên desktop/mobile; thu sidebar phụ trên màn nhỏ, giữ dock và focus bàn phím. Không cài thêm dependency.
+
+### 23.3 Schema và verification
+
+- Schema yêu cầu `servers.visibility` theo docs/03 mục 4.7. Script thủ công phải được review/apply trước khi chạy phiên bản code mới; không dựa vào Hibernate `ddl-auto=update` để chuyển dữ liệu cũ hoặc áp constraint/default.
+- Backend: `ServerDiscoveryIT` kiểm JWT/service/JPA/H2 cho phân trang, ranking, escape, tiếng Việt, dữ liệu công khai tối thiểu, quyền truy cập, default và thay đổi visibility, invite sau khi chuyển riêng tư. Fixture direct-join cũ được đặt `PUBLIC` rõ ràng.
+- Frontend: `server-search.browser.test.mjs` kiểm Home không còn ô tìm, giữ danh sách đầy đủ/link chữ (kể cả lỗi/rỗng), link hoạt động bằng Enter ở 1440/375px; Khám phá không có hàng Owner/đã tham gia, truy vấn lại sau Join không còn Server đó. Giữ regression debounce/response cũ, phân trang, lỗi, join/điều hướng, tạo/cài đặt và authentication. Test Back/Forward chờ workspace trung gian render thay vì chỉ chờ URL đổi trước khi React commit.
+- Kết quả lệnh cuối và giới hạn được ghi tại docs/00. Sau approval “áp dụng”, script đã được sửa tách batch ADD COLUMN/CHECK và apply vào local `denhubdb`; metadata/default/CHECK/backfill 2 Server cùng query LIKE/ESCAPE/CASE/OFFSET/FETCH smoke PASS trên SQL Server. HTTP không JWT trả 401; chưa kiểm HTTP authenticated, collation/locking đầy đủ. Kết quả H2/API mock vẫn không thay thế các kiểm chứng còn thiếu trên môi trường thật.
+
+## 24. Server không dùng Hibernate second-level cache (2026-11-01)
+
+- Người dùng cung cấp stack trace `ServerVisibility` không gán được vào field cùng tên khi Hibernate assemble `StandardCacheEntryImpl`, qua `loadFromSecondLevelCache` và `findById`. JVM local có nhiều bản `Server` qua các restart classloader; metadata SQL và giá trị `PUBLIC` của Server được kiểm tra hợp lệ. Đây là lỗi enum instance cũ trong cache sau DevTools reload, không phải lỗi schema hoặc quyền truy cập.
+- Kế hoạch bỏ cache riêng Server đã được người dùng duyệt bằng “làm đi”. `Server` bỏ Hibernate `@Cache(NONSTRICT_READ_WRITE)` và có JPA `@Cacheable(false)`. Các lần đọc Entity Server ở transaction/persistence context mới truy vấn database, không assemble trạng thái enum cũ từ Hibernate L2. Cache của Entity khác và cấu hình cache toàn ứng dụng không thay đổi; first-level cache trong một persistence context vẫn theo JPA hiện có.
+- `spring.cache.type=none` chỉ là cấu hình cache abstraction của Spring, không chứng minh Hibernate L2 bị tắt. Fix dùng mapping rõ ràng trên Server thay vì đổi cache toàn cục. Không thay Entity fields, enum, schema/DDL, DTO, API, quyền Owner/Member/outsider hoặc FE.
+- Đánh đổi: đọc Server qua các transaction khác nhau phát sinh SQL thay vì hit L2. Chưa benchmark hiệu năng trên SQL Server; không thêm cache thay thế hoặc dependency.
+- `ServerCacheIT` chủ động bật Hibernate L2/statistics trong môi trường test để tránh kiểm chứng nhầm khi cache vô tình tắt toàn cục. Hai ca PUBLIC/PRIVATE commit fixture, đọc qua các transaction riêng, cập nhật enum bằng JDBC chỉ trong H2 để giữ nguyên bất kỳ cache cũ, rồi kiểm giá trị mới, SQL read và không có cache hit/entry cho Server. Trước fix hai ca này thất bại vì đọc trạng thái cache cũ; sau fix PASS.
+- Hai ca PUBLIC/PRIVATE khác gọi lặp lại GET detail/channels/members qua JWT/MockMvc bằng Owner và Member, và kiểm outsider tiếp tục bị từ chối theo status hiện có. Fixture được commit/cleanup trong H2, có guard không chạy JDBC mutation trên SQL Server local. Tests không khởi động JVM DevTools thật hoặc mô phỏng thay classloader trực tiếp; chúng kiểm cơ chế bỏ đọc Server từ L2 và regression API/quyền.
+- Khi nhận thay đổi này, Stop hẳn backend trong IDE rồi Run lại một lần để SessionFactory/mapping mới được nạp và cache cũ trong JVM được bỏ. Không cần chạy lại SQL visibility. Không tự dừng/khởi động lại tiến trình IDE của người dùng trong lượt sửa; HTTP có JWT trên JVM local sau restart còn cần xác minh.
+
 ---
 
-## 23. QUY TẮC XỬ LÝ MÃ MỜI SAI VÀ CHỐNG THAM GIA TRÙNG LẶP (TASK 4.14)
+## 25. QUY TẮC XỬ LÝ MÃ MỜI SAI VÀ CHỐNG THAM GIA TRÙNG LẶP (TASK 4.14)
 
-### 23.1 Phân loại lỗi mã mời không hợp lệ
+### 25.1 Phân loại lỗi mã mời không hợp lệ
 | Trường hợp | Điều kiện phát hiện | HTTP Status | Thông điệp Backend | Thông điệp hiển thị Frontend |
 |---|---|:---:|---|---|
 | **Trống / Khoảng trắng** | `rawCode.isBlank()` hoặc regex không khớp Base62 | `400 Bad Request` | `"Mã mời không được để trống"` | `"Vui lòng nhập Mã mời hoặc Server ID."` |
@@ -1086,7 +1149,7 @@ Ngay sau khi thành viên bị loại thành công:
 | **Đã hết hạn** | `invite.expiresAt < now` | `400 Bad Request` | `"Mã mời đã hết hạn"` | `"Mã mời này đã hết hạn sử dụng!"` |
 | **Server đã bị xóa** | `serverRepository.findByIdForUpdate` rỗng | `404 Not Found` | `"Không tìm thấy Server liên kết với mã mời"` | `"Không tìm thấy Server với thông tin này. Vui lòng kiểm tra lại!"` |
 
-### 23.2 Cơ chế bảo vệ chống tham gia trùng lặp 2 lớp (Two-tier Duplicate Join Defense)
+### 25.2 Cơ chế bảo vệ chống tham gia trùng lặp 2 lớp (Two-tier Duplicate Join Defense)
 - **Lớp 1 (Application Guard)**:
   - Trước khi lưu bản ghi, service truy vấn `serverMemberRepository.existsByServerIdAndUserId(serverId, userId)`.
   - Nếu đã tồn tại $\rightarrow$ từ chối ngay với HTTP `400 Bad Request`.
@@ -1097,6 +1160,6 @@ Ngay sau khi thành viên bị loại thành công:
   - Trong trường hợp 2 request gửi đồng thời vượt qua lớp 1 (Race condition), DB kích hoạt vi phạm toàn vẹn dữ liệu.
   - Khối `try-catch (DataIntegrityViolationException)` tại `ServerService` lập tức bắt lỗi và chuyển đổi sang HTTP `400 Bad Request` thay vì trả về lỗi 500 sập hệ thống.
 
-### 23.3 Bảo vệ State và Giao diện Frontend
+### 25.3 Bảo vệ State và Giao diện Frontend
 - **Không tạo Membership giả**: Khi API join trả về lỗi (400, 404, 500, Network error), Client tuyệt đối không tự ý thêm Server vào danh sách hoặc redirect giả lập.
 - **Ngăn chặn Double Click**: Cờ `submittingRef` khóa request ngay khi click "Tham gia", vô hiệu hóa nút bấm và chống race condition submit trùng lặp từ giao diện.

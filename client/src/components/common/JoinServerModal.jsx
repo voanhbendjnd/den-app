@@ -147,7 +147,7 @@ export default function JoinServerModal({ open, onClose, onSuccess }) {
             Tham Gia Server
           </Title>
           <Text style={{ color: '#94A3B8', fontSize: 13, display: 'block', maxWidth: 360, margin: '0 auto' }}>
-            Nhập mã mời hoặc ID của Server bạn muốn tham gia để bắt đầu kết nối.
+            Nhập mã mời để tham gia server riêng tư, hoặc ID để tham gia server công khai.
           </Text>
         </div>
 
