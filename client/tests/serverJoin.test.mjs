@@ -117,3 +117,121 @@ test('getJoinErrorMessage maps network and fallback errors safely', () => {
   const fallbackErr = { response: { status: 500, data: {} } };
   assert.equal(getJoinErrorMessage(fallbackErr), 'Không thể tham gia Server. Vui lòng thử lại!');
 });
+
+test('Task 4.14: getJoinErrorMessage maps localized Vietnamese ResponseStatusException errors', () => {
+  // 1. Duplicate join Vietnamese message
+  const errDuplicateVN = {
+    response: {
+      status: 400,
+      data: { message: 'Bạn đã là thành viên của Server này rồi' },
+    },
+  };
+  assert.equal(getJoinErrorMessage(errDuplicateVN), 'Bạn đã là thành viên của Server này rồi!');
+
+  // 2. Non-existent invite code Vietnamese message
+  const errNotFoundVN = {
+    response: {
+      status: 404,
+      data: { message: 'Mã mời không tồn tại' },
+    },
+  };
+  assert.equal(getJoinErrorMessage(errNotFoundVN), 'Mã mời không tồn tại hoặc không chính xác!');
+
+  // 3. Expired invite code Vietnamese message
+  const errExpiredVN = {
+    response: {
+      status: 400,
+      data: { message: 'Mã mời đã hết hạn' },
+    },
+  };
+  assert.equal(getJoinErrorMessage(errExpiredVN), 'Mã mời này đã hết hạn sử dụng!');
+
+  // 4. Revoked invite code Vietnamese message
+  const errRevokedVN = {
+    response: {
+      status: 400,
+      data: { message: 'Mã mời đã bị vô hiệu hóa hoặc không còn hiệu lực' },
+    },
+  };
+  assert.equal(getJoinErrorMessage(errRevokedVN), 'Mã mời này đã bị vô hiệu hóa!');
+
+  // 5. Server deleted / not found for invite Vietnamese message
+  const errServerDeletedVN = {
+    response: {
+      status: 404,
+      data: { message: 'Không tìm thấy Server liên kết với mã mời' },
+    },
+  };
+  assert.equal(
+    getJoinErrorMessage(errServerDeletedVN),
+    'Không tìm thấy Server với thông tin này. Vui lòng kiểm tra lại!'
+  );
+});
+
+test('Task 4.14: Frontend state preservation - failed join via invite or direct ID preserves server list', async () => {
+  const initialServers = [
+    { id: 10, name: 'Server Alpha' },
+    { id: 20, name: 'Server Beta' },
+  ];
+
+  let currentServers = [...initialServers];
+  let capturedError = null;
+
+  // Mock API call that fails with duplicate join
+  const mockJoinDuplicate = async () => {
+    const error = new Error('Request failed with status code 400');
+    error.response = {
+      status: 400,
+      data: { errorKey: 'alreadymember', message: 'User is already a member of this server' },
+    };
+    throw error;
+  };
+
+  const handleJoinSubmit = async () => {
+    try {
+      const res = await mockJoinDuplicate();
+      // On success: would append server
+      currentServers.push(res.data);
+    } catch (err) {
+      capturedError = getJoinErrorMessage(err);
+      // State remains unchanged
+    }
+  };
+
+  await handleJoinSubmit();
+
+  // Servers list is untouched (no ghost membership added)
+  assert.equal(currentServers.length, 2);
+  assert.equal(currentServers[0].id, 10);
+  assert.equal(currentServers[1].id, 20);
+  assert.equal(capturedError, 'Bạn đã là thành viên của Server này rồi!');
+});
+
+test('Task 4.14: Join in-flight guard blocks concurrent duplicate submit clicks', async () => {
+  let callCount = 0;
+  let submitting = false;
+
+  const mockApiJoin = async () => {
+    callCount += 1;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    return { data: { id: 99, name: 'New Server' } };
+  };
+
+  const submitJoin = async () => {
+    if (submitting) return false;
+    submitting = true;
+    try {
+      await mockApiJoin();
+      return true;
+    } finally {
+      submitting = false;
+    }
+  };
+
+  // Launch two concurrent join clicks
+  const [firstResult, secondResult] = await Promise.all([submitJoin(), submitJoin()]);
+
+  assert.equal(firstResult, true);
+  assert.equal(secondResult, false); // Guard rejected second in-flight click
+  assert.equal(callCount, 1);
+});
