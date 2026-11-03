@@ -102,6 +102,9 @@ public class ServerService {
 
     @Transactional(readOnly = true)
     public ServerResponseDTO getServerDetail(Long serverId) {
+        if (serverId == null || serverId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Server ID không hợp lệ");
+        }
         User currentUser = getActiveCurrentUser();
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -161,6 +164,9 @@ public class ServerService {
 
     @Transactional(readOnly = true)
     public List<ServerMemberResponseDTO> getServerMembers(Long serverId) {
+        if (serverId == null || serverId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Server ID không hợp lệ");
+        }
         User currentUser = getActiveCurrentUser();
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -416,7 +422,7 @@ public class ServerService {
         member.setUserId(currentUser.getId());
         member.setRole("MEMBER");
         member.setJoinedAt(Instant.now());
-        member.setNickname(ownerNickname(currentUser.getName()));
+        member.setNickname(generatedNickname(currentUser.getName(), "Member"));
         try {
             serverMemberRepository.saveAndFlush(member);
         } catch (DataIntegrityViolationException ex) {
