@@ -43,8 +43,9 @@ export function canRemoveMember(server, currentUser, targetMember) {
     };
   }
 
+  const targetRole = String(targetMember.role || '').toUpperCase();
   const isTargetOwner =
-    targetMember.role === 'OWNER' ||
+    targetRole === 'OWNER' ||
     String(server.ownerId) === String(targetUserId);
 
   if (isTargetOwner) {
@@ -173,7 +174,13 @@ export function getMemberCountDisplay(members) {
  */
 export function formatMemberDisplayName(member) {
   if (!member) return 'Thành viên';
-  return member.nickname || member.name || member.username || 'Thành viên';
+  const nick = typeof member.nickname === 'string' ? member.nickname.trim() : '';
+  if (nick) return nick;
+  const name = typeof member.name === 'string' ? member.name.trim() : '';
+  if (name) return name;
+  const username = typeof member.username === 'string' ? member.username.trim() : '';
+  if (username) return username;
+  return 'Thành viên';
 }
 
 /**

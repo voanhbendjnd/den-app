@@ -28,7 +28,7 @@ import serverApi from '../../api/serverApi';
 import channelApi from '../../api/channelApi';
 import messageApi from '../../api/messageApi';
 import { canDeleteChannel, isChannelDeletable } from '../../utils/channelUtils';
-import { canRemoveMember } from '../../utils/serverMember';
+import { canRemoveMember, formatMemberDisplayName } from '../../utils/serverMember';
 import {
   sortMessagesChronological,
   mergeMessagePages,
@@ -259,7 +259,7 @@ function MembersPanel({
       ) : (
         <div className="group-members-list" role="list">
           {members.map((member) => {
-            const displayName = member.nickname || member.name || member.username || 'Thành viên';
+            const displayName = formatMemberDisplayName(member);
             const initial = displayName[0]?.toUpperCase() || 'U';
             const isMemberOwner =
               member.role === 'OWNER' ||
