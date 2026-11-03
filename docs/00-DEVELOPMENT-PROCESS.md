@@ -335,7 +335,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Server & Invite (Task 3.24)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-27  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
-| **Member & Role (Task 4.09)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-29  |
+| **Member & Role (Task 4.14)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-30  |
 | **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
 | **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-25  |
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
@@ -3053,15 +3053,45 @@ Docs Updated:
 
 ---
 
+### [2026-10-30] TASK-4.14 — Kiểm tra mã mời sai và tham gia trùng (Invalid Invite & Duplicate Join Verification)
+
+Implemented & Verified:
+- Audit toàn diện 12 ca kiểm thử bắt buộc cho luồng xử lý mã mời không hợp lệ và chống tham gia trùng lặp:
+  1. Mã mời sai định dạng: Mã rỗng, khoảng trắng hoặc chứa ký tự đặc biệt bị từ chối với HTTP 400 Bad Request; frontend `validateJoinInput` chặn ngay trước khi gửi request.
+  2. Mã mời không tồn tại trong DB: Trả về HTTP 404 Not Found ("Mã mời không tồn tại"); frontend `getJoinErrorMessage` hiển thị "Mã mời không tồn tại hoặc không chính xác!".
+  3. Mã mời bị vô hiệu hóa (`REVOKED`): Trả về HTTP 400 Bad Request ("Mã mời đã bị vô hiệu hóa hoặc không còn hiệu lực"); frontend hiển thị "Mã mời này đã bị vô hiệu hóa!".
+  4. Mã mời đã hết hạn (`expiresAt < now`): Trả về HTTP 400 Bad Request ("Mã mời đã hết hạn"); frontend hiển thị "Mã mời này đã hết hạn sử dụng!".
+  5. Server của mã mời đã bị xóa: Trả về HTTP 404 Not Found ("Không tìm thấy Server liên kết với mã mời"); frontend hiển thị "Không tìm thấy Server với thông tin này. Vui lòng kiểm tra lại!".
+  6. Tham gia trùng qua mã mời: Thành viên gọi lại `POST /api/v1/servers/join-invite/{code}` bị từ chối với HTTP 400 Bad Request ("Bạn đã là thành viên của Server này rồi"); cơ sở dữ liệu không sinh bản ghi nhân đôi.
+  7. Tham gia trùng qua ID trực tiếp: Thành viên gọi lại `POST /api/v1/servers/{serverId}/join` bị từ chối với HTTP 400 Bad Request (`alreadymember`); cơ sở dữ liệu không sinh bản ghi nhân đôi.
+  8. Chủ sở hữu tham gia Server của chính mình: Cả 2 kênh (Invite Code và Direct ID) đều trả về HTTP 400 Bad Request; vai trò `OWNER` và số lượng membership của Server được bảo toàn nguyên vẹn.
+  9. Tham gia chéo kênh 2 chiều (Cross-channel duplicate join): Join Direct ID trước rồi join Invite Code $\rightarrow$ trả về HTTP 400; Join Invite Code trước rồi join Direct ID $\rightarrow$ trả về HTTP 400. Số lượng bản ghi `server_member` cho mỗi user luôn chính xác bằng 1.
+  10. Bẫy lỗi tương tranh (Concurrent duplicate join): Khối try-catch `DataIntegrityViolationException` tầng DB chuyển đổi an toàn thành HTTP 400 thay vì làm sập hệ thống với lỗi 500.
+  11. Frontend không tạo membership giả: Khi API join gặp lỗi (400, 404, network), danh sách Server trong sidebar giữ nguyên, không render server giả.
+  12. In-flight guard chống duplicate submit: Cờ `submittingRef` trong `JoinServerModal.jsx` vô hiệu hóa hoàn toàn thao tác nhấn đúp hoặc gửi đồng thời.
+- Backend Tests:
+  - Bổ sung `ownerJoiningOwnServer_ViaDirectAndInvite_Returns400_RolePreserved` và `crossChannelDuplicateJoin_DirectThenInvite_And_InviteThenDirect_BothReturn400_SingleRow` trong `ServerSecurityIT.java`.
+  - Kết quả: `ServerSecurityIT` (107 tests) PASS 100%, `ServerServiceTest` (99 tests) PASS 100%.
+- Frontend Tests:
+  - Chuẩn hóa `getJoinErrorMessage` trong `client/src/utils/serverJoin.js` hỗ trợ song ngữ hoàn hảo (Problem Details `errorKey` và `ResponseStatusException` tiếng Việt).
+  - Bổ sung 3 test suites trong `client/tests/serverJoin.test.mjs` kiểm tra mapping lỗi tiếng Việt, bảo toàn state khi join thất bại và guard chống click đúp.
+  - Kết quả: 118/118 tests PASS 100%, client production build PASS 100%.
+
+Docs Updated:
+- `docs/00-DEVELOPMENT-PROCESS.md` (Section 10 Progress, Section 11 Log, Section 12 Handoff).
+- `docs/02-SYSTEM-ARCHITECTURE.md` (Section 23 Invalid Invite & Duplicate Join Handling).
+
+---
+
 ## 12. CURRENT WORK / HANDOFF
 
-### Handoff hiện tại — Task 4.09: Kiểm tra loại thành viên khỏi Server (2026-10-29)
+### Handoff hiện tại — Task 4.14: Kiểm tra mã mời sai và tham gia trùng (2026-10-30)
 
-- Task 4.09 hoàn thành xuất sắc toàn bộ 12 ca kiểm thử theo yêu cầu.
-- Toàn bộ backend integration & service tests (ServerSecurityIT: 105 tests, ServerServiceTest: 99 tests) PASS 100%.
-- Toàn bộ frontend unit tests (115 tests) và client production build PASS 100%.
-- Cơ chế bảo vệ Owner, thu hồi quyền hạn tức thì của thành viên bị loại, idempotency (consecutive removal -> 404), cô lập đa thành viên (multi-member isolation), và state rollback an toàn ở frontend được kiểm chứng trọn vẹn.
-- Sẵn sàng chuyển tiếp sang Task 4.14 (Kiểm tra mã mời sai và tham gia trùng) sau khi người dùng xác nhận.
+- Task 4.14 hoàn thành xuất sắc toàn bộ 12 ca kiểm thử theo yêu cầu.
+- Toàn bộ backend integration & service tests (ServerSecurityIT: 107 tests, ServerServiceTest: 99 tests) PASS 100%.
+- Toàn bộ frontend unit tests (118 tests) và client production build PASS 100%.
+- Cơ chế kiểm soát mã mời sai định dạng, hết hạn, thu hồi, server bị xóa; cơ chế chống tham gia trùng lặp 2 lớp, cross-channel duplicate join, bẫy lỗi tương tranh DataIntegrityViolationException; và state guard ở frontend được kiểm chứng trọn vẹn.
+- Sẵn sàng chuyển tiếp sang Task 4.19 (Sửa các lỗi Member) sau khi người dùng xác nhận.
 
 ### Handoff hiện tại — Task 3.24: Kiểm tra mã mời và quyền thành viên (2026-10-27)
 

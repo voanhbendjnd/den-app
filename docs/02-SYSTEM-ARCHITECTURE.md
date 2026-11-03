@@ -1072,3 +1072,31 @@ Ngay sau khi thành viên bị loại thành công:
 - **Phòng chống Race Condition & Double Submit**:
   - `submittingRef` khóa request ngay khi nhấn "Loại thành viên", vô hiệu hóa nút bấm và chặn mọi thao tác click liên tiếp trong lúc request đang xử lý.
   - Quản lý phiên giao diện (`sessionRef`): Nếu người dùng đóng modal hoặc chuyển sang server khác trong lúc request đang gửi, phản hồi cũ bị huỷ bỏ, tránh rò rỉ cập nhật state sai vị trí.
+
+---
+
+## 23. QUY TẮC XỬ LÝ MÃ MỜI SAI VÀ CHỐNG THAM GIA TRÙNG LẶP (TASK 4.14)
+
+### 23.1 Phân loại lỗi mã mời không hợp lệ
+| Trường hợp | Điều kiện phát hiện | HTTP Status | Thông điệp Backend | Thông điệp hiển thị Frontend |
+|---|---|:---:|---|---|
+| **Trống / Khoảng trắng** | `rawCode.isBlank()` hoặc regex không khớp Base62 | `400 Bad Request` | `"Mã mời không được để trống"` | `"Vui lòng nhập Mã mời hoặc Server ID."` |
+| **Không tồn tại** | `inviteRepository.findByCode` rỗng | `404 Not Found` | `"Mã mời không tồn tại"` | `"Mã mời không tồn tại hoặc không chính xác!"` |
+| **Đã bị vô hiệu hóa** | `invite.status != ACTIVE` (`REVOKED`) | `400 Bad Request` | `"Mã mời đã bị vô hiệu hóa hoặc không còn hiệu lực"` | `"Mã mời này đã bị vô hiệu hóa!"` |
+| **Đã hết hạn** | `invite.expiresAt < now` | `400 Bad Request` | `"Mã mời đã hết hạn"` | `"Mã mời này đã hết hạn sử dụng!"` |
+| **Server đã bị xóa** | `serverRepository.findByIdForUpdate` rỗng | `404 Not Found` | `"Không tìm thấy Server liên kết với mã mời"` | `"Không tìm thấy Server với thông tin này. Vui lòng kiểm tra lại!"` |
+
+### 23.2 Cơ chế bảo vệ chống tham gia trùng lặp 2 lớp (Two-tier Duplicate Join Defense)
+- **Lớp 1 (Application Guard)**:
+  - Trước khi lưu bản ghi, service truy vấn `serverMemberRepository.existsByServerIdAndUserId(serverId, userId)`.
+  - Nếu đã tồn tại $\rightarrow$ từ chối ngay với HTTP `400 Bad Request`.
+  - Áp dụng bình đẳng cho mọi kênh tham gia: Join Direct ID (`POST /api/v1/servers/{id}/join`), Join Invite Code (`POST /api/v1/servers/join-invite/{code}`), và Owner gia nhập chính server của mình.
+  - Tham gia chéo kênh (Cross-channel duplicate join) được ngăn chặn toàn diện: User đã join qua Direct ID không thể join lại qua Invite Code và ngược lại.
+- **Lớp 2 (Database Unique Constraint Guard)**:
+  - Bảng `server_member` được thiết lập chỉ mục duy nhất `ux_server_member(server_id, user_id)`.
+  - Trong trường hợp 2 request gửi đồng thời vượt qua lớp 1 (Race condition), DB kích hoạt vi phạm toàn vẹn dữ liệu.
+  - Khối `try-catch (DataIntegrityViolationException)` tại `ServerService` lập tức bắt lỗi và chuyển đổi sang HTTP `400 Bad Request` thay vì trả về lỗi 500 sập hệ thống.
+
+### 23.3 Bảo vệ State và Giao diện Frontend
+- **Không tạo Membership giả**: Khi API join trả về lỗi (400, 404, 500, Network error), Client tuyệt đối không tự ý thêm Server vào danh sách hoặc redirect giả lập.
+- **Ngăn chặn Double Click**: Cờ `submittingRef` khóa request ngay khi click "Tham gia", vô hiệu hóa nút bấm và chống race condition submit trùng lặp từ giao diện.
