@@ -101,24 +101,46 @@ export function getJoinErrorMessage(err) {
   const errorKey = (data.errorKey || '').toLowerCase();
   const messageStr = (data.message || data.detail || data.title || '').toLowerCase();
 
-  // Specific domain errors from backend
-  if (errorKey === 'alreadymember' || messageStr.includes('already a member')) {
+  // Specific domain errors from backend (supporting both errorKey and localized backend exceptions)
+  if (
+    errorKey === 'alreadymember' ||
+    messageStr.includes('already a member') ||
+    messageStr.includes('đã là thành viên')
+  ) {
     return 'Bạn đã là thành viên của Server này rồi!';
   }
 
-  if (errorKey === 'invitenotfound' || messageStr.includes('invite code not found')) {
+  if (
+    errorKey === 'invitenotfound' ||
+    messageStr.includes('invite code not found') ||
+    messageStr.includes('mã mời không tồn tại')
+  ) {
     return 'Mã mời không tồn tại hoặc không chính xác!';
   }
 
-  if (errorKey === 'inviteexpired' || messageStr.includes('invite code is expired')) {
+  if (
+    errorKey === 'inviteexpired' ||
+    messageStr.includes('invite code is expired') ||
+    messageStr.includes('mã mời đã hết hạn') ||
+    messageStr.includes('hết hạn')
+  ) {
     return 'Mã mời này đã hết hạn sử dụng!';
   }
 
-  if (errorKey === 'inviterevoked' || messageStr.includes('invite code is revoked')) {
+  if (
+    errorKey === 'inviterevoked' ||
+    messageStr.includes('invite code is revoked') ||
+    messageStr.includes('vô hiệu hóa')
+  ) {
     return 'Mã mời này đã bị vô hiệu hóa!';
   }
 
-  if (errorKey === 'servernotfound' || status === 404 || messageStr.includes('server not found')) {
+  if (
+    errorKey === 'servernotfound' ||
+    status === 404 ||
+    messageStr.includes('server not found') ||
+    messageStr.includes('không tìm thấy server')
+  ) {
     return 'Không tìm thấy Server với thông tin này. Vui lòng kiểm tra lại!';
   }
 

@@ -1840,4 +1840,97 @@ class ServerSecurityIT {
         problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/leave")
                 .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
     }
+
+    @Test
+    void ownerJoiningOwnServer_ViaDirectAndInvite_Returns400_RolePreserved() throws Exception {
+        addMembership(server.getId());
+
+        String inviteCode = "OWNR" + UUID.randomUUID().toString().replace("-", "").substring(0, 4);
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setServerId(server.getId());
+        invite.setCode(inviteCode);
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(reader.getId());
+        invite.setCreatedAt(Instant.now());
+        invites.saveAndFlush(invite);
+
+        // 1. Owner attempts to join own server via direct join -> 400 Bad Request
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+
+        // 2. Owner attempts to join own server via invite code -> 400 Bad Request
+        problem(mvc.perform(post("/api/v1/servers/join-invite/" + inviteCode)
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+
+        // 3. Confirm membership count is exactly 1 and role remains OWNER
+        List<ServerMember> serverMembers = members.findAllByServerId(server.getId());
+        assertEquals(1, serverMembers.size());
+        assertEquals(reader.getId(), serverMembers.get(0).getUserId());
+
+        mvc.perform(get(membersUrl()).header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].userId").value(reader.getId()))
+                .andExpect(jsonPath("$.data[0].role").value("OWNER"));
+    }
+
+    @Test
+    void crossChannelDuplicateJoin_DirectThenInvite_And_InviteThenDirect_BothReturn400_SingleRow() throws Exception {
+        addMembership(server.getId());
+
+        String inviteCode = "CROS" + UUID.randomUUID().toString().replace("-", "").substring(0, 4);
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setServerId(server.getId());
+        invite.setCode(inviteCode);
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(reader.getId());
+        invite.setCreatedAt(Instant.now());
+        invites.saveAndFlush(invite);
+
+        // Scenario 1: User A joins via Direct ID first, then tries Invite Code
+        User userA = new User();
+        userA.setEmail("cross-a-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        userA.setPassword("fixture-" + UUID.randomUUID());
+        userA.setName("Cross User A");
+        userA.setActivated(true);
+        userA.setSessionId(UUID.randomUUID().toString());
+        final User savedUserA = users.saveAndFlush(userA);
+        String tokenA = bearerFor(savedUserA);
+
+        mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, tokenA))
+                .andExpect(status().isNoContent());
+
+        // Attempting to join same server via invite code returns 400
+        problem(mvc.perform(post("/api/v1/servers/join-invite/" + inviteCode)
+                .header(HttpHeaders.AUTHORIZATION, tokenA)), 400);
+
+        long countA = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(savedUserA.getId()))
+                .count();
+        assertEquals(1, countA);
+
+        // Scenario 2: User B joins via Invite Code first, then tries Direct ID
+        User userB = new User();
+        userB.setEmail("cross-b-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        userB.setPassword("fixture-" + UUID.randomUUID());
+        userB.setName("Cross User B");
+        userB.setActivated(true);
+        userB.setSessionId(UUID.randomUUID().toString());
+        final User savedUserB = users.saveAndFlush(userB);
+        String tokenB = bearerFor(savedUserB);
+
+        mvc.perform(post("/api/v1/servers/join-invite/" + inviteCode)
+                .header(HttpHeaders.AUTHORIZATION, tokenB))
+                .andExpect(status().isOk());
+
+        // Attempting to join same server via direct ID returns 400
+        problem(mvc.perform(post("/api/v1/servers/" + server.getId() + "/join")
+                .header(HttpHeaders.AUTHORIZATION, tokenB)), 400);
+
+        long countB = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(savedUserB.getId()))
+                .count();
+        assertEquals(1, countB);
+    }
 }
