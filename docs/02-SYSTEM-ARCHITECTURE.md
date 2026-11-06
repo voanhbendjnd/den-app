@@ -1163,3 +1163,21 @@ Ngay sau khi thành viên bị loại thành công:
 ### 25.3 Bảo vệ State và Giao diện Frontend
 - **Không tạo Membership giả**: Khi API join trả về lỗi (400, 404, 500, Network error), Client tuyệt đối không tự ý thêm Server vào danh sách hoặc redirect giả lập.
 - **Ngăn chặn Double Click**: Cờ `submittingRef` khóa request ngay khi click "Tham gia", vô hiệu hóa nút bấm và chống race condition submit trùng lặp từ giao diện.
+
+---
+
+## 24. CHUẨN HÓA VÀ SỬA LỖI QUẢN LÝ THÀNH VIÊN (TASK 4.19)
+
+### 24.1 Quy tắc gán Nickname mặc định
+- Khi tạo Server mới (`createServer`): Creator là chủ sở hữu, được gán vai trò `OWNER` và fallback nickname là `"Owner"` (`ownerNickname(name)`).
+- Khi tham gia Server qua mã mời (`joinServerByInviteCode`) hoặc tham gia trực tiếp (`joinServer`): Joiner là thành viên thông thường, được gán vai trò `MEMBER` và fallback nickname là `"Member"` (`generatedNickname(name, "Member")`).
+- Tên hiển thị tối đa 20 ký tự, hỗ trợ an toàn ký tự Unicode / Surrogate Pair UTF-16.
+
+### 24.2 Chuẩn hóa tham số truy vấn Server ID
+- Các API truy vấn danh sách thành viên (`GET /api/v1/servers/{serverId}/members`) và chi tiết Server (`GET /api/v1/servers/{serverId}`) bắt buộc kiểm tra `serverId > 0`.
+- Nếu `serverId == null || serverId <= 0` $\rightarrow$ trả về HTTP `400 Bad Request` (`"Server ID không hợp lệ"`).
+
+### 24.3 Chuẩn hóa hiển thị tên thành viên trên Frontend
+- `formatMemberDisplayName(member)` áp dụng thứ tự ưu tiên: `nickname.trim() > name.trim() > username.trim() > 'Thành viên'`.
+- Chuỗi chỉ chứa khoảng trắng rỗng (`"   "`, `"\t"`) được loại bỏ hoàn toàn, không hiển thị khoảng trắng vô nghĩa trên giao diện và đảm bảo ký tự viết tắt đại diện (`initial`) luôn hợp lệ.
+- So sánh vai trò `role` được chuẩn hóa không phân biệt chữ hoa/thường (`toUpperCase()`), bảo đảm ngăn chặn loại nhầm chủ sở hữu (`OWNER` / `owner`).

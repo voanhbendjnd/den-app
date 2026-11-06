@@ -362,7 +362,7 @@ Phát hành local 2026-10-21: Backend và Frontend đã được commit theo t�
 | **Server & Invite (Task 3.24)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-27  |
 | **Server Detail — phần vỏ**  | IMPLEMENTED | IMPLEMENTED |                REUSED                | TESTED (H2 / FE mock) |     PASS     |      DONE (phạm vi đã duyệt)       | 2026-10-13  |
 | **Server CRUD — sửa 6 bug**  | IMPLEMENTED | IMPLEMENTED | Mapping + script; SQL Server pending | TESTED (H2 / FE mock) |     PASS     | Release 6/6; còn apply schema thật | 2026-10-13  |
-| **Member & Role (Task 4.14)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-30  |
+| **Member & Role (Task 4.19)** |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-31  |
 | **Channel**                  | IMPLEMENTED | IMPLEMENTED |              CONFIRMED               |      IMPLEMENTED      |    TESTED    |            IN_PROGRESS             | 2026-10-13  |
 | **Message (Channel)**        |    DONE     |    DONE     |             IMPLEMENTED              |         DONE          |     PASS     |                DONE                | 2026-10-25  |
 | **Message (1-1)**            |    DONE     |    DONE     |              CONFIRMED               |         DONE          |     PASS     |                DONE                | 2026-10-12  |
@@ -3365,13 +3365,13 @@ Docs Updated:
 - Muốn cộng đồng xuất hiện trong Khám phá, Owner chủ động đổi sang công khai sau khi schema/backend sẵn sàng. Không tự public các Server cũ hoặc mở quyền đọc nội dung cho outsider.
 - Giữ các hạng mục/handoff của developer khác bên dưới; approval áp dụng chỉ dành cho local `denhubdb` trong lượt này, không cho phép sửa database khác, commit hoặc push.
 
-### Handoff hiện tại — Task 4.14: Kiểm tra mã mời sai và tham gia trùng (2026-10-30)
+### Handoff hiện tại — Task 4.19: Sửa các lỗi Member (2026-10-31)
 
-- Task 4.14 hoàn thành xuất sắc toàn bộ 12 ca kiểm thử theo yêu cầu.
-- Toàn bộ backend integration & service tests (ServerSecurityIT: 107 tests, ServerServiceTest: 99 tests) PASS 100%.
-- Toàn bộ frontend unit tests (118 tests) và client production build PASS 100%.
-- Cơ chế kiểm soát mã mời sai định dạng, hết hạn, thu hồi, server bị xóa; cơ chế chống tham gia trùng lặp 2 lớp, cross-channel duplicate join, bẫy lỗi tương tranh DataIntegrityViolationException; và state guard ở frontend được kiểm chứng trọn vẹn.
-- Sẵn sàng chuyển tiếp sang Task 4.19 (Sửa các lỗi Member) sau khi người dùng xác nhận.
+- Task 4.19 hoàn thành xuất sắc việc khắc phục toàn bộ 5 lỗi Member đã được phát hiện ở cả backend và frontend.
+- Toàn bộ backend integration & service tests (ServerSecurityIT: 110 tests, ServerServiceTest: 102 tests) PASS 100%.
+- Toàn bộ frontend unit tests (131 tests) và client production build PASS 100%.
+- Logic gán fallback nickname chuẩn "Member" khi join invite, validation Server ID, trim chuỗi hiển thị tên thành viên chống khoảng trắng rỗng, và phân quyền OWNER không phân biệt hoa thường đã hoạt động trơn tru.
+- Sẵn sàng chuyển tiếp sang Task 4.24 (Chạy lại toàn bộ test Member) sau khi người dùng xác nhận.
 
 
 ### Handoff hiện tại — Task 4.09: Kiểm tra loại thành viên khỏi Server (2026-10-29)

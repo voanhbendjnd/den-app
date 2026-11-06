@@ -298,3 +298,13 @@ test('Task 4.09: Modal in-flight guard prevents duplicate concurrent remove subm
   assert.equal(second, false); // Guard rejected second in-flight click
   assert.equal(callCount, 1);
 });
+
+test('Task 4.19: canRemoveMember prevents removing member with lowercase "owner" role case-insensitively', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const ownerUser = { id: '100', username: 'alice' };
+  const targetOwnerMember = { userId: '500', username: 'co-owner', role: 'owner' };
+
+  const result = canRemoveMember(server, ownerUser, targetOwnerMember);
+  assert.equal(result.canRemove, false);
+  assert.match(result.reason, /Không thể loại chủ sở hữu khỏi Server/);
+});

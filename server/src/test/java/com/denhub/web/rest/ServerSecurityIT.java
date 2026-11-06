@@ -1933,4 +1933,55 @@ class ServerSecurityIT {
                 .count();
         assertEquals(1, countB);
     }
+
+    @Test
+    void joinServerByInviteCode_NoNameUser_HasMemberNicknameAndMemberRole() throws Exception {
+        addMembership(server.getId());
+
+        User joiner = new User();
+        joiner.setEmail("noname-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test");
+        joiner.setPassword("fixture-" + UUID.randomUUID());
+        joiner.setName(null); // No display name!
+        joiner.setUsername("nonameuser");
+        joiner.setActivated(true);
+        joiner.setSessionId(UUID.randomUUID().toString());
+        final User savedJoiner = users.saveAndFlush(joiner);
+        String joinerToken = bearerFor(savedJoiner);
+
+        String inviteCode = "NN" + UUID.randomUUID().toString().replace("-", "").substring(0, 6);
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setServerId(server.getId());
+        invite.setCode(inviteCode);
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(reader.getId());
+        invite.setCreatedAt(Instant.now());
+        invites.saveAndFlush(invite);
+
+        mvc.perform(post("/api/v1/servers/join-invite/" + inviteCode)
+                .header(HttpHeaders.AUTHORIZATION, joinerToken))
+                .andExpect(status().isOk());
+
+        ServerMember member = members.findAllByServerId(server.getId()).stream()
+                .filter(m -> m.getUserId().equals(savedJoiner.getId()))
+                .findFirst().orElseThrow();
+
+        assertEquals("Member", member.getNickname());
+        assertEquals("MEMBER", member.getRole());
+    }
+
+    @Test
+    void getServerMembers_InvalidServerId_Returns400() throws Exception {
+        problem(mvc.perform(get("/api/v1/servers/0/members")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+        problem(mvc.perform(get("/api/v1/servers/-1/members")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
+
+    @Test
+    void getServerDetail_InvalidServerId_Returns400() throws Exception {
+        problem(mvc.perform(get("/api/v1/servers/0")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+        problem(mvc.perform(get("/api/v1/servers/-1")
+                .header(HttpHeaders.AUTHORIZATION, bearer())), 400);
+    }
 }

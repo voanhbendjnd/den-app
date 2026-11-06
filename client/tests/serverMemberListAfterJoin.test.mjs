@@ -111,3 +111,29 @@ test('formatMemberDisplayName prioritizes nickname over name, username, and defa
   assert.equal(formatMemberDisplayName(empty), 'Thành viên');
   assert.equal(formatMemberDisplayName(null), 'Thành viên');
 });
+
+test('Task 4.19: formatMemberDisplayName handles whitespace-only strings and trims names properly', () => {
+  // Whitespace nickname falls back to valid name
+  assert.equal(
+    formatMemberDisplayName({ nickname: '   ', name: 'Valid Name', username: 'validuser' }),
+    'Valid Name'
+  );
+
+  // Whitespace nickname and whitespace name falls back to username
+  assert.equal(
+    formatMemberDisplayName({ nickname: '   ', name: '  \t  ', username: 'validuser' }),
+    'validuser'
+  );
+
+  // All whitespace fields fall back to default
+  assert.equal(
+    formatMemberDisplayName({ nickname: '   ', name: '  ', username: '   ' }),
+    'Thành viên'
+  );
+
+  // Valid nickname with surrounding whitespace gets trimmed
+  assert.equal(
+    formatMemberDisplayName({ nickname: '  CoolNick  ', name: 'Name' }),
+    'CoolNick'
+  );
+});

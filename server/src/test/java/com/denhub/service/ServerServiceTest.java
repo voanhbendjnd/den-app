@@ -1001,6 +1001,70 @@ class ServerServiceTest {
     }
 
     @Test
+    void joinServerByInviteCode_WhenUserNameBlank_AssignsMemberFallbackNickname() {
+        String email = "noname@example.test";
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(email, null, java.util.List.of()));
+
+        User userWithoutName = new User();
+        userWithoutName.setId(77L);
+        userWithoutName.setEmail(email);
+        userWithoutName.setName("   "); // Blank name
+        userWithoutName.setActivated(true);
+
+        when(userRepository.findOneByEmail(email)).thenReturn(Optional.of(userWithoutName));
+
+        com.denhub.domain.Invite invite = new com.denhub.domain.Invite();
+        invite.setId(1L);
+        invite.setServerId(10L);
+        invite.setCode("valid123");
+        invite.setStatus("ACTIVE");
+        invite.setCreatedBy(2L);
+
+        Server server = new Server();
+        server.setId(10L);
+        server.setName("Target Server");
+        server.setOwnerId(2L);
+
+        when(inviteRepository.findByCode("valid123")).thenReturn(Optional.of(invite));
+        when(serverRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(server));
+        when(serverMemberRepository.existsByServerIdAndUserId(10L, 77L)).thenReturn(false);
+        when(serverMemberRepository.saveAndFlush(any(ServerMember.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        serverService.joinServerByInviteCode("valid123");
+
+        org.mockito.ArgumentCaptor<ServerMember> captor = org.mockito.ArgumentCaptor.forClass(ServerMember.class);
+        verify(serverMemberRepository, atLeastOnce()).saveAndFlush(captor.capture());
+        ServerMember saved = captor.getValue();
+        assertThat(saved.getNickname()).isEqualTo("Member"); // MUST be "Member", not "Owner"!
+        assertThat(saved.getRole()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void getServerMembers_InvalidServerId_ReturnsBadRequest() {
+        ResponseStatusException exNull = assertThrows(ResponseStatusException.class, () -> serverService.getServerMembers(null));
+        assertThat(exNull.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException exZero = assertThrows(ResponseStatusException.class, () -> serverService.getServerMembers(0L));
+        assertThat(exZero.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException exNeg = assertThrows(ResponseStatusException.class, () -> serverService.getServerMembers(-5L));
+        assertThat(exNeg.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void getServerDetail_InvalidServerId_ReturnsBadRequest() {
+        ResponseStatusException exNull = assertThrows(ResponseStatusException.class, () -> serverService.getServerDetail(null));
+        assertThat(exNull.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException exZero = assertThrows(ResponseStatusException.class, () -> serverService.getServerDetail(0L));
+        assertThat(exZero.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseStatusException exNeg = assertThrows(ResponseStatusException.class, () -> serverService.getServerDetail(-5L));
+        assertThat(exNeg.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void joinServerByInviteCode_RejectsBlankCode() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> serverService.joinServerByInviteCode("   "));
