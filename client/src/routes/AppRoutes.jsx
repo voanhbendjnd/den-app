@@ -26,7 +26,6 @@ import FriendRequestPage from '../pages/direct/FriendRequestPage';
 
 // Admin pages
 import AdminUsersPage from '../pages/admin/AdminUsersPage';
-import AdminRoomsPage from '../pages/admin/AdminRoomsPage';
 
 // Error pages
 import NotFoundPage from '../pages/errors/NotFoundPage';
@@ -64,7 +63,6 @@ export default function AppRoutes() {
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>
             <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/rooms" element={<AdminRoomsPage />} />
           </Route>
         </Route>
       </Route>

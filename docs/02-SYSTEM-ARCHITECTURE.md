@@ -246,6 +246,15 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/direct-conversations/{id}/messages?before={id}&limit=30`: Lịch sử DM
 - `POST /api/direct-conversations/{id}/messages`: Gửi tin nhắn DM
 
+### 5.5 Admin Account Management (`ROLE_ADMIN` — `IMPLEMENTED` 2026-11-11)
+- `GET /api/v1/admin/users`: Danh sách tài khoản phân trang (`page`, `size`), tìm kiếm (`search` theo email/username/name) và lọc (`role`, `activated`), kèm số lượng Server đang làm chủ (`ownedServerCount`).
+- `GET /api/v1/admin/users/{userId}`: Xem thông tin chi tiết một tài khoản.
+- `GET /api/v1/admin/users/{userId}/ownership-preview`: Kiểm tra danh sách các Server mà tài khoản đang làm chủ trước khi xóa mềm (hiển thị thành viên kế nhiệm dự kiến hoặc cảnh báo tự động xóa Server trống).
+- `POST /api/v1/admin/users`: Tạo tài khoản người dùng hoặc Admin mới (`201 Created`).
+- `PUT /api/v1/admin/users/{userId}`: Cập nhật thông tin tài khoản, vai trò, mật khẩu hoặc trạng thái kích hoạt (chặn Admin tự hạ quyền hoặc tự vô hiệu hóa chính mình).
+- `DELETE /api/v1/admin/users/{userId}`: Xóa mềm tài khoản (`activated = false`, xóa `sessionId` & `refreshToken`) và tự động chuyển quyền chủ Server cho thành viên gia nhập sớm nhất đang hoạt động hoặc tự động xóa Server trống trong cùng transaction.
+- `PATCH /api/v1/admin/users/{userId}/restore`: Khôi phục tài khoản đã bị xóa mềm (`activated = true`).
+
 ---
 
 ## 6. Quy chuẩn WebSocket / STOMP Real-time Contract (`CONFIRMED`)

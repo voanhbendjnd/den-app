@@ -40,9 +40,9 @@ public class ConversationResource {
     @GetMapping("/{conversationId}/messages")
     @Operation(summary = "Lấy lịch sử tin nhắn của một hội thoại (có phân trang)")
     public ResponseEntity<Page<MessageHistoryDTO>> getConversationMessages(
-            @PathVariable Long conversationId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "30") int size
+            @PathVariable("conversationId") Long conversationId,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "30") int size
     ) {
         Pageable pageable = PageRequest.of(page, size);
         Page<MessageHistoryDTO> messagePage = conversationService.getConversationMessages(conversationId, pageable);

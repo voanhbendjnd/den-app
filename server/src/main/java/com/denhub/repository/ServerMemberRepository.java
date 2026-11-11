@@ -20,6 +20,10 @@ public interface ServerMemberRepository extends JpaRepository<ServerMember, Long
 
     List<ServerMember> findAllByServerId(Long serverId);
 
+    List<ServerMember> findAllByServerIdOrderByIdAsc(Long serverId);
+
+    long countByServerId(Long serverId);
+
     Optional<ServerMember> findByServerIdAndUserId(Long serverId, Long userId);
 
     @Modifying(flushAutomatically = true)

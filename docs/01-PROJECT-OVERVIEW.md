@@ -108,6 +108,8 @@ Các quyết định nghiệp vụ hiện được ghi nhận dưới đây. Cá
 | **MESSAGE** | Cơ chế phân trang lịch sử tin nhắn? | `CONFIRMED` | Phân trang bằng con trỏ (Cursor Pagination) qua `before` và `limit`. |
 | **DIRECT MESSAGE** | Phạm vi Direct Message? | `CONFIRMED` | Duy nhất 1-1. Cặp người dùng duy nhất không phân biệt thứ tự `(user1 < user2)`. |
 | **AUTH** | Xác thực & Phiên làm việc? | `CONFIRMED` | Spring Security + JWT Access Token (24h) + HttpOnly Refresh Token Cookie. |
+| **ADMIN** | Phạm vi quyền hạn của Admin toàn hệ thống (`ROLE_ADMIN`)? | `CONFIRMED` (2026-11-11) | Chỉ bao gồm quản lý tài khoản người dùng (CRUD tài khoản). Không quản lý phòng/server trực tiếp. |
+| **ADMIN** | Xóa mềm tài khoản đang là Chủ Server (`OWNER`) xử lý như thế nào? | `CONFIRMED` (2026-11-11) | Khi Admin xóa mềm (`activated = false`, thu hồi `sessionId` & `refreshToken`), hệ thống kiểm tra toàn bộ Server người đó làm chủ: (1) Nếu có thành viên đang hoạt động (`activated = true`) khác trong Server, hệ thống **tự động chuyển quyền Chủ Server (`ownerId`)** cho thành viên gia nhập sớm nhất (`server_member.id` nhỏ nhất) và xóa chủ cũ khỏi `server_member`; (2) Nếu Server chỉ có duy nhất chủ cũ (không có thành viên active khác để kế nhiệm), hệ thống **tự động xóa luôn Server trống đó** cùng kênh/tin nhắn kênh/invite/membership trong cùng transaction. |
 
 ---
 

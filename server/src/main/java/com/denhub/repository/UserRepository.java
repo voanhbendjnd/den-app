@@ -68,5 +68,32 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByUsernameIgnoreCaseAndIdNot(String username, Long id);
 
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
+
     Optional<User> findOneByUsernameIgnoreCase(String username);
+
+    @EntityGraph(attributePaths = {"authorities"})
+    @Query(value = """
+        SELECT DISTINCT u FROM User u
+        WHERE (:pattern IS NULL OR LOWER(u.email) LIKE :pattern ESCAPE '!'
+               OR LOWER(COALESCE(u.username, '')) LIKE :pattern ESCAPE '!'
+               OR LOWER(COALESCE(u.name, '')) LIKE :pattern ESCAPE '!')
+          AND (:activated IS NULL OR u.activated = :activated)
+          AND (:role IS NULL OR EXISTS (SELECT 1 FROM u.authorities a WHERE a.name = :role))
+        """, countQuery = """
+        SELECT COUNT(DISTINCT u) FROM User u
+        WHERE (:pattern IS NULL OR LOWER(u.email) LIKE :pattern ESCAPE '!'
+               OR LOWER(COALESCE(u.username, '')) LIKE :pattern ESCAPE '!'
+               OR LOWER(COALESCE(u.name, '')) LIKE :pattern ESCAPE '!')
+          AND (:activated IS NULL OR u.activated = :activated)
+          AND (:role IS NULL OR EXISTS (SELECT 1 FROM u.authorities a WHERE a.name = :role))
+        """)
+    org.springframework.data.domain.Page<User> searchAdminUsers(
+            @Param("pattern") String pattern,
+            @Param("role") String role,
+            @Param("activated") Boolean activated,
+            org.springframework.data.domain.Pageable pageable);
+
+    @EntityGraph(attributePaths = {"authorities"})
+    Optional<User> findOneWithAuthoritiesById(Long id);
 }
