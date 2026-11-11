@@ -197,7 +197,8 @@ public class MessageService {
                         msg.getChannelId(),
                         msg.getAuthorId(),
                         msg.getContent(),
-                        msg.getCreatedDate()))
+                        msg.getCreatedDate(),
+                        msg.getLastModifiedDate()))
                 .toList();
 
         return new CursorPageResponse<>(items, nextCursor, hasMore, effectiveLimit);
@@ -252,15 +253,17 @@ public class MessageService {
         }
 
         message.setContent(request.content());
-        Message savedMessage = messageRepository.save(message);
+        Message savedMessage = messageRepository.saveAndFlush(message);
 
-        return new MessageResponse(
+        MessageResponse response = new MessageResponse(
                 savedMessage.getId(),
                 savedMessage.getChannelId(),
                 savedMessage.getAuthorId(),
                 savedMessage.getContent(),
                 savedMessage.getCreatedDate(),
                 savedMessage.getLastModifiedDate());
+        if (savedMessage.getChannelId() != null) events.publishEvent(new ChannelMessageDelivery.Updated(response));
+        return response;
     }
 
     private void validateUpdateRequest(UpdateMessageRequest request) {
@@ -297,6 +300,7 @@ public class MessageService {
         }
 
         messageRepository.delete(message);
+        if (message.getChannelId() != null) events.publishEvent(new ChannelMessageDelivery.Deleted(message.getId(), message.getChannelId()));
     }
 }
 

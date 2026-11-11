@@ -39,7 +39,7 @@ public class ChannelChatController {
     }
 
     @MessageMapping("/channels/{channelId}/send")
-    public void sendChannelMessage(@DestinationVariable Long channelId,
+    public void sendChannelMessage(@DestinationVariable("channelId") Long channelId,
                                    @Payload SendMessageRequest request,
                                    Principal principal,
                                    @Header("simpSessionId") String sessionId,

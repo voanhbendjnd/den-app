@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.denhub.repository.UserRepository;
 import com.denhub.service.errors.DataResourceNotFoundException;
 
@@ -23,9 +24,15 @@ public class SessionManager {
         }
         throw new DataResourceNotFoundException(String.format("User with ID %d not found!", userId), "userManagement", "idnotfound");
     }
+    @Transactional(readOnly = true)
     public boolean isValidSessionIdByEmail(String email, String sessionId){
+        if (email == null || email.isBlank() || sessionId == null || sessionId.isBlank()) {
+            return false;
+        }
         String normalizedEmail = email.trim().toLowerCase(Locale.ENGLISH);
-        return userRepository.findOneWithAuthoritiesByEmail(normalizedEmail).map(existingUser -> existingUser.getSessionId().equals(sessionId)).orElse(false);
+        return userRepository.findCurrentSessionIdByEmail(normalizedEmail)
+                .map(sessionId::equals)
+                .orElse(false);
     }
 
 }
