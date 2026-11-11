@@ -292,6 +292,15 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
+### Tiến độ riêng — Quản trị Tài khoản cho Admin & Tự động chuyển quyền Chủ Server khi Xóa mềm (2026-11-11)
+
+| Phạm vi | FE | BE | DB | Verification | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Admin CRUD tài khoản (`/api/v1/admin/users`); Xóa mềm kiểm tra Chủ Server, tự động chuyển quyền cho thành viên active vào sớm nhất hoặc tự động xóa Server trống; UI `/admin/users` đồng bộ hệ thống | IMPLEMENTED | IMPLEMENTED | Tái sử dụng schema hiện tại | `AdminUserServiceTest` (5/5 PASS), `AdminUserResourceIT` (3/3 PASS), `npm run build` PASS | DONE trên nhánh `feature/admin-user-management` |
+
+- Người dùng chốt 2 quy tắc nghiệp vụ: (1) Server chỉ có duy nhất chủ bị xóa mềm thì tự động xóa luôn Server trống đó; (2) Hệ thống hoàn toàn tự động chọn thành viên gia nhập sớm nhất đang hoạt động (`server_member.id ASC` + `user.activated = true`) làm Chủ Server kế nhiệm.
+- Nhánh thực hiện: `feature/admin-user-management`. Chưa commit/push.
+
 ### Phát hành — Server discovery / visibility / cache (2026-11-01)
 
 - Người dùng yêu cầu chia commit theo use case/cụm và push. Đã chốt các thay đổi đã duyệt thành cụm backend, form cài đặt, trang Khám phá, sửa cache và tài liệu; source hiện đã nằm trong các commit local, các dòng “chưa commit” trong log cũ phản ánh thời điểm từng lượt trước release.
