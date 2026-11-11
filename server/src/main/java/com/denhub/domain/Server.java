@@ -2,6 +2,8 @@ package com.denhub.domain;
 
 import jakarta.persistence.*;
 import com.denhub.domain.enums.ServerVisibility;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.validator.constraints.Length;
 
 import java.io.Serial;
@@ -15,7 +17,8 @@ import java.io.Serializable;
     @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", length = 254, updatable = false)),
     @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
 })
-
+@Getter
+@Setter
 public class Server extends AbstractAuditingEntity<Long> implements Serializable{
     @Serial
     private static final long serialVersionUID = 1L;
@@ -30,48 +33,11 @@ public class Server extends AbstractAuditingEntity<Long> implements Serializable
     @Column(name = "owner_id",  nullable = false)
     private Long ownerId;
 
+    @Getter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 7, columnDefinition = "NVARCHAR(7)")
     private ServerVisibility visibility = ServerVisibility.PRIVATE;
 
-    public ServerVisibility getVisibility() {
-        return visibility;
-    }
 
-    public void setVisibility(ServerVisibility visibility) {
-        this.visibility = visibility;
-    }
 
-    @Override
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getIconUrl() {
-        return iconUrl;
-    }
-
-    public void setIconUrl(String iconUrl) {
-        this.iconUrl = iconUrl;
-    }
-
-    public Long getOwnerId() {
-        return ownerId;
-    }
-
-    public void setOwnerId(Long ownerId) {
-        this.ownerId = ownerId;
-    }
 }
