@@ -16,6 +16,8 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
+import { useChannelChat } from '../../hooks/useChannelChat';
+import { isMessageForChannel } from '../../utils/channelWebSocket';
 import MessageInput from '../../components/chat/MessageInput';
 import CreateChannelModal from '../../components/common/CreateChannelModal';
 import EditChannelModal from '../../components/common/EditChannelModal';
@@ -597,6 +599,8 @@ function ServerWorkspace({ serverId }) {
       throw new Error('Kênh đang chọn đã thay đổi.');
     }
     const session = channelSession.current;
+    // Ưu tiên WebSocket; tin nhắn được hiển thị khi server broadcast về topic của kênh.
+    if (sendChannelMessage(chId, payload)) return null;
     const res = await messageApi.sendMessage(chId, payload);
     if (currentServerId.current !== serverId || channelSession.current !== session || activeChannelId.current !== chId) return null;
     return res.data?.data || res.data;
@@ -617,6 +621,12 @@ function ServerWorkspace({ serverId }) {
       }
     });
   };
+
+  const handleSentMessageRef = useRef(handleSentMessage);
+  handleSentMessageRef.current = handleSentMessage;
+  const { sendChannelMessage } = useChannelChat(activeChannel?.id ?? null, (incoming) => {
+    if (isMessageForChannel(incoming, activeChannelId.current)) handleSentMessageRef.current(incoming, incoming.channelId);
+  });
 
   const handleStartEdit = (msg) => {
     if (!msg || !msg.id) return;

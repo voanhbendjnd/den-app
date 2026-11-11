@@ -289,6 +289,18 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 
 ## 10. CURRENT PROJECT PROGRESS
 
+### Hoàn thiện chat nhóm WebSocket — backend đã kiểm thử, task chưa hoàn tất (2026-11-11)
+
+- **UI QA sau yêu cầu kiểm thử trên màn hình (2026-11-11):** các task Duy trong ảnh là 3.07 (history theo Channel), 3.12 (chống trùng), 3.17 (UI chat/history), 3.22 (gửi/sửa/xóa với hai tài khoản). Đã mở DenHub `http://localhost:3000/login` bằng trình duyệt và thao tác nút demo/đăng nhập thật trên UI; chưa vào được chat, không đánh dấu các task này DONE.
+- Backend lúc đầu không chạy (trình duyệt `ERR_CONNECTION_REFUSED` ở 8080). `bootRun` mặc định thiếu `denhub.jwt.base64-secret` vì không có application config ở main resources. Đã chạy local bằng settings ánh xạ từ `.env` qua biến môi trường process, `ddl-auto=none`; không ghi config/credential vào repo hoặc đổi schema. Lượt đầu thiếu cache `usersByEmail`; khởi động lại riêng process của lượt QA với Spring cache `simple` thì backend khởi động thành công, `/` trả 401 theo bảo vệ hiện có. Không coi đây là thay đổi cấu hình production đã triển khai.
+- Sau khi backend sẵn sàng, demo login trên UI trả “Email hoặc mật khẩu không chính xác”. Google console đồng thời báo origin không được phép cho client ID. Đang chờ người dùng đăng nhập tài khoản kiểm thử sẵn có; không đổi/reset mật khẩu, tạo account hoặc dùng credential lấy từ source để vượt đăng nhập. Backend QA tiếp tục chạy trên 8080; log tạm nằm ngoài repo.
+- Browser regression command `node --test --test-name-pattern="pagination|history|composer|message|messages" tests/group-chat.browser.test.mjs` từ client **không chạy được** vì thiếu module `playwright` (`MODULE_NOT_FOUND`); không cài dependency hoặc nhận browser tests PASS. Chưa kiểm hai tài khoản, chưa gửi/sửa/xóa tin thật, chưa chỉnh bảng tiến độ Google Sheets của người dùng.
+
+- Kế hoạch backend/frontend và queue kết quả `/user/queue/channel-message-results` được duyệt bằng `ok`. Nhánh giữ `feature/edit-message-api`, bảo toàn các thay đổi chưa commit đã có. Không đổi database, dependency, branch, không commit/push.
+- Backend: REST/STOMP phát tin qua cùng event sau commit; kết quả gửi có request-id và chỉ về tab gốc; chặn wildcard/giả mạo broker và kiểm membership/active User/expiry trước mỗi lần nhận tin Channel. Contract chi tiết tại docs/02 mục 6.1.
+- Verification: 91/91 test liên quan PASS; toàn bộ backend 606 test, 21 FAIL ở ServerCacheIT/ServerDiscoveryIT; chạy riêng hai lớp 21/21 PASS. Không coi toàn bộ backend PASS hoặc lỗi có sẵn đã được xác minh baseline.
+- **IN PROGRESS / DỪNG theo AGENTS.md mục 15, 27:** lỗi suite ngoài phạm vi chưa giải quyết. Frontend hiện vẫn là bản cũ, không gửi request-id hoặc xử lý queue kết quả mới; gửi STOMP sẽ bị backend mới từ chối 400 và UI cũ có thể xóa draft. Chưa triển khai/chạy riêng backend mới với frontend cũ. Cần xử lý blocker và hoàn tất đợt frontend đã duyệt trước khi coi chat nhóm sử dụng được.
+
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
 
@@ -481,6 +493,22 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-11-11] CHANNEL-WS-RELIABILITY-BACKEND — Hoàn thiện backend, dừng tại lỗi suite ngoài phạm vi
+
+- Approval: `ok` cho kế hoạch hoàn thiện gửi/nhận Channel. Phần đang ghi nhận là đợt backend; chưa hoàn tất task toàn bộ.
+- Implemented: `MessageService` publish `ChannelMessageDelivery.Created` từ phần persist chung REST/STOMP; `ChannelMessageDelivery` dùng `@TransactionalEventListener(AFTER_COMMIT)` để không phát tin rollback hoặc phát hai lần. Lỗi broker sau commit không làm request trả lỗi lưu sai sự thật. Delivery best effort, không outbox/replay/idempotency database.
+- `ChannelChatController`: native header `request-id` (1–100 ký tự ASCII chữ/số/gạch dưới/gạch ngang), phản hồi `{requestId, channelId, statusCode, message, detail}` tại queue session riêng. 201 chỉ sau khi Service transaction trả thành công; validation/quyền/lỗi lưu/JSON sai có phản hồi an toàn, không lộ raw exception. Chưa có frontend xử lý contract này.
+- `WebSocketConfig`: giữ cách decode JWT/Principal của Ben; thêm identity/expiry theo session, dọn khi disconnect; kiểm quyền subscribe và outbound Channel, chặn wildcard và SEND broker trực tiếp, bảo vệ queue kết quả. Test bảo toàn subscription DM/feed cụ thể; không thay service chat riêng hoặc Entity/schema.
+- Tests added/updated: `MessageServiceTest` (REST publish event), `MessageServiceWebSocketTest` (STOMP publish/reject, principal tràn số), `ChannelChatControllerTest` (success/failure theo requestId/session, dữ liệu lỗi an toàn, JSON sai), `ChannelMessagingTest` (transaction commit/rollback thực với H2 + event listener, interceptor với STOMP/SIMP headers thật, cô lập tab bằng Spring UserDestinationResolver, kiểm quyền từng recipient, revoke/expiry/wildcard/giả mạo broker).
+- Lệnh thực sự chạy từ `server/`:
+  - `.\gradlew.bat test --tests com.denhub.service.MessageServiceTest --tests com.denhub.service.MessageServiceWebSocketTest --tests com.denhub.web.websocket.ChannelChatControllerTest --tests com.denhub.config.ChannelMessagingTest --no-daemon`: lần đầu 91 test, 4 FAIL do test config chưa bật transactional listener và CONNECT test headers immutable. Đã sửa test setup, chạy lại cùng lệnh **91/91 PASS**; compileJava/compileTestJava PASS.
+  - `.\gradlew.bat test --no-daemon`: **606 test, 585 PASS, 21 FAIL**, 0 skipped. `ServerCacheIT` 4 lỗi khởi tạo context: FK `USER_AUTHORITY` → `AUTHORITIES` không có `ROLE_USER`; `ServerDiscoveryIT` 17 lỗi `Cache[com.denhub.domain.User.authorities] is closed`. Hai lớp không bị sửa ở đợt này.
+  - `.\gradlew.bat test --tests com.denhub.web.rest.ServerCacheIT --tests com.denhub.web.rest.ServerDiscoveryIT --no-daemon`: **21/21 PASS**. Không chứng minh full suite PASS; lỗi phụ thuộc chạy chung, cần điều tra fixture/context/cache riêng.
+  - `git diff --check`, `git diff --staged --check`: PASS (chỉ cảnh báo LF→CRLF trong docs/00); index rỗng, không stage/commit. Đã đọc diff và các file mới trong đợt backend.
+- **PRE-EXISTING ISSUE (nghi ngờ, chưa kiểm baseline):** cùng 21 lỗi đã được báo trước lượt này; lượt này tự xác minh lỗi chạy chung và chạy riêng PASS. Không tự sửa Cache/Discovery hoặc đổi cấu hình để che lỗi. Dừng theo AGENTS.md mục 15/27 và ghi handoff để xin quyết định tiếp theo.
+- Documentation impact: cập nhật docs/02 mục 6–6.1 và 20.2 (thay mô tả cũ chỉ DM/feed), docs/00 progress/log/handoff. Đã kiểm docs/01,03,04: không thêm nghiệp vụ, Entity/schema hoặc thay UI trong đợt backend nên không sửa ba file này.
+- Remaining: frontend còn thiếu requestId/result Promise/giữ draft khi lỗi hoặc kết quả chưa rõ, merge lịch sử+realtime, chống trùng ID chuẩn hóa và browser regressions; chưa kiểm hai tài khoản qua STOMP thật/SQL Server. Thay đổi mới **chưa đồng bộ FE/BE**, không đánh dấu DONE hoặc ready for commit.
 
 ### [2026-11-01] RELEASE-SERVER-DISCOVERY — Chia commit theo cụm và chuẩn bị đồng bộ nhánh feature
 
@@ -3350,6 +3378,14 @@ Docs Updated:
 
 ## 12. CURRENT WORK / HANDOFF
 
+### Handoff — Hoàn thiện chat nhóm WebSocket, backend dừng tại full-suite blocker (2026-11-11)
+
+- Người dùng duyệt kế hoạch cả BE/FE bằng `ok`. Đợt backend trong 10 file (4 application, 4 test, 2 docs) đã làm; không sửa các file frontend từ snapshot đầu đợt. Giữ nguyên toàn bộ thay đổi có sẵn trong worktree.
+- Cần quyết định xử lý 21 lỗi full suite ở Cache/Discovery trước khi tiếp tục theo stop condition của repo. 91 test Message/WebSocket PASS; 21 test Cache/Discovery chạy riêng PASS. Đừng gọi lỗi có sẵn đã xác minh nếu chưa có baseline độc lập.
+- Backend mới yêu cầu native header `request-id` và thêm queue kết quả session riêng; **frontend cũ chưa tương thích**. Không chạy/deploy riêng backend mới như bản chat nhóm hoàn chỉnh. Xem docs/02 mục 6.1 để nối frontend đúng contract.
+- Phần frontend đã nằm trong kế hoạch duyệt nhưng chưa thực hiện: Promise chờ kết quả rồi mới xóa draft, timeout/đóng kết nối giữ draft và không auto-retry, resubscribe/reload lịch sử khi reconnect, merge/dedup ID đồng nhất, bỏ frame cũ, tests hook/browser cho lỗi/race/REST+WS.
+- Chưa commit/push; không đổi dependency hoặc database. Chưa kiểm STOMP qua hai tài khoản hoặc SQL Server thật.
+
 ### Handoff release — Server discovery / visibility / cache (2026-11-01)
 
 - Source đã được chia thành bốn commit `77627ee`, `7929e20`, `ec99eb6`, `e1c05ad`, cùng commit tài liệu `docs(server): synchronize discovery release and handoff`. Xem RELEASE-SERVER-DISCOVERY. Các trạng thái “chưa commit” ở handoff/log phía dưới là lịch sử trước release.
@@ -3876,3 +3912,13 @@ Luôn ghi: `Not pushed — AI agents are not allowed to push DenHub.`
 - **Database & Entity Fix (Lỗi SQL 2628 truncation):**
   - Đồng bộ cột `refresh_token` trong bảng `users` sang kiểu `NVARCHAR(MAX)` theo đúng đặc tả `docs/03-DATABASE-DESIGN.md` mục 3.1.
   - Cập nhật entity `User.java`: Thêm `columnDefinition = "NVARCHAR(MAX)"` cho trường `refreshToken` để lưu trữ an toàn các JWT refresh token có payload/claims dài mà không bị tràn bộ nhớ đệm SQL Server.
+
+
+---
+
+## 23. Cập nhật ngày 2026-11-11: Chat nhóm qua WebSocket (STOMP)
+
+- **Backend:** thêm `ChannelChatController` (`/app/channels/{channelId}/send` → broadcast `/topic/channels/{channelId}`); `MessageService` thêm `sendMessageFromWebSocket` và `isChannelMember` (dùng chung `persistMessage` với REST, hành vi REST giữ nguyên); `WebSocketConfig` kiểm tra membership khi SUBSCRIBE topic kênh.
+- **Frontend:** `hooks/useChannelChat.js` (STOMP client riêng), `utils/channelWebSocket.js`; `GroupChatPage` gửi qua WebSocket, fallback REST nếu chưa kết nối, nhận tin qua topic và khử trùng theo `id`.
+- **Kiểm thử:** `ChannelChatControllerTest`, `MessageServiceWebSocketTest`, `client/tests/channelWebSocket.test.mjs` (thêm vào `npm test`).
+- **Giới hạn:** chưa có test tích hợp STOMP end-to-end thật; chưa broadcast sửa/xóa; lỗi gửi qua WebSocket không báo về người gửi (`/user/queue/errors` còn `TBD`). Không đổi database/schema.

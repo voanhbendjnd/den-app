@@ -58,6 +58,7 @@ class MessageServiceTest {
     @Mock private ServerMemberRepository serverMemberRepository;
     @Mock private UserRepository userRepository;
     @Mock private com.denhub.repository.ServerRepository serverRepository;
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
 
     private MessageService messageService;
 
@@ -75,7 +76,7 @@ class MessageServiceTest {
     void setUp() {
         SecurityContextHolder.clearContext();
         messageService = new MessageService(messageRepository, channelRepository,
-                serverMemberRepository, userRepository, validatorFactory.getValidator(), serverRepository);
+                serverMemberRepository, userRepository, validatorFactory.getValidator(), serverRepository, events);
     }
 
     @AfterEach
@@ -104,6 +105,9 @@ class MessageServiceTest {
         String content = "  Hello mọi người!\nDòng thứ hai 🙂  ";
 
         MessageResponse response = messageService.sendMessage(CHANNEL_ID, new SendMessageRequest(content));
+        verify(events).publishEvent(argThat((Object event) ->
+                event instanceof com.denhub.service.realtime.ChannelMessageDelivery.Created created
+                        && created.getMessage() == response));
 
         ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
         verify(messageRepository).save(messageCaptor.capture());

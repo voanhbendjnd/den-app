@@ -1,0 +1,43 @@
+package com.denhub.service.realtime;
+
+import com.denhub.service.dto.MessageResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+/** Both REST and STOMP publish this event inside the message's database transaction. */
+@Component
+public class ChannelMessageDelivery {
+    private static final Logger log = LoggerFactory.getLogger(ChannelMessageDelivery.class);
+    private final SimpMessagingTemplate messaging;
+
+    public ChannelMessageDelivery(SimpMessagingTemplate messaging) {
+        this.messaging = messaging;
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void deliver(Created event) {
+        MessageResponse message = event.getMessage();
+        try {
+            messaging.convertAndSend("/topic/channels/" + message.channelId(), message);
+        } catch (RuntimeException ex) {
+            // The database has committed. Do not turn a delivery failure into a failed send/retry.
+            log.warn("Could not broadcast committed channel message, messageId={}", message.id());
+        }
+    }
+
+    public static final class Created {
+        private final MessageResponse message;
+
+        public Created(MessageResponse message) {
+            this.message = message;
+        }
+
+        public MessageResponse getMessage() {
+            return message;
+        }
+    }
+}

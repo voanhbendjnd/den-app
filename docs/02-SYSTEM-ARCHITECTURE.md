@@ -259,7 +259,7 @@ Hiện trạng đã đọc từ source sau gộp:
 
 ## 6. Quy chuẩn WebSocket / STOMP Real-time Contract (`CONFIRMED`)
 
-WebSocket là task sau, không triển khai trong Task 1.07 hoặc 1.12. Các destination dưới đây giữ vai trò contract cho giai đoạn real-time.
+Các destination dưới đây là contract cho giai đoạn real-time. **Backend cập nhật (2026-11-11), frontend chờ tích hợp contract kết quả gửi:** `/app/channels/{channelId}/send` (`ChannelChatController` → `MessageService.sendMessageFromWebSocket`, danh tính lấy từ STOMP Principal, kiểm tra membership, lưu SQL Server). Cả REST và STOMP publish một sự kiện `ChannelMessageDelivery.Created` trong transaction; listener `AFTER_COMMIT` mới broadcast `MessageResponse` tới `/topic/channels/{channelId}`. Rollback không broadcast; controller không broadcast lần thứ hai. Chỉ có tin mới; `UPDATED`/`DELETED` vẫn qua REST và chưa broadcast. Không coi frontend hiện tại đã hoàn thiện hoặc triển khai backend/frontend riêng lẻ khi chưa đồng bộ contract tại mục 6.1.
 
 - **Handshake Endpoint:** `/ws`
 - **Authentication:** Header `Authorization: Bearer <jwt-token>` trong frame STOMP `CONNECT`.
@@ -276,6 +276,7 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 | Destination | Action | Mục đích | Trạng thái |
 | :--- | :---: | :--- | :---: |
 | `/app/channels/{channelId}/send` | `SEND` | Gửi tin nhắn văn bản vào channel | `CONFIRMED` |
+| `/user/queue/channel-message-results` | `SUBSCRIBE` | Kết quả gửi Channel theo requestId, chỉ về session đã gửi | `CONFIRMED` (duyệt 2026-11-11; backend có, frontend chờ tích hợp) |
 | `/topic/channels/{channelId}` | `SUBSCRIBE` | Nhận sự kiện tin nhắn (`CREATED`, `UPDATED`, `DELETED`) | `CONFIRMED` |
 | `/topic/channels/{channelId}/reactions` | `SUBSCRIBE` | Nhận sự kiện reaction (`ADDED`, `REMOVED`) | `TBD` |
 | `/topic/servers/{serverId}` | `SUBSCRIBE` | Nhận sự kiện quản trị server (kênh mới, thành viên bị kick) | `TBD` |
@@ -291,6 +292,15 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 > [!NOTE]
 > **Định danh WebSocket Principal & Private Queue Routing:**  
 > Trong `WebSocketConfig`, STOMP `Principal.getName()` được trích xuất từ JWT claim `user.id` (dạng chuỗi, fallback về `jwt.getSubject()` email) để các lệnh `convertAndSendToUser(userId, ...)` như trong `NotificationFriendshipRequest` có thể định tuyến chính xác vào session của người nhận. Đồng thời, `NotificationFriendshipRequest` thực hiện dual-delivery (gửi cho cả numeric User ID và email) để đảm bảo 100% không bị thất lạc sự kiện.
+
+### 6.1 Kết quả gửi Channel và bảo vệ phiên (2026-11-11)
+
+- Người dùng duyệt kế hoạch hoàn thiện bằng `ok`. STOMP SEND giữ body `SendMessageRequest` (`content`) và thêm native header `request-id`: 1–100 ký tự ASCII `[A-Za-z0-9_-]` (UUID hợp lệ). Thiếu/sai header: không lưu, trả 400. `requestId` chỉ dùng đối chiếu kết quả; chưa có idempotency lưu database, không tự gửi lại sau timeout/mất kết nối.
+- Client phải subscribe `/user/queue/channel-message-results` trước khi gửi. Backend trả `{requestId, channelId, statusCode, message, detail}`: thành công `201` kèm `MessageResponse` tại `message`, `detail: null`; thất bại `400/401/403/404/500`, `message: null` và mô tả an toàn. JSON không đọc được trả `400` qua exception handler. Lỗi không lộ SQL, raw exception hoặc nội dung nhạy cảm.
+- Kết quả dùng `convertAndSendToUser(sessionId, ...)` cùng header `simpSessionId`; chỉ tab gửi nhận được, không gửi cho tất cả tab cùng tài khoản. Chưa chốt và không sử dụng `/user/queue/errors` chung. Client chỉ xóa draft khi nhận kết quả thành công tương ứng; timeout hoặc đóng kết nối là chưa biết kết quả, phải giữ draft và kiểm tra lịch sử trước khi gửi lại.
+- `ChannelMessageDelivery` bắt lỗi broker sau commit để không báo sai rằng lưu thất bại. Broadcast/kết quả là best effort, không có outbox hoặc replay; reconnect cần tải lại lịch sử để bù khoảng mất kết nối. Chưa có test hai tài khoản qua WebSocket thật trong lượt backend.
+- Inbound kiểm membership khi subscribe topic Channel cụ thể; từ chối wildcard ở namespace broker, channel ID sai/tràn số, subscribe queue vật lý của kết quả và SEND trực tiếp vào `/topic/`, `/queue/`, `/user/` để ngăn giả mạo event. Các destination DM/feed cụ thể giữ hành vi hiện có.
+- Lưu identity/expiry đã decode khi CONNECT theo session; xóa khi DISCONNECT hoặc `SessionDisconnectEvent`. Outbound kiểm lại User active và membership cho mỗi phiên nhận tin Channel; phiên hết hạn, đã rời/kick hoặc kiểm quyền lỗi không nhận tin. Không sửa membership, schema hoặc quyền DM/feed.
 
 ### 6.3 Định dạng WebSocket Payload gửi lên 1-1 (`SendMessageReq`) (`CONFIRMED`)
 ```json
@@ -1043,7 +1053,7 @@ Ngay sau khi thành viên bị loại thành công:
 
 ### 20.2 Ranh giới REST và WebSocket/STOMP đối với Member
 - Phân quyền Server Member được áp dụng nhất quán trên toàn bộ REST endpoints (Server, Member, Channel, Channel Message).
-- Inbound STOMP WebSocket (`/ws`) trong kiến trúc DenHub chỉ phục vụ tin nhắn riêng 1-1 (`/app/conversations/send`) và bảng tin bài viết (`/app/post`). Gửi tin nhắn kênh chat Server sử dụng REST POST (`/api/channels/{channelId}/messages`), tại đây `MessageService` bắt buộc kiểm tra sự tồn tại của membership qua `serverMemberRepository.existsByServerIdAndUserId`.
+- Cập nhật 2026-11-11: inbound STOMP `/ws` bổ sung gửi Channel (`/app/channels/{channelId}/send`) bên cạnh chat 1-1 (`/app/conversations/send`) và feed (`/app/post`). REST POST `/api/channels/{channelId}/messages` vẫn được hỗ trợ. Cả hai đường gửi Channel dùng chung kiểm tra active User/membership và publish sau commit theo mục 6–6.1. Quy định “chỉ DM/feed” trước đây mô tả trạng thái trước tích hợp, không còn giới hạn STOMP Channel đã được duyệt.
 
 ---
 

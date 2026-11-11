@@ -13,6 +13,8 @@ import com.denhub.service.dto.CursorPageResponse;
 import com.denhub.service.dto.MessageResponse;
 import com.denhub.service.dto.SendMessageRequest;
 import com.denhub.service.dto.UpdateMessageRequest;
+import com.denhub.service.realtime.ChannelMessageDelivery;
+import org.springframework.context.ApplicationEventPublisher;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.data.domain.PageRequest;
@@ -36,19 +38,22 @@ public class MessageService {
     private final UserRepository userRepository;
     private final Validator validator;
     private final ServerRepository serverRepository;
+    private final ApplicationEventPublisher events;
 
     public MessageService(MessageRepository messageRepository,
                           ChannelRepository channelRepository,
                           ServerMemberRepository serverMemberRepository,
                           UserRepository userRepository,
                           Validator validator,
-                          ServerRepository serverRepository) {
+                          ServerRepository serverRepository,
+                          ApplicationEventPublisher events) {
         this.messageRepository = messageRepository;
         this.channelRepository = channelRepository;
         this.serverMemberRepository = serverMemberRepository;
         this.userRepository = userRepository;
         this.validator = validator;
         this.serverRepository = serverRepository;
+        this.events = events;
     }
 
     @Transactional
@@ -61,6 +66,58 @@ public class MessageService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
 
+        return persistMessage(channelId, request, sender);
+    }
+
+    /**
+     * Gửi tin nhắn từ STOMP: danh tính lấy từ Principal của phiên WebSocket
+     * (User ID dạng số hoặc email), không tin dữ liệu từ client.
+     */
+    @Transactional
+    public MessageResponse sendMessageFromWebSocket(Long channelId, SendMessageRequest request, String principalName) {
+        validateRequest(channelId, request);
+        User sender = resolveActiveUser(principalName);
+        return persistMessage(channelId, request, sender);
+    }
+
+    /** Kiểm tra Principal WebSocket là thành viên của Server chứa Channel (dùng khi SUBSCRIBE). */
+    @Transactional(readOnly = true)
+    public boolean isChannelMember(Long channelId, String principalName) {
+        if (channelId == null || principalName == null || principalName.isBlank()) {
+            return false;
+        }
+        try {
+            User user = resolveActiveUser(principalName);
+            return channelRepository.findById(channelId)
+                    .map(channel -> serverMemberRepository.existsByServerIdAndUserId(channel.getServerId(), user.getId()))
+                    .orElse(false);
+        } catch (ResponseStatusException ex) {
+            return false;
+        }
+    }
+
+    private User resolveActiveUser(String principalName) {
+        if (principalName == null || principalName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
+        }
+        String name = principalName.trim();
+        java.util.Optional<User> found;
+        if (name.chars().allMatch(Character::isDigit)) {
+            try {
+                found = userRepository.findById(Long.parseLong(name));
+            } catch (NumberFormatException ex) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
+            }
+        } else {
+            found = userRepository.findOneByEmail(name.toLowerCase(Locale.ENGLISH));
+        }
+        return found
+                .filter(user -> Boolean.TRUE.equals(user.getActivated()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+    }
+
+    private MessageResponse persistMessage(Long channelId, SendMessageRequest request, User sender) {
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Không tìm thấy Channel"));
@@ -80,12 +137,14 @@ public class MessageService {
         message.setContent(request.content());
 
         Message savedMessage = messageRepository.save(message);
-        return new MessageResponse(
+        MessageResponse response = new MessageResponse(
                 savedMessage.getId(),
                 savedMessage.getChannelId(),
                 savedMessage.getAuthorId(),
                 savedMessage.getContent(),
                 savedMessage.getCreatedDate());
+        events.publishEvent(new ChannelMessageDelivery.Created(response));
+        return response;
     }
 
     @Transactional(readOnly = true)
