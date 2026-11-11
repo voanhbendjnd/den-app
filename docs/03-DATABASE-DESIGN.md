@@ -61,6 +61,7 @@ erDiagram
 | `name` | `NVARCHAR(100)` | `NOT NULL` | Tên Server |
 | `icon_url` | `VARCHAR(500)` | `NULL` | Ảnh biểu tượng server |
 | `owner_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Khóa ngoại người sở hữu |
+| `visibility` | `NVARCHAR(7)` | `NOT NULL`, `DEFAULT 'PRIVATE'`, `CHECK IN ('PUBLIC','PRIVATE')` | Chế độ hiển thị/tham gia, bổ sung được duyệt 2026-10-31; xem mục 4.7 |
 | `created_at` | `DATETIME2` | `NOT NULL`, `DEFAULT SYSUTCDATETIME()` | Thời điểm tạo |
 | `updated_at` | `DATETIME2` | `NULL` | Thời điểm cập nhật cuối |
 
@@ -165,6 +166,79 @@ erDiagram
 
 ---
 
+### 3.4 Bảng `conversations` (Quản lý Cuộc trò chuyện 1-1 / Nhóm)
+- **Mục đích:** Lưu trữ các cuộc trò chuyện trực tiếp giữa 2 cá nhân hoặc nhóm nhỏ.
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `type` | `VARCHAR(20)` | `NOT NULL`, `DEFAULT 'DIRECT'` | Loại cuộc trò chuyện (`DIRECT`, `GROUP`) |
+| `last_message_id` | `BIGINT` | `NULL` | Tham chiếu ID tin nhắn mới nhất |
+| `created_date` | `DATETIME2` | `NOT NULL`, `DEFAULT GETUTCDATE()` | Thời điểm tạo |
+
+---
+
+### 3.5 Bảng `conversation_member` (Thành viên cuộc trò chuyện 1-1)
+- **Mục đích:** Liên kết User và Conversation 1-1.
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `conversation_id` | `BIGINT` | `NOT NULL`, `FK -> conversations(id)` | Tham chiếu cuộc trò chuyện |
+| `user_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Tham chiếu người dùng |
+| `joined_at` | `DATETIME2` | `NULL`, `DEFAULT GETUTCDATE()` | Thời điểm tham gia |
+| `unread_count` | `INT` | `NOT NULL`, `DEFAULT 0` | Số lượng tin nhắn chưa đọc |
+| `is_muted` | `BIT` | `DEFAULT 0` | Tắt thông báo |
+| `is_deleted` | `BIT` | `DEFAULT 0` | Xóa hội thoại phía user |
+
+*Ràng buộc:*
+- `ux_conversation_member`: `UNIQUE (user_id, conversation_id)`
+
+---
+
+### 3.6 Bảng `messages` (Quản lý Tin nhắn trong SQL Server)
+- **Mục đích:** Lưu trữ nội dung tin nhắn trao đổi 1-1 (Văn bản & Hình ảnh) và Channel nhóm.
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `sender_id` | `BIGINT` | `NULL`, `FK -> users(id)` | Người gửi tin nhắn direct |
+| `author_id` | `BIGINT` | `NULL`, `FK -> users(id)` | Tác giả tin nhắn channel |
+| `conversation_id` | `BIGINT` | `NULL`, `FK -> conversations(id)` | Cuộc trò chuyện direct tham chiếu |
+| `channel_id` | `BIGINT` | `NULL`, `FK -> channels(id)` | Channel nhóm tham chiếu |
+| `type` | `VARCHAR(20)` | `NULL`, `DEFAULT 'TEXT'` | Loại tin nhắn (`TEXT`, `IMAGE`, `FILE`, `SYSTEM`) |
+| `content` | `NVARCHAR(MAX)` | `NULL` | Nội dung văn bản |
+| `media_url` | `NVARCHAR(1000)` | `NULL` | Đường dẫn đến tệp ảnh/tài liệu |
+| `file_name` | `NVARCHAR(255)` | `NULL` | Tên tệp tin đính kèm |
+| `file_size` | `BIGINT` | `NULL` | Kích thước tệp tin (bytes) |
+| `width` | `INT` | `NULL` | Chiều rộng ảnh (pixels) |
+| `height` | `INT` | `NULL` | Chiều cao ảnh (pixels) |
+| `created_at` | `DATETIME2` | `NULL` | Thời điểm gửi direct |
+| `created_date` | `DATETIME2` | `NULL` | Kế thừa từ AbstractAuditingEntity |
+
+---
+
+### 3.7 Bảng `friendships` (Quản lý Quan hệ Bạn bè)
+- **Mục đích:** Lưu trữ quan hệ bạn bè và trạng thái lời mời kết bạn.
+- **Trạng thái:** `CONFIRMED`
+
+| Cột | Kiểu dữ liệu | Ràng buộc (Constraint) | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | `PK`, `IDENTITY(1,1)` | Khóa chính tự tăng |
+| `user_one_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Min(UserId1, UserId2) |
+| `user_two_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | Max(UserId1, UserId2) |
+| `status` | `VARCHAR(20)` | `NOT NULL`, `DEFAULT 'PENDING'` | Trạng thái (`PENDING`, `ACCEPT`, `BLOCKED`) |
+| `action_user_id` | `BIGINT` | `NOT NULL`, `FK -> users(id)` | ID người thực hiện hành động gần nhất |
+| `created_date` | `DATETIME2` | `NOT NULL`, `DEFAULT GETUTCDATE()` | Thời điểm tạo |
+
+*Ràng buộc & Index:*
+- `ux_friendship`: `UNIQUE (user_one_id, user_two_id)`
+
+---
+
 ## 4. Đối chiếu source trước Task 1.07 (2026-10-10)
 
 Đã đọc các Entity liên quan và, theo yêu cầu của Duy, **đã truy vấn metadata SQL Server thực tế của `denhubdb` bằng `sqlcmd` ngày 2026-10-10**. Kết quả chi tiết ở mục 4.1. Không coi annotation JPA là bằng chứng database có đủ cột, FK, index hoặc constraint trong thiết kế.
@@ -218,8 +292,42 @@ Kết luận tại thời điểm kiểm tra schema: Entity và database thống
 Duy đã duyệt bổ sung sửa audit bằng yêu cầu “làm tiếp đi” sau khi xem lỗi email 53 ký tự gây 500 và kế hoạch tăng riêng hai cột audit của messages lên 254.
 
 - `Message` dùng `@AttributeOverrides` cho `createdBy` → `created_by` và `lastModifiedBy` → `last_modified_by`, `length = 254`. Giữ `created_by` không updatable; giữ nullability hiện có, identity audit vẫn là email lấy từ Security Context. Không rút ngắn email.
-- Đây là override riêng Entity Message; `AbstractAuditingEntity` và mapping User/Server/Channel vẫn giữ nguyên. Giới hạn audit 50 ký tự ở các Entity khác còn là rủi ro có sẵn, cần task riêng.
+- Ở lượt Message đây là override riêng Entity Message; `AbstractAuditingEntity` và mapping User/Server/Channel được giữ nguyên. Server sau đó được sửa riêng ở mục 4.4; User/Channel vẫn còn giới hạn audit 50 ký tự và cần task riêng.
 - Script thủ công: `server/scripts/sql/2026-10-11-message-audit-email.sql`. Script chỉ xét `dbo.messages.created_by` và `last_modified_by`; giữ varchar/nvarchar, collation và nullability từ metadata; chỉ mở rộng cột ngắn hơn 254, không thu hẹp cột dài hơn/MAX. Sai bảng/cột/kiểu thông thường sẽ dừng.
 - Script mặc định `@ApplyChanges = 0` để in database và SQL dự kiến. Người vận hành chọn đúng database, review rồi mới đặt `1`; hai ALTER nằm trong transaction, lỗi sẽ rollback. Script không được đăng ký chạy tự động khi ứng dụng khởi động.
 - **Chưa chạy hoặc xác minh script trên SQL Server thật**, chưa áp dụng schema thật. Trước khi triển khai, review/apply schema bằng quy trình của nhóm; không coi `ddl-auto=update` là bằng chứng migration đã thành công.
 - H2/JPA tests đã PASS với email fixture 53 và biên 254 ký tự; kiểm tra cả hai trường audit đọc lại nguyên vẹn cùng Message content/author/channel. Không thay `content`, FK, index hoặc tên cột timestamp.
+
+### 4.4 Audit của Server hỗ trợ email 254 ký tự (`CONFIRMED`, 2026-10-13)
+
+- Duy duyệt kế hoạch sửa 6 bug phần Server bằng “triển khai”. `Server` override riêng `createdBy` → `created_by` và `lastModifiedBy` → `last_modified_by`, `length = 254`, giữ `created_by` không updatable và nullability hiện có. Giữ đầy đủ email làm audit; không đổi AbstractAuditingEntity, User, Channel hoặc ServerMember.
+- Script `server/scripts/sql/2026-10-13-server-audit-email.sql` chỉ xét `dbo.servers.created_by` và `last_modified_by`. Kiểm đủ hai cột varchar/nvarchar thông thường; bảo toàn kiểu, collation và nullability; chỉ mở rộng cột ngắn hơn 254, không thu hẹp cột dài hơn hoặc MAX. Không thay index/FK/timestamps.
+- Mặc định `@ApplyChanges = 0`: hiển thị database, metadata và SQL dự kiến rồi dừng. Người vận hành chọn đúng database, review rồi đặt `1` để apply hai ALTER trong transaction; lỗi rollback. Script không chạy tự động khi khởi động ứng dụng.
+- **Chưa thực thi hoặc xác minh script trên SQL Server thật.** Cần review/apply schema trước khi coi lỗi email dài đã được xử lý trên database đang triển khai; không suy ra `ddl-auto=update` đã thực hiện thành công thay đổi này.
+- MockMvc/JWT/JPA/H2 test PASS với email 55 và 254 ký tự: tạo Server kèm membership Owner, đọc lại cả hai audit đầy đủ, cập nhật Server và đọc lại không mất email. Bộ backend hiện tại PASS 150/150. Cột `server_member.nickname` giữ `NVARCHAR(20)`; xử lý tên người tạo dài/rỗng bằng nickname tự sinh ở Service theo docs/01 mục 5, không sửa schema nickname.
+
+### 4.5 Chỉnh sửa Server dùng mapping hiện có (`CONFIRMED`, 2026-10-15)
+
+- `Server.name` và request chỉnh sửa dùng giới hạn 100 đơn vị UTF-16, mapping `NVARCHAR(100)`; `Server.iconUrl` hiện map `icon_url` với `length = 255`, `CreateServerDTO` và `UpdateServerDTO` đều giới hạn 255. Bảng thiết kế mục 3.2 ghi `VARCHAR(500)` là chênh lệch thiết kế/mapping đã đối chiếu; task này theo mapping/giới hạn 255 được người dùng duyệt, không mở rộng Entity hoặc database.
+- Update chỉ thay `name`, `iconUrl` và audit sửa đổi qua cơ chế hiện có. Giữ `owner_id`, identity, created date, membership, Channel, constraints và indexes. Không thêm field, migration, DDL hoặc thay schema SQL Server.
+- H2/JPA qua PUT kiểm tra tên 100 đơn vị UTF-16 (50 emoji), icon 255, từ chối các biên 101/256 và email audit 53/254 ký tự. Script audit tại mục 4.4 vẫn chưa được thực thi/xác minh trên SQL Server thật trong task này.
+
+### 4.6 Xóa Server theo Entity và metadata hiện tại (2026-10-21)
+
+- Đã SELECT metadata SQL Server từ cấu hình local, không đọc nội dung chat/tài khoản hoặc ghi dữ liệu: có `servers`, `server_member`, `channels`, `messages`, `invites`, `conversations`. Không thấy `attachments` hoặc `message_reactions` trong các bảng kiểm tra; không thêm truy vấn xóa vào bảng chỉ có trong thiết kế.
+- Không có FK tham chiếu `servers`/`channels`/`messages` được trả về; không thấy trigger trên ba bảng này. Vì vậy không giả định ON DELETE CASCADE tại mục 3 đã được áp dụng. Không có DDL, migration hoặc sửa Entity trong task.
+- ServerMember hiện dùng bảng số ít `server_member`; `role` và `joinedAt` là `@Transient`. Log lịch sử nói hai field này đã persistent không phản ánh Entity hiện tại. Kiểm quyền xóa bằng `servers.owner_id`, không thêm cột role để làm tính năng này.
+- `messages` dùng chung cho Channel và Direct Conversation. DELETE chọn theo `channel_id` thuộc Channel của đúng Server và `conversation_id IS NULL`; trước đó từ chối nếu tin Channel có conversation_id hoặc được conversations.last_message_id tham chiếu. Không đổi/cắt tin riêng để dọn Server.
+- Xóa theo thứ tự Message Channel → Channel → Invite → ServerMember → Server trong cùng transaction; general được dọn khi xóa cả Server. Giữ User, Server khác, Conversation/tin riêng, ảnh/media vật lý. Dùng bulk JPQL để không nạp toàn bộ tin nhắn vào RAM; Hibernate quản lý invalidation cache theo query.
+- Khóa `PESSIMISTIC_WRITE` trên Server và phối hợp khóa ở các Service ghi liên quan; không dùng cascade JPA với ID scalar. H2 test xác nhận graph cleanup, rollback giao dịch đã thực hiện DELETE con và serialization hai chiều với tạo Channel; chưa chạy DELETE thật hoặc xác minh khóa trên SQL Server.
+
+### 4.7 Visibility của Server và tìm kiếm công khai (2026-10-31)
+
+- Kế hoạch cả Home/Khám phá và quy tắc công khai/riêng tư được người dùng duyệt bằng “triển khai”. `Server.visibility` ánh xạ `NVARCHAR(7) NOT NULL` bằng `@Enumerated(EnumType.STRING)`, enum `ServerVisibility.PUBLIC/PRIVATE`, mặc định Java là `PRIVATE`.
+- Script `server/scripts/sql/2026-10-31-server-visibility.sql` bổ sung riêng cột `dbo.servers.visibility`, default `PRIVATE` với `WITH VALUES` cho các hàng cũ và CHECK chỉ cho `PUBLIC`/`PRIVATE`. Không xóa dữ liệu hoặc thay quan hệ, owner, audit, membership, invite, Channel, Message hay index khác.
+- Mặc định `@ApplyChanges = 0`: chỉ in tên database và SQL dự kiến. Người vận hành chọn đúng database, review rồi mới đặt `1`; DDL nằm trong transaction, lỗi rollback. Nếu đã có cột, script chỉ in metadata và dừng để review, không ghi đè visibility đã cấu hình hoặc tự sửa cột không đúng kiểu.
+- Không gắn script vào startup. Cần apply/review schema trước khi chạy backend mới; không coi Hibernate update là migration dữ liệu cũ thành công.
+- Update visibility và Join bằng ID dùng cùng khóa `PESSIMISTIC_WRITE` trên hàng Server. Invite/member hiện có được giữ khi chuyển chế độ; query Khám phá chỉ đọc `PUBLIC`, loại Owner và membership của người tìm bằng `NOT EXISTS` trước phân trang và khi count. Điều chỉnh lọc này không cần thêm cột hoặc thay schema/index.
+- **Cập nhật áp dụng local sau approval “áp dụng”:** đã chạy script vào `denhubdb`, thêm `visibility NVARCHAR(7) NOT NULL`, default `N'PRIVATE'` và CHECK trusted/enabled. Trước/sau đều 2 Server; cả 2 PRIVATE, 0 PUBLIC, 0 NULL/invalid. DBCC CHECKCONSTRAINTS trả 0 vi phạm; projection cột mới và query discovery LIKE/ESCAPE/CASE/OFFSET/FETCH PASS trên SQL Server thật.
+- Lượt apply đầu gặp lỗi `207/1750` do CHECK tham chiếu cột mới trong cùng batch; transaction đã rollback và được kiểm tra không để lại cột/constraint. Script đã sửa dùng hai `sp_executesql` để ADD COLUMN trước, ADD CHECK sau trong cùng transaction. File vẫn mặc định preview `0`; khi cột tồn tại thì chỉ đọc metadata/no-op.
+- Chưa kiểm HTTP có JWT, collation/ranking với dữ liệu đa dạng hoặc concurrent locking đầy đủ trên SQL Server. Không thay các chênh lệch thiết kế/mapping lịch sử khác. Chi tiết lệnh/verification tại log APPLY-SERVER-VISIBILITY trong docs/00.

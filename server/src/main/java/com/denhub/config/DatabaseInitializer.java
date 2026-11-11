@@ -69,11 +69,30 @@ public class DatabaseInitializer implements CommandLineRunner {
             User admin = new User();
             admin.setName("Admin");
             admin.setActivated(true);
+            admin.setUsername("admin");
             admin.setEmail(initEmail);
             admin.setPassword(passwordEncoder.encode(resolvedPassword));
             admin.setAuthorities(authorities);
             userRepository.save(admin);
             log.info("Initial admin user ready with email: {}", initEmail);
+
+            User user1 = new User();
+            user1.setName("Oni");
+            user1.setActivated(true);
+            user1.setUsername("djnd");
+            user1.setEmail("benva.ce190709@gmail.com");
+            user1.setPassword(passwordEncoder.encode("123123"));
+            user1.setAuthorities(authorities);
+            userRepository.save(user1);
+
+            User user2 = new User();
+            user2.setName("Nico");
+            user2.setActivated(true);
+            user2.setUsername("nico");
+            user2.setEmail("voanhbendjnd@gmail.com");
+            user2.setPassword(passwordEncoder.encode("123123"));
+            user2.setAuthorities(authorities);
+            userRepository.save(user2);
         }
         if (totalUsers > 0 || totalAuthority > 0) {
             log.info("Skip processing initialize...");

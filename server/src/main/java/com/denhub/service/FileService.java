@@ -1,8 +1,10 @@
 package com.denhub.service;
 
 import com.denhub.service.dto.FileUploadResponseDTO;
+import com.denhub.service.errors.BadRequestResourceException;
 import com.denhub.web.rest.errors.BadRequestAlertException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -10,15 +12,13 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -29,6 +29,39 @@ public class FileService {
     private static final Set<String> ALLOWED_EXTENSIONS = new HashSet<>(
             Arrays.asList("jpg", "jpeg", "png", "webp", "gif")
     );
+
+    @Value("${denhub.upload-file.base-uri:uploads/}")
+    private String absolutePath;
+
+    public List<String> saveAndGetUrls(List<MultipartFile> files) throws IOException {
+        if (files == null || files.isEmpty()) {
+            throw new BadRequestResourceException("File not found", "fileManagement", "filenotfound");
+        }
+        List<String> errorMessage = new ArrayList<>();
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                throw new BadRequestResourceException("File null or empty", "fileManagement", "cannotdefine");
+            }
+            if (file.getOriginalFilename() == null || file.getOriginalFilename().isEmpty()) {
+                errorMessage.add("File has invalid original file name");
+            }
+        }
+        if (!errorMessage.isEmpty()) {
+            throw new BadRequestResourceException(String.join("\n", errorMessage), "fileManagement", "filenameinvalid");
+        }
+        var directoryPath = Paths.get(absolutePath);
+        Files.createDirectories(directoryPath);
+        List<String> urlFiles = new ArrayList<>();
+        for (MultipartFile file : files) {
+            String fileName = "denhub-" + System.currentTimeMillis() + "-" + UUID.randomUUID() + ".webp";
+            var filePath = directoryPath.resolve(fileName);
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            urlFiles.add(fileName);
+        }
+        return urlFiles;
+    }
 
     public FileUploadResponseDTO uploadImage(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {

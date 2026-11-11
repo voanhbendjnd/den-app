@@ -3,6 +3,7 @@
 > **Tài liệu kiến trúc hệ thống & Quy chuẩn giao tiếp**\
 > **Source of Truth:** Tài liệu này quản lý architecture, API, DTO, Security và WebSocket; nghiệp vụ ở [`01-PROJECT-OVERVIEW.md`](./01-PROJECT-OVERVIEW.md), dữ liệu ở [`03-DATABASE-DESIGN.md`](./03-DATABASE-DESIGN.md).\
 > **Cập nhật 2026-10-11:** Duy chốt giữ wrapper response thành công hiện có; xem mục 4.1, 4.4 và 7.1. Contract được chốt không đồng nghĩa source code đã triển khai xong; xem mục 7.
+> **Cập nhật 2026-10-13:** Đọc chi tiết phần vỏ Server qua `GET /api/v1/servers/{serverId}` và tích hợp FE đã hoàn tất theo phạm vi Duy duyệt; xem mục 9. Channel thuộc developer khác.
 
 ---
 
@@ -143,26 +144,50 @@ Bảng dưới giữ các endpoint và trạng thái được ghi ở nhánh inc
 
 | Phân hệ | Phương thức | Endpoint | Chức năng dự kiến | Trạng thái |
 | :--- | :---: | :--- | :--- | :---: |
+| **Search** | `GET` | `/api/users/search?username={q}` | Tìm kiếm danh sách người dùng theo username | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/requests` | Gửi yêu cầu kết bạn (hoặc chấp nhận nếu đã có pended req) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/friend-requests` | Lấy danh sách lời mời kết bạn nhận được (Cursor time pagination) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/accept-friend-request` | Chấp nhận lời mời kết bạn | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/remove-friend-request` | Hủy gửi yêu cầu kết bạn hoặc từ chối lời mời kết bạn | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/all-friend` | Lấy danh sách tất cả bạn bè đã kết bạn (Cursor time pagination) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/block-user` | Chặn người dùng (kể cả khi chưa là bạn hoặc đã là bạn) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/block-user/remove` | Gỡ chặn người dùng (Unblock user) | `CONFIRMED` |
+| **Friendship** | `POST` | `/api/friendships/blocked-users` | Lấy danh sách người dùng đã bị chặn (Cursor time pagination) | `CONFIRMED` |
+| **Post** | `POST` | `/api/posts/all-friends` | Lấy danh sách bài viết từ bạn bè & bản thân trên Newsfeed (Cursor pagination theo date và id) | `CONFIRMED` |
+| **Post** | `POST` | `/api/posts/{postId}/like` | Thích hoặc bỏ thích một bài viết (Toggle Like, đồng bộ Redis Set & DB like_counts) | `CONFIRMED` |
+| **Post** | `PUT` | `/api/posts/{postId}` | Chỉnh sửa nội dung, quyền riêng tư và ảnh đính kèm bài viết (yêu cầu là tác giả) | `CONFIRMED` |
+| **Post** | `DELETE` | `/api/posts/{postId}` | Xóa bài viết vĩnh viễn và dọn dẹp Redis Set (yêu cầu là tác giả) | `CONFIRMED` |
+| **Auth** | `POST` | `/api/login` | Đăng nhập bằng Email và nhận JWT Access Token | `CONFIRMED` |
+| **Auth** | `GET` | `/api/account` (hoặc `/api/users/me`) | Lấy thông tin tài khoản người dùng hiện tại qua token | `CONFIRMED` |
+| **User Profile** | `GET` | `/api/v1/users/profile` (alias `/api/v1/users/me`) | Lấy thông tin chi tiết hồ sơ cá nhân của người dùng đang đăng nhập | `CONFIRMED` |
+| **User Profile** | `PUT` | `/api/v1/users/profile` (alias `/api/v1/users/me`) | Cập nhật thông tin hồ sơ cá nhân (name, username, avatar) của người dùng đang đăng nhập | `CONFIRMED` |
+| **User Profile** | `POST` | `/api/v1/users/change-password` (alias `/api/v1/users/password`, `/api/account/change-password`) | Đổi mật khẩu của người dùng đang đăng nhập | `CONFIRMED` |
 | **Auth** | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/login` | Đăng nhập và lấy Access Token JWT | `TBD` |
 | **Auth** | `GET` | `/api/v1/auth/me` | Lấy thông tương user hiện tại qua token | `TBD` |
 | **Auth** | `POST` | `/api/v1/auth/logout` | Đăng xuất người dùng | `TBD` |
 | **Server** | `GET` | `/api/v1/servers` | Lấy danh sách Server mà User là Member / Owner | `CONFIRMED` |
 | **Server** | `POST` | `/api/v1/servers` | Tạo một Server mới | `CONFIRMED` |
-| **Server** | `GET` | `/api/v1/servers/{serverId}` | Lấy thông tin chi tiết một Server | `TBD` |
-| **Server** | `PUT` | `/api/v1/servers/{serverId}` | Cập nhật thông tin Server | `TBD` |
-| **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Xóa Server | `TBD` |
-| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `IMPLEMENTED` |
-| **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server | `TBD` |
-| **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `TBD` |
-| **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Kick một Member ra khỏi Server | `TBD` |
+| **Server** | `GET` | `/api/v1/servers/{serverId}` | Đọc thông tin phần vỏ Server; Owner/Member, contract mục 9 | `IMPLEMENTED` |
+| **Server** | `PUT` | `/api/v1/servers/{serverId}` | Owner cập nhật tên/ảnh Server, contract mục 11 | `IMPLEMENTED` |
+| **Server** | `DELETE`| `/api/v1/servers/{serverId}` | Owner xóa vĩnh viễn Server, contract mục 12 | `IMPLEMENTED` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/join` | Tham gia vào một Server | `CONFIRMED` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/invites` | Tạo mã mời Server mới (duy nhất Owner) | `IMPLEMENTED` |
+| **Server** | `POST` | `/api/v1/servers/{serverId}/leave` | Rời khỏi Server (Member, Admin; Owner cấm theo BR-SRV-01) | `IMPLEMENTED` |
+| **Member** | `GET` | `/api/v1/servers/{serverId}/members` | Lấy danh sách Member của Server | `IMPLEMENTED` |
+| **Member** | `DELETE`| `/api/v1/servers/{serverId}/members/{userId}` | Owner loại (kick) một Member ra khỏi Server (Task 2.19) | `IMPLEMENTED` |
 | **Member** | `PUT` | `/api/v1/servers/{serverId}/members/{userId}/role` | Phân quyền Member trong Server | `TBD` |
-| **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message (có pagination) | `TBD` |
-| **Message** | `DELETE`| `/api/v1/servers/{serverId}/messages/{messageId}` | Xóa Message (nếu có tính năng) | `TBD` |
+| **Message** | `GET` | `/api/channels/{channelId}/messages?before={id}&limit=30` | Lấy lịch sử Message (Cursor pagination) | `CONFIRMED` |
+| **Message** | `GET` | `/api/v1/servers/{serverId}/messages` | Lấy lịch sử Message server cũ | `TBD` |
+| **Message** | `DELETE`| `/api/messages/{messageId}` | Xóa Message (duy nhất tác giả tin nhắn; trả `204 No Content`) | `IMPLEMENTED` |
 | **Channel** | `POST` | `/api/v1/channels` | Tạo mới một Channel trong Server (yêu cầu là Owner/Member) | `CONFIRMED` |
-| **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `TBD` |
+| **Channel** | `GET` | `/api/v1/servers/{serverId}/channels` | Lấy danh sách Channel của Server | `CONFIRMED` |
+| **Channel** | `PUT` | `/api/v1/channels/{channelId}` | Cập nhật thông tin (tên, thứ tự) Channel | `CONFIRMED` |
+| **Channel** | `DELETE`| `/api/v1/channels/{channelId}` | Xóa một Channel trong Server (yêu cầu là Owner/Member, không được xóa #general hoặc kênh cuối cùng) | `CONFIRMED` |
 | **Media / File** | `POST` | `/api/v1/files/upload` | Tải lên file ảnh (multipart/form-data) nhận URL tĩnh | `CONFIRMED` |
 | **Media / File** | `GET` | `/api/v1/files/{folder}/{filename}` | Phục vụ file ảnh công khai cho trình duyệt | `CONFIRMED` |
+| **Conversation** | `GET` | `/api/v1/conversations` | Lấy danh sách hội thoại của user hiện tại (thông tin người kia & tin nhắn mới nhất) | `CONFIRMED` |
+| **Conversation** | `GET` | `/api/v1/conversations/{conversationId}/messages` | Lấy lịch sử tin nhắn của một hội thoại (phân trang page & size) | `CONFIRMED` |
 
 Hiện trạng đã đọc từ source sau gộp:
 
@@ -172,30 +197,35 @@ Hiện trạng đã đọc từ source sau gộp:
 - ResFormatResponse bọc success response đúng quyết định SUCCESS-WRAPPER tại mục 4.1/7.1. MessageResource.java còn untracked có sẵn; MessageResourceIT.java đã tracked. Security/JWT/Problem Details và H2 đã PASS theo mục 7.5; còn ghi SQL Server thật chưa xác minh.
 - Backend 58 tests và frontend build PASS thuộc lượt gộp code trước khi áp dụng stash. Lượt gộp tài liệu sau stash không chạy lại test/build; các kết quả lịch sử không xác nhận lại toàn bộ working tree hiện tại hoặc các chênh lệch còn lại.
 
+
 ---
 
 ## 5. Danh mục REST API Chuẩn hóa (`CONFIRMED`)
 
 ### 5.1 Authentication & User
-- `POST /api/auth/register`: Đăng ký tài khoản mới
-- `POST /api/auth/login`: Đăng nhập, nhận Access Token JWT và cookie Refresh Token
+- `POST /api/register` & `POST /api/auth/register`: Đăng ký tài khoản mới (`RegisterReqDTO`: email, password, name, username), lưu người dùng, trả `UserDTO` bọc trong `RestResponse<UserDTO>` (201 Created).
+- `POST /api/login` & `POST /api/auth/login`: Đăng nhập, nhận Access Token JWT và cookie Refresh Token (`ResLoginDTO`).
+- `POST /api/auth/google` & `POST /api/login/google`: Đăng nhập hoặc đăng ký tài khoản qua Google OAuth / Google Identity Services (`GoogleLoginReqDTO`: credential, email, name, avatar, googleId), trả về `ResLoginDTO` (200 OK).
+- `POST /api/social-login`: Đăng nhập hoặc đăng ký tài khoản thông qua mạng xã hội (`SocialLoginVM`: `accessToken`, `type` ["GOOGLE", "GITHUB"]), cấp Access Token JWT và cookie Refresh Token HttpOnly (`ResLoginDTO`, 200 OK).
 - `POST /api/auth/logout`: Đăng xuất, hủy refresh token
-- `GET /api/users/me`: Thông tin người dùng hiện tại
+- `GET /api/account` & `GET /api/users/me`: Thông tin người dùng hiện tại
 - `PATCH /api/users/me`: Cập nhật display name, avatar
 - `GET /api/users/search?q={query}`: Tìm kiếm người dùng theo tên
 
 ### 5.2 Server & Member Management
-- `GET /api/servers`: Lấy danh sách server người dùng tham gia
-- `POST /api/servers`: Tạo server mới (transactional với `#general` channel và Owner)
-- `GET /api/servers/{serverId}`: Chi tiết server kèm danh sách kênh
-- `PATCH /api/servers/{serverId}`: Cập nhật tên/ảnh server (Owner)
-- `DELETE /api/servers/{serverId}`: Xóa server (Owner)
-- `POST /api/servers/{serverId}/leave`: Rời server (Member, Admin)
-- `POST /api/servers/{serverId}/invites`: Tạo invite code
-- `POST /api/invites/{code}/join`: Tham gia server qua code
+- `GET /api/v1/servers`: Lấy danh sách server người dùng sở hữu/tham gia; có `visibility` theo mục 23. Đường dẫn thiết kế cũ `/api/servers` không phải alias hiện có.
+- `POST /api/v1/servers`: Tạo server mới (transactional với `#general` channel và Owner), `visibility` mặc định `PRIVATE`; xem mục 23.
+- `GET /api/v1/servers/discover`: Tìm Server công khai, phân trang; xem mục 23.
+- `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp chỉ khi Server `PUBLIC`; Server `PRIVATE` trả `403`, cần mã mời hợp lệ.
+- `GET /api/v1/servers/{serverId}`: Chi tiết phần vỏ Server theo phạm vi duyệt 2026-10-13 (mục 9); trả DTO Server hiện có. Thiết kế trước đó `/api/servers/{serverId}` kèm danh sách kênh được thu hẹp cho lượt này; dữ liệu Channel thuộc module Channel, không thêm alias `/api/servers/{serverId}`.
+- `PUT /api/v1/servers/{serverId}`: Cập nhật tên/ảnh server (Owner), contract mục 11 được duyệt 2026-10-15; thay thế đề xuất cũ `PATCH /api/servers/{serverId}`, không thêm alias.
+- `DELETE /api/v1/servers/{serverId}`: Owner xóa vĩnh viễn Server theo mục 12 (2026-10-21); thay thế đường dẫn thiết kế `/api/servers/{serverId}`, không thêm alias.
+- `POST /api/v1/servers/{serverId}/leave`: Rời khỏi Server (Member, Admin; Owner cấm theo BR-SRV-01, alias `DELETE /api/v1/servers/{serverId}/members/me`, trả `204 No Content`)
+- `POST /api/v1/servers/{serverId}/invites`: Tạo invite code (duy nhất Server Owner, mã 8 ký tự Base62 an toàn, trả `ServerInviteResponseDTO` trong wrapper `RestResponse`)
+- `POST /api/v1/servers/join-invite/{code}`: Tham gia server qua invite code (Người dùng đã đăng nhập, trả `ServerResponseDTO` trong wrapper `RestResponse`)
 - `DELETE /api/invites/{code}`: Thu hồi invite code
-- `GET /api/servers/{serverId}/members`: Danh sách thành viên
-- `DELETE /api/servers/{serverId}/members/{userId}`: Kick thành viên
+- `GET /api/v1/servers/{serverId}/members`: Danh sách thành viên (Owner/Member, `ServerMemberResponseDTO`)
+- `DELETE /api/v1/servers/{serverId}/members/{userId}`: Owner loại (kick) thành viên khỏi Server (trả `204 No Content`)
 - `PATCH /api/servers/{serverId}/members/{userId}/role`: Phân quyền `ADMIN`/`MEMBER` (Owner)
 
 ### 5.3 Channels & Messages
@@ -206,7 +236,7 @@ Hiện trạng đã đọc từ source sau gộp:
 - `GET /api/channels/{channelId}/messages?before={id}&limit=30`: Lịch sử tin nhắn
 - `POST /api/channels/{channelId}/messages`: Gửi tin nhắn mới
 - `PATCH /api/messages/{messageId}`: Chỉnh sửa tin nhắn (tác giả)
-- `DELETE /api/messages/{messageId}`: Xóa mềm tin nhắn
+- `DELETE /api/messages/{messageId}`: Xóa tin nhắn (duy nhất tác giả tin nhắn; trả `204 No Content`)
 - `POST /api/messages/{messageId}/reactions`: Thả emoji reaction
 - `DELETE /api/messages/{messageId}/reactions/{emoji}`: Gỡ emoji reaction
 
@@ -234,14 +264,61 @@ Server ──[BROADCAST]──> /topic/channels/{channelId} ──────�
 Server ──[PRIVATE]────> /user/queue/direct-messages ───────(Người nhận DM)
 ```
 
-| Destination | Action | Mục đích |
-| :--- | :---: | :--- |
-| `/app/channels/{channelId}/send` | `SEND` | Gửi tin nhắn văn bản vào channel |
-| `/topic/channels/{channelId}` | `SUBSCRIBE` | Nhận sự kiện tin nhắn (`CREATED`, `UPDATED`, `DELETED`) |
-| `/topic/channels/{channelId}/reactions` | `SUBSCRIBE` | Nhận sự kiện reaction (`ADDED`, `REMOVED`) |
-| `/topic/servers/{serverId}` | `SUBSCRIBE` | Nhận sự kiện quản trị server (kênh mới, thành viên bị kick) |
-| `/user/queue/direct-messages` | `SUBSCRIBE` | Nhận tin nhắn riêng tư 1-1 gửi trực tiếp cho người dùng |
-| `/user/queue/errors` | `SUBSCRIBE` | Nhận thông báo lỗi thời gian thực cá nhân |
+| Destination | Action | Mục đích | Trạng thái |
+| :--- | :---: | :--- | :---: |
+| `/app/channels/{channelId}/send` | `SEND` | Gửi tin nhắn văn bản vào channel | `CONFIRMED` |
+| `/topic/channels/{channelId}` | `SUBSCRIBE` | Nhận sự kiện tin nhắn (`CREATED`, `UPDATED`, `DELETED`) | `CONFIRMED` |
+| `/topic/channels/{channelId}/reactions` | `SUBSCRIBE` | Nhận sự kiện reaction (`ADDED`, `REMOVED`) | `TBD` |
+| `/topic/servers/{serverId}` | `SUBSCRIBE` | Nhận sự kiện quản trị server (kênh mới, thành viên bị kick) | `TBD` |
+| `/app/conversations/send` | `SEND` | Client gửi tin nhắn 1-1 (Text / Image) | `CONFIRMED` |
+| `/topic/conversations/{conversationId}` | `SUBSCRIBE` | Client lắng nghe tin nhắn 1-1 real-time | `CONFIRMED` |
+| `/user/queue/friend-requests/received` | `SUBSCRIBE` | Nhận thông báo có lời mời kết bạn mới | `CONFIRMED` |
+| `/user/queue/friend-requests/accepted` | `SUBSCRIBE` | Sự kiện ngầm cập nhật danh sách bạn bè khi lời mời được chấp nhận (không hiển thị popup notification để chống spam) | `CONFIRMED` |
+| `/user/queue/direct-messages` | `SUBSCRIBE` | Nhận tin nhắn riêng tư 1-1 gửi trực tiếp cho người dùng | `TBD` |
+| `/app/post` | `SEND` | Client đăng bài viết mới (`FeedPostReq`: content, privacy, mediaUrl, mediaUrls) | `CONFIRMED` |
+| `/user/queue/new-post` | `SUBSCRIBE` | Bạn bè nhận thông báo bài viết mới real-time (`DisplayPostDTO`) khi privacy != PRIVATE | `CONFIRMED` |
+| `/user/queue/errors` | `SUBSCRIBE` | Nhận thông báo lỗi thời gian thực cá nhân | `TBD` |
+
+> [!NOTE]
+> **Định danh WebSocket Principal & Private Queue Routing:**  
+> Trong `WebSocketConfig`, STOMP `Principal.getName()` được trích xuất từ JWT claim `user.id` (dạng chuỗi, fallback về `jwt.getSubject()` email) để các lệnh `convertAndSendToUser(userId, ...)` như trong `NotificationFriendshipRequest` có thể định tuyến chính xác vào session của người nhận. Đồng thời, `NotificationFriendshipRequest` thực hiện dual-delivery (gửi cho cả numeric User ID và email) để đảm bảo 100% không bị thất lạc sự kiện.
+
+### 6.3 Định dạng WebSocket Payload gửi lên 1-1 (`SendMessageReq`) (`CONFIRMED`)
+```json
+{
+  "conversationId": 100,
+  "targetUserId": 2,
+  "type": "IMAGE",
+  "content": "Gửi mọi người bộ ảnh tài liệu",
+  "mediaUrl": "denhub-172838392-uuid1.webp,denhub-172838392-uuid2.webp",
+  "mediaUrls": [
+    "denhub-172838392-uuid1.webp",
+    "denhub-172838392-uuid2.webp"
+  ]
+}
+```
+
+### 6.4 Định dạng WebSocket Message phát sóng xuống Client (`SendMessageRes`) (`CONFIRMED`)
+```json
+{
+  "messageId": 501,
+  "conversationId": 100,
+  "sender": {
+    "userId": 1,
+    "name": "Hoàng Nam",
+    "avatar": "https://..."
+  },
+  "type": "IMAGE",
+  "content": "Gửi mọi người bộ ảnh tài liệu",
+  "mediaUrl": "denhub-172838392-uuid1.webp,denhub-172838392-uuid2.webp",
+  "mediaUrls": [
+    "denhub-172838392-uuid1.webp",
+    "denhub-172838392-uuid2.webp"
+  ],
+  "status": "SENT",
+  "createdAt": "2026-10-08T17:10:00Z"
+}
+```
 
 ---
 
@@ -272,7 +349,6 @@ HTTP `201 Created`, Response DTO `MessageResponse` nằm trong `data`:
     "senderId": 2,
     "content": "Hello mọi người!",
     "createdAt": "2026-10-10T07:30:00Z"
-  }
 }
 ```
 
@@ -363,7 +439,114 @@ Request DTO chỉ có content để client không chọn người gửi; Respons
 2. Vì sao 2000 emoji `😀` được chấp nhận còn thêm một chữ `a` bị 400?
 3. Vì sao JPA/H2 pass nhưng database SQL Server cũ vẫn cần được kiểm tra hai cột audit?
 
-Dừng tại phạm vi POST; chờ Duy trả lời và yêu cầu tiếp tục trước API GET hoặc frontend.
+### 7.7 API Lấy lịch sử tin nhắn Channel — Cursor Pagination (`IMPLEMENTED`)
+
+Endpoint: `GET /api/channels/{channelId}/messages?before={id}&limit=30`
+
+- **Xác thực & Phân quyền:** Yêu cầu Bearer JWT hợp lệ, tài khoản activated, Channel tồn tại và người dùng là thành viên Server (`ServerMember`) hoặc Owner.
+- **Tham số truy vấn:**
+  - `before` (Long, optional): Con trỏ ID tin nhắn (lấy các tin có ID nhỏ hơn con trỏ này, phục vụ cuộn lên tải tin cũ).
+  - `limit` (Integer, optional, mặc định 30): Số lượng tin nhắn tối đa mỗi trang (chấp nhận 1 đến 100).
+- **Thứ tự:** Sắp xếp ID giảm dần (mới nhất trước).
+- **Response Format (Thành công 200 OK):**
+  Wrapper `ResFormatResponse` bọc `CursorPageResponse<MessageResponse>` trong `data`:
+  ```json
+  {
+    "statusCode": 200,
+    "error": null,
+    "message": "Lấy lịch sử tin nhắn thành công",
+    "data": {
+      "items": [
+        {
+          "id": 105,
+          "channelId": 5,
+          "senderId": 2,
+          "content": "Nội dung tin nhắn",
+          "createdAt": "2026-10-10T07:30:00Z"
+        }
+      ],
+      "nextCursor": 101,
+      "hasMore": true,
+      "limit": 30
+    }
+  }
+  ```
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `channelId` <= 0, `limit` ngoài khoảng 1..100, hoặc `before` <= 0.
+  - `401 Unauthorized`: Chưa đăng nhập hoặc token không hợp lệ / tài khoản chưa kích hoạt.
+  - `403 Forbidden`: Người dùng không phải thành viên của Server chứa Channel.
+  - `404 Not Found`: Không tìm thấy Channel.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 11 unit tests kiểm thử thành công, default limit, hasMore, nextCursor, kênh rỗng, và toàn bộ các mã lỗi 400/401/403/404.
+  - `MessageResourceIT`: 4 standalone MockMvc tests kiểm thử response code, JSON paths wrapper và Problem Details.
+  - `MessageSecurityIT`: 5 SpringBootTest integration tests với JWT encoder và JPA/H2 thật kiểm thử sắp xếp giảm dần, phân trang `before`, chặn 401 khi thiếu token, chặn 403 khi không phải member, chặn 400 khi limit sai.
+
+### 7.8 API Chỉnh sửa tin nhắn văn bản — Edit Message (`IMPLEMENTED`)
+
+Endpoint: `PATCH /api/messages/{messageId}` & `PUT /api/messages/{messageId}`
+
+- **Xác thực & Phân quyền:**
+  - Yêu cầu Bearer JWT hợp lệ, tài khoản activated.
+  - Áp dụng Business Rule `BR-MSG-02`: **Chỉ tác giả gốc (`authorId` / `senderId`) mới được quyền sửa tin nhắn của mình**.
+  - Server Owner hay Admin không được phép sửa tin nhắn của thành viên khác; nếu cố tình gửi request sửa sẽ nhận `403 Forbidden` (`"Bạn không có quyền sửa tin nhắn này"`).
+- **Request Body (`UpdateMessageRequest`):**
+  ```json
+  {
+    "content": "Nội dung tin nhắn sau khi chỉnh sửa"
+  }
+  ```
+- **Validation Constraints:**
+  - `messageId` (path variable): kiểu Long, phải lớn hơn 0.
+  - `content`: `@NotBlank`, `@Pattern(regexp = "(?sU).*\\S.*")`, `@Size(max = 4000)` UTF-16 characters (tương thích validation `SendMessageRequest`).
+- **Response Format (Thành công 200 OK):**
+  Wrapper `ResFormatResponse` bọc `MessageResponse` trong `data`:
+  ```json
+  {
+    "statusCode": 200,
+    "error": null,
+    "message": "Chỉnh sửa tin nhắn thành công",
+    "data": {
+      "id": 101,
+      "channelId": 5,
+      "senderId": 2,
+      "content": "Nội dung tin nhắn sau khi chỉnh sửa",
+      "createdAt": "2026-10-10T07:30:00Z",
+      "updatedAt": "2026-10-10T08:00:00Z"
+    }
+  }
+  ```
+  *Ghi chú:* `MessageResponse.updatedAt` được cấu hình `@JsonInclude(JsonInclude.Include.NON_NULL)` nên chỉ xuất hiện khi tin nhắn có thông tin thời điểm sửa.
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `messageId` <= 0, content null, rỗng, toàn khoảng trắng Unicode hoặc vượt quá 4000 ký tự.
+  - `401 Unauthorized`: Người dùng chưa xác thực hoặc token không hợp lệ / session hết hạn.
+  - `403 Forbidden`: Người gửi request không phải tác giả của tin nhắn (áp dụng cả với Server Owner).
+  - `404 Not Found`: Không tìm thấy tin nhắn với `messageId`.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 9 unit tests kiểm thử sửa thành công, chặn invalid ID, blank content, content > 4000 ký tự, chưa đăng nhập, message không tồn tại, user khác sửa (403), server owner sửa (403).
+  - `MessageResourceIT`: 5 MockMvc tests kiểm thử PATCH & PUT trả 200 kèm envelope, 400 khi blank content, 404 khi not found, 403 khi forbidden.
+  - `MessageSecurityIT`: 7 SpringBootTest integration tests với JWT token thật và database H2 thật kiểm thử sửa qua PATCH và PUT thành công và cập nhật `lastModifiedDate`, chặn 403 khi member khác sửa, chặn 403 khi server owner sửa, chặn 401 khi không token, chặn 400 khi blank, chặn 404 khi tin nhắn không tồn tại.
+
+### 7.9 API Xóa tin nhắn — Delete Message (`IMPLEMENTED`)
+
+- **Mục đích:** Xóa vĩnh viễn một tin nhắn khỏi Channel.
+- **Quyền hạn truy cập:**
+  - **Duy nhất tác giả tin nhắn (`authorId == currentUser.id`)**.
+  - Server Owner, Admin hoặc thành viên khác không được quyền xóa tin nhắn của người khác chỉ nhờ vai trò (bị từ chối `403 Forbidden`).
+- **Endpoint:** `DELETE /api/messages/{messageId}`
+- **Authentication:** Bắt buộc JWT Bearer token qua header `Authorization: Bearer <token>`.
+- **Validation Constraints:**
+  - `messageId` (path variable): kiểu Long, phải lớn hơn 0 (<= 0 trả `400 Bad Request`).
+- **Response Format (Thành công 204 No Content):**
+  - Trả về mã HTTP `204 No Content` với body rỗng (chuẩn REST cho thao tác DELETE trong DenHub).
+- **Response Format (Lỗi):** Problem Details RFC 9457 (`application/problem+json`).
+  - `400 Bad Request`: `messageId` null hoặc <= 0.
+  - `401 Unauthorized`: Chưa đăng nhập hoặc token không hợp lệ / tài khoản inactive.
+  - `403 Forbidden`: Người gửi request không phải tác giả của tin nhắn (`"Bạn không có quyền xóa tin nhắn này"`).
+  - `404 Not Found`: Không tìm thấy tin nhắn với `messageId`.
+- **Kiểm thử tự động:**
+  - `MessageServiceTest`: 6 unit tests (tác giả xóa 204, server owner cố xóa bị 403, other member cố xóa bị 403, invalid id 400, unauthenticated 401, not found 404).
+  - `MessageResourceIT`: 4 MockMvc tests (DELETE 204, 400, 404, 403).
+  - `MessageSecurityIT`: 5 SpringBootTest integration tests với token JWT thật và database H2 (tác giả xóa thành công 204, server owner bị 403 và DB còn nguyên, member khác bị 403 và DB còn nguyên, 401 không token, 404 not found).
 
 ## 8. Task 1.12 — UI nhập và gửi tin nhắn
 
@@ -383,7 +566,7 @@ Luồng tích hợp: `Người dùng nhập → React State cập nhật → Sen
 Duy duyệt riêng phạm vi làm UI trước khi API Group chat hoàn tất. Đây là ngoại lệ thứ tự thực hiện cho đợt UI, không xác nhận Backend đã DONE hoặc cho phép tự thay contract.
 
 - Route Frontend `/servers/:serverId` nằm trong `ProtectedRoute`, dùng `GroupChatPage`; dock chọn nhóm bằng `Link`. Đây là route trình duyệt, không phải endpoint Backend.
-- Tái sử dụng `GET /api/v1/servers` qua `serverApi.getAll()` và state của `MainLayout`. GroupChatPage chọn nhóm từ danh sách trả về, không gọi `serverApi.getById()` vì chưa có endpoint tương ứng. Loading, lỗi tải và nhóm không có trong danh sách là ba trạng thái khác nhau; lỗi có nút thử lại.
+- Trong lượt UI ban đầu, tái sử dụng `GET /api/v1/servers` qua `serverApi.getAll()` và state của `MainLayout` để chọn nhóm. Từ 2026-10-13, `GroupChatPage` đọc riêng `serverApi.getById(serverId)` theo mục 9; dock vẫn dùng danh sách. Loading và lỗi trang chi tiết độc lập với danh sách ở dock.
 - Bố cục tham khảo Discord, dùng màu DenHub: dock nhóm → cột kênh → vùng trò chuyện/ô nhập → thành viên. Từ 1200 px có panel thành viên bật/tắt; dưới 1200 px dùng Drawer thành viên, dưới 992 px dùng Drawer kênh. Không có voice, category hoặc trạng thái online giả.
 - Chưa có API đọc danh sách kênh, thành viên hoặc lịch sử trong source. Tạo server hiện chưa tạo general. UI hiển thị dữ liệu chưa sẵn sàng và khóa composer; không tạo kênh/thành viên/tin nhắn giả, không hardcode channelId, không gọi WebSocket cũ.
 - `MessageInput` nhận props `channelId`, `channelName`, `disabled`, `onSend`, `onSent`. `onSend(channelId, { content })` phải trả Promise chứa kết quả gửi thành công; `onSent(message, channelId)` báo về cha sau thành công. Đây là giao diện component nội bộ, không bổ sung DTO/endpoint.
@@ -446,3 +629,555 @@ Ba câu kiểm tra để Duy trả lời trước khi chuyển đợt:
 1. `onSend` reject thì input và nút Gửi thay đổi thế nào?
 2. Nếu lấy `response.data` thay vì `response.data.data`, component cha sẽ nhận gì?
 3. Vì sao route Group hiện chưa được mở gửi thật dù đã có MessageInput?
+
+## 9. Đọc chi tiết phần vỏ Server (`CONFIRMED`, 2026-10-13)
+
+Duy xác nhận chỉ phụ trách phần vỏ Server; Channel thuộc developer khác. Lượt đầu bổ sung API đọc và nối FE trên nhánh `feature/server-detail`; không thay database hoặc API tạo/list. Lượt sửa 6 bug được duyệt sau đó mở rộng riêng phần tạo/list, audit Server và FE như mục 9.4; không thay role, Join, Channel, Message, Invite hoặc WebSocket.
+
+### 9.1 REST contract
+
+- `GET /api/v1/servers/{serverId}`; dùng prefix hiện có của `ServerResource` và hàm `serverApi.getById` đã tồn tại. Không có request body hoặc endpoint alias mới.
+- Bearer JWT theo Security hiện có. Service từ chối anonymous, Authentication chưa xác thực, subject trống, User không tồn tại hoặc chưa activated. Owner được xác định qua `Server.ownerId`; thành viên được kiểm bằng `existsByServerIdAndUserId` đúng Server. `ROLE_ADMIN` toàn hệ thống không bỏ qua điều kiện này.
+- HTTP `200`, `ServerResponseDTO` nằm trong `data` của wrapper mục 4.1; gồm `id`, `name`, `iconUrl` (có thể null), `ownerId`, `createdDate` (`Instant`, JSON ISO-8601 UTC). `message` dùng mặc định `Call API success!`, `error` là null. Không trả Entity, audit hoặc danh sách Channel.
+- `401`: thiếu/JWT sai, hết hạn, session sai hoặc tài khoản không hợp lệ; `403`: User hợp lệ nhưng không phải Owner/Member; `404`: Server không tồn tại; `400`: ID không chuyển được sang Long. Lỗi qua handler hiện có, `application/problem+json`; không bọc success.
+- `ServerService.getServerDetail` dùng transaction `readOnly`; không tạo membership hoặc thay dữ liệu khi đọc. Owner có thể đọc ngay cả khi chưa có bản ghi membership, thống nhất cách lấy danh sách Server hiện có.
+
+### 9.2 Frontend
+
+- Khi mở, reload hoặc chuyển `/servers/:serverId`, `GroupChatPage` gọi `GET /api/v1/servers/{serverId}` và đọc `response.data.data`. Dock ở `MainLayout` tiếp tục dùng API danh sách.
+- Trang chi tiết độc lập với thành công/thất bại của danh sách; không suy ra thiếu quyền chỉ vì Server chưa nằm trong state dock.
+- Loading riêng; API chi tiết trả `403` thì FE chuyển về Home `/` bằng `replace`, không hiển thị thông báo thiếu quyền, không logout. Đường dẫn bị từ chối được thay trong history để Back quay về trang trước đó. `404`/`400` vẫn có thông báo an toàn, lỗi mạng/5xx có thể thử lại. `401` sử dụng interceptor đã có để xóa phiên và về login. Không hiển thị nguyên chi tiết hạ tầng từ response lỗi.
+- Effect cleanup bỏ qua response thành công/thất bại của request cũ; render kiểm tra serverId để tránh hiển thị nhóm cũ khi route đã đổi. Retry tải lại chi tiết của Server hiện tại.
+- Duy duyệt thay đổi redirect bằng “oke duyệt” ngày 2026-10-13. BE vẫn trả `403` và kiểm Owner/Member; redirect chỉ áp dụng cho lỗi chi tiết của Server hiện tại. Response `403` cũ không được điều hướng về Home. URL tiếp tục dùng ID số; UUID/publicId cần kế hoạch và phê duyệt riêng.
+- Giữ khung Channel/Member và composer chưa tích hợp của lượt UI trước; không tự tạo kênh hoặc bật gửi tin.
+
+### 9.3 Verification và giới hạn
+
+- `ServerServiceTest`: thêm 7 cases đọc/authorization/identity; `ServerResourceTest`: thêm case ánh xạ đúng ID. Standalone test chỉ kiểm Controller; wrapper/errors/filters được kiểm trong suite bên dưới.
+- Lượt API ban đầu: `ServerSecurityIT` có 13 cases chạy HTTP/MockMvc → JWT ký thật/filters → Service → JPA/H2, không mock Service/Repository. Kiểm Owner không có membership, Member, outsider dù có ROLE_ADMIN, membership Server khác, 404, ID sai, token thiếu/malformed/sai chữ ký/hết hạn, session sai, User inactive/missing; assertions wrapper/Problem Details và đọc không làm thay dữ liệu. Fixture rollback sau test. Lượt sửa bug dùng spy Repository riêng để gây lỗi membership có kiểm soát; xem mục 9.4.
+- Từ `server/`: `.\gradlew.bat compileJava test check --no-daemon` **PASS 128/128**, 0 failure/error/skip.
+- Từ `client/`: `node --test tests/messageInput.test.mjs` **PASS 5/5**; `npm run build` **PASS**; với Playwright sẵn có qua NODE_PATH, `node --test tests/group-chat.browser.test.mjs` **PASS 14/14** trên Edge headless.
+- Browser tests kiểm DTO chi tiết khác snapshot danh sách, ID/reload, list lỗi/rỗng, loading/503/404, 403, lỗi mạng/retry, 401/logout, response cũ thành công/lỗi, route guard, responsive và regression composer. API là fixture trong test; không kiểm thử FE gọi BE/SQL Server thật.
+- Lượt redirect `403` (2026-10-13): cập nhật case mở URL trực tiếp về Home, không hiện thiếu quyền và không mất token; thêm case mở từ dock và Back về Server trước đó; bổ sung assertion URL cho response cũ. `node --test tests/group-chat.browser.test.mjs` với NODE_PATH như lượt trước **PASS 15/15**, 0 failure/skip; `npm run build` **PASS**. Chỉ đổi FE/tests/docs, không chạy lại backend hoặc Node logic tests trong lượt này. Số 14/14 bên trên là kết quả trước thay đổi redirect.
+- PRE-EXISTING ISSUE: build có warning chunk >500 kB; browser có warning Ant Design Spin tip, Modal destroyOnClose và Empty imageStyle. Không đổi dependency hoặc sửa module khác.
+- Kiểm tra lại trước commit (2026-10-13): `.\gradlew.bat compileJava test check --no-daemon --rerun-tasks` **PASS 128/128**; với NODE_PATH Playwright như lượt trước, `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` **PASS 20/20**; `npm run build` **PASS**. Duy đã trực tiếp yêu cầu chia commit và push nhánh `feature/server-detail`; xem log RELEASE-SERVER-DETAIL trong docs/00.
+- Chưa kiểm thử SQL Server thật; không khởi động app với cấu hình production hoặc thay schema.
+
+### 9.4 Sửa 6 bug phần Server CRUD (`CONFIRMED`, 2026-10-13)
+
+- Duy duyệt kế hoạch bằng “triển khai”; không triển khai UUID/publicId, Join hoặc Channel. Endpoint và DTO thành công giữ nguyên.
+- `POST /api/v1/servers` và `GET /api/v1/servers` dùng cùng kiểm tra identity với chi tiết: Authentication đã xác thực, không anonymous, subject email hợp lệ, User tồn tại và `activated = true`. Vi phạm trả `401` Problem Details; không lưu Server/membership hoặc đọc danh sách trước khi qua kiểm tra. Email được trim/lowercase khi tìm User, audit vẫn giữ identity đầy đủ.
+- Tạo Server vẫn nằm trong một transaction cùng membership Owner. Nickname Owner tự sinh theo quy tắc docs/01 mục 5; không đổi tên User hoặc mở rộng cột nickname. Nếu lưu membership lỗi, Server cũng rollback. Audit Server riêng hỗ trợ email 254 ký tự theo docs/03 mục 4.4.
+- `CreateServerModal` khóa nút tạo và kiểm tra upload đang chờ trong handler submit, kể cả Enter/Form submit. Upload thành công cập nhật `iconUrl` trước khi cho tạo.
+- Mỗi upload có request ID. Đóng/mở lại modal, chọn preset/template hoặc file mới làm request trước đó hết hiệu lực. Success, error và finally của request cũ không được sửa icon/form/loading hoặc hiển thị toast của phiên mới. Bỏ qua response không xóa file đã upload trên máy chủ; quản lý file dùng chung ngoài phạm vi này.
+- Home sử dụng `serversLoading`, `serversError`, `refreshServers` từ MainLayout: loading riêng, lỗi mạng/5xx có nút Thử lại, chỉ hiển thị “Bạn chưa có Server nào” và số lượng khi tải danh sách thành công. Không hiển thị nguyên lỗi hạ tầng.
+- Verification: từ `server/`, `.\gradlew.bat compileJava test check --no-daemon` **PASS 150/150**, 0 failure/error/skip sau sửa fixture email biên trong test. Thêm 13 unit cases nickname/identity và 9 integration cases create/list, email 55/254, tên rỗng/dài/emoji, rollback. `ServerMemberRepository` là spy gọi thật mặc định; duy nhất case rollback stub lỗi save, chạy ngoài transaction test để xác nhận transaction Service rollback.
+- Từ `client/`, với NODE_PATH Playwright như mục 8.2, `node --test tests/group-chat.browser.test.mjs tests/messageInput.test.mjs` **PASS 25/25** (20 Edge browser + 5 logic); `npm run build` **PASS**. Năm browser tests mới kiểm loading/503/retry/empty, submit pending, icon gửi đúng, response cũ, file mới/preset/template và lỗi upload hiện tại. Không có pageerror trong các cases.
+- H2 và browser mock không chứng minh FE → BE → SQL Server thật. Script SQL Server chỉ đã chuẩn bị/review nội dung, chưa thực thi; cần review/apply trên database đích. Các warning Ant Design và chunk >500 kB có sẵn vẫn còn. Không có npm script lint/test để chạy.
+
+### 9.5 Sửa UI tạo và danh sách Server (`IMPLEMENTED`, 2026-10-26)
+
+- Người dùng duyệt kế hoạch bằng “triển khai”; nhánh local `fix/server-crud-ui`. Giữ REST/DTO, Security/Owner, transaction tạo membership/general và schema hiện tại.
+- `MainLayout.handleServerCreated` vô hiệu các GET danh sách bắt đầu trước khi POST tạo thành công, thêm/upsert Server theo ID dạng chuỗi, xóa trạng thái loading/error để Home và dock hiện Server mới ngay. Ref theo dõi request đang chờ và việc danh sách đã tải đầy đủ; không phụ thuộc state đã bị capture từ lúc gửi POST. Nếu GET đang chờ hoặc danh sách chưa tải thành công, gọi GET mới sau POST ở chế độ nền để lấy đủ các Server khác.
+- Refresh nền không che Server mới bằng loading. Nếu lỗi, Home giữ các Server đã biết, ẩn tổng số và hiển thị cảnh báo/nút Thử lại; chỉ dùng trạng thái lỗi toàn trang khi chưa có Server nào. DELETE tiếp tục vô hiệu GET cũ và tải lại nếu có request danh sách đang chờ, kể cả GET nền sau tạo.
+- `CreateServerModal` có session cho từng lần mở/đóng, cùng ref khóa submit trước khi React render loading. POST cũ thành công vẫn gọi callback cập nhật danh sách. Chỉ session hiện tại được đóng/reset form, hiển thị success/error hoặc cập nhật loading; upload giữ cơ chế request ID cũ. Đóng modal không hủy giao dịch backend.
+- Form tạo kiểm tra whitespace và `String.length <= 100` theo đơn vị UTF-16, cùng `CreateServerDTO` hiện có. Native input maxlength cũng là 100; validator vẫn từ chối 101 khi native limit bị bỏ qua. 50 emoji `🙂` dài 100 UTF-16; không dùng số code point của validator mặc định để thay giới hạn backend.
+- Home thêm Link ở tên/ảnh card tới `/servers/{id}`, dùng được bằng bàn phím. CSS riêng `pages/home/home.css`, scope `.home-layout`: dưới 992px ẩn sidebar phụ và cung cấp nav Tin nhắn/Bạn bè/Hồ sơ/Đăng xuất; dưới 601px dock rộng 56px, bố cục/nút co theo viewport. Các route Group/Direct/Friends giữ layout hiện có.
+- Regression tests mới: 12 browser cases cho thứ tự GET/POST, refresh lỗi/retry, kết quả POST cũ, submit trùng, giới hạn tên, keyboard link và viewport 320/375/768/1440. Đã xem screenshot mobile 375/desktop 1440.
+- Verification cuối từ `client/`, NODE_PATH Playwright theo mục 8.2: `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` PASS **63/63** (35 Group/Home + 28 Settings/Delete); `npm test` PASS **103/103**; `npm run build` PASS. Hai browser suites chạy tuần tự để tránh dùng chung Vite optimizer cache đồng thời. Không có pageerror trong các cases mới.
+- Giới hạn: browser dùng API mock; không chạy lại backend hoặc truy cập SQL Server thật trong lượt sửa FE. Bundle lớn và các warning Ant Design/style có sẵn vẫn còn. `package.json` hiện có `npm test`, chưa có script lint; ghi chú không có script test ở các lượt trước là lịch sử.
+
+### 9.6 Cô lập dữ liệu theo Server/kênh và bảo vệ Join bằng ID (`IMPLEMENTED`, 2026-10-26)
+
+- Người dùng duyệt kế hoạch bằng “triển khai”, phạm vi đúng 5 lỗi: kênh/tin nhắn A ghi đè B, inactive Join bằng ID, nickname Join không vừa cột 20, rời A điều hướng nhầm khỏi B, kick ở A làm sai danh sách B. Không sửa các lỗi khác của audit hoặc tự chốt ma trận quyền kênh/cách tham gia.
+- `GroupChatPage` lấy route ID rồi render `ServerWorkspace` với React key theo Server ID. Chuyển A → B → A tạo phiên A mới, reset state kênh/tin nhắn/thành viên/modal; request phiên A cũ không dùng state của A mới. Ref identity được đặt/xóa trong layout effect trước khi paint để callback cũ không điều hướng hay thay state sau unmount.
+- GET kênh và GET thành viên dùng số thứ tự request, kiểm tra cả phiên Server và request mới nhất trước success/error/finally. Retry thành viên dùng cùng guard với lần tải đầu. Callback kick thành công hiện tại vô hiệu snapshot thành viên đã bắt đầu trước khi kick để tránh khôi phục người đã loại.
+- Chọn kênh mới xóa lịch sử, lỗi, cursor và loading của kênh cũ trong layout effect. History/retry kiểm tra session kênh và request; pagination còn kiểm tra phiên history, dùng ref khóa request trùng. Success/error/finally và callback cuộn trễ chỉ tác động đúng phiên. Gửi tin kiểm lại kênh hiện tại trước HTTP; kết quả gửi của phiên/kênh cũ không được append vào lịch sử hoặc làm mất draft mới.
+- Leave/Remove modal dùng session theo lần mở, Server ID và target member khi phù hợp; cleanup vô hiệu response trước khi view mới hiển thị. Leave thành công vẫn cập nhật dock/Home của đúng Server dù người dùng đã chuyển trang, nhưng chỉ navigate Home khi phiên Server gốc còn mở. Kick cũ không thay danh sách hoặc modal của phiên mới; current failure giữ modal để retry, current success cập nhật đúng view. Đóng/chuyển view không hủy giao dịch backend đã gửi.
+- `POST /api/v1/servers/{serverId}/join` dùng `getActiveCurrentUser()` chung với Server CRUD: authentication hợp lệ, email chuẩn hóa, User tồn tại/active; vi phạm trả `401` Problem Details, không lưu membership. ID sai vẫn `400`; Server không tồn tại hoặc đã tham gia vẫn theo error key hiện có; thành công vẫn `204` body rỗng. Không thêm DTO, endpoint hoặc WebSocket.
+- Nickname Join bằng ID theo docs/01 mục 5: strip, fallback `Member`, tối đa 20 UTF-16 và không tách surrogate pair. Helper cắt nickname được dùng chung với Owner nhưng giữ fallback `Owner` của các luồng Owner/invite hiện có. Không đổi User.name, Entity, cột `server_member.nickname`, role hoặc joinedAt.
+- Tests mới: 9 service cases, 10 MockMvc/JWT/JPA/H2 cases và 15 browser cases. Kiểm inactive/missing/JWT, nickname null/rỗng/dài/emoji, User.name không đổi, membership xuất hiện và join lặp không tạo dòng thứ hai; A/B và A/B/A, response kênh/history 200/503, chuyển kênh khi loading, pagination/send đang chờ, leave/kick cũ 204/503 và retry trong phiên hiện tại.
+- Verification: từ `server/`, `.\gradlew.bat test --tests "com.denhub.service.Server*" --tests "com.denhub.web.rest.Server*" check --no-daemon` PASS **234/234**. Từ `client/`, với NODE_PATH theo mục 8.2, `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` PASS **78/78** (50 Group/Home + 28 Settings/Delete); `npm test` PASS **103/103**; `npm run build` PASS. Không có pageerror trong các browser cases mới.
+- Giới hạn: H2 và browser API mock; chưa kiểm thử SQL Server thật. Warning bundle lớn và Ant Design có sẵn còn tồn tại. Các lỗi ngoài 5 mục đã duyệt (mã mời toàn số, rename rồi xóa general, Unicode blank ở API tạo Server) chưa sửa trong lượt này.
+
+### 9.7 Tự mở Server vừa tạo (`IMPLEMENTED`, 2026-10-27)
+
+- Người dùng duyệt kế hoạch bằng “triển khai”. POST tạo vẫn trả DTO/HTTP 201 hiện có; chỉ thay frontend, không đổi backend, database, quyền hoặc WebSocket.
+- `CreateServerModal.onSuccess` tiếp tục cập nhật danh sách cho mọi POST thành công, kể cả form đã đóng. Với session form hiện tại, thông báo thành công, đóng/reset modal rồi gọi callback nội bộ `onOpenServer(id)` mới. Response của session cũ không gọi callback điều hướng.
+- `MainLayout` sở hữu điều hướng: dùng ID từ response để `navigate('/servers/{id}')`, không đợi GET danh sách chạy nền. Route được thêm vào history, nên Back trở về trang trước khi tạo. Group đọc chi tiết và kênh qua các API hiện có; kênh general được chọn theo luồng tải kênh hiện tại. Loading/error/authorization của trang chi tiết giữ xử lý hiện có, độc lập lỗi tải danh sách.
+- Callback gắn với phiên route nơi POST bắt đầu. Kiểm tra cả token theo `location.key` và pathname/search/hash thực tế trước khi navigate: Back có thể đổi URL trước khi React commit view mới. Khi đã chuyển trang, hoặc Back/Forward quay lại cùng history entry sau một visit khác, POST cũ chỉ cập nhật danh sách và không chiếm điều hướng của phiên mới.
+- Browser fixtures được bổ sung DTO chi tiết/kênh general cho đúng Server đã tạo. Các test danh sách trước đây giả định ở lại Home được cập nhật để kiểm tra route mới rồi trở lại Home xác minh danh sách; không bỏ regression upload, nickname, submit trùng hoặc response cũ.
+- Verification: thêm 7 browser cases và cập nhật 8 cases tạo Server hiện có. Với NODE_PATH theo mục 8.2, từ `client/`: `node --test --test-concurrency=1 tests/server-settings.browser.test.mjs tests/group-chat.browser.test.mjs` PASS **85/85** (57 Group/Home + 28 Settings/Delete), 0 failure/skip; `npm test` PASS **103/103**; `npm run build` PASS. Kiểm tạo/mở trên 1440/375px, lỗi 400/503 và retry, form cũ/route mới/Back-Forward quay lại entry cũ, GET danh sách chờ/lỗi và kênh general. Không có pageerror trong các cases mới.
+- Giới hạn: browser dùng API mock; backend không thay đổi và không chạy lại test backend/SQL Server thật trong lượt này. Warning bundle lớn và Ant Design có sẵn vẫn còn.
+
+## 10. Chạy local bằng VS Code — Channel và ảnh upload (2026-10-15)
+
+- Với workspace mở ở `den-app`, cấu hình Java trong `.vscode/launch.json` dùng `cwd = ${workspaceFolder}/server` và `envFile = ${workspaceFolder}/server/.env`. Giữ `projectName` khớp project mà Java extension nhận diện; project hiện tại trong Spring Boot Dashboard là `denhub-server-server`. Nếu mở riêng workspace `server`, hai đường dẫn tương ứng là `${workspaceFolder}` và `${workspaceFolder}/.env`.
+- `FileService.uploadImage` và `loadFileAsResource` dùng thư mục tương đối `uploads/{folder}`. Chạy từ `server/` sẽ đọc/ghi trong `server/uploads`, nơi ảnh server local hiện có được lưu. Chạy từ `den-app/` sẽ tìm trong `den-app/uploads` và không thấy ảnh cũ. Restart Java sau khi thay cwd; không cần di chuyển ảnh hoặc sửa URL trong database cho thay đổi này.
+- `.vscode` và `.env` bị Git ignore. Hướng dẫn này giúp tái tạo cấu hình trên máy khác; không commit credential. Cấu hình launch không tự áp dụng cho mọi cách chạy ngoài cấu hình Java đó.
+- `GET /api/v1/servers/{serverId}/channels` khai báo rõ `@PathVariable("serverId")`; `GET /api/v1/files/{folder}/{filename}` khai báo rõ `folder` và `filename`. Binding của hai API hoạt động cả khi IDE compiler không giữ tên tham số bằng `-parameters`; route, response và quyền truy cập hiện có được giữ nguyên.
+- Hai MockMvc regression tests tắt việc khám phá tên tham số: Channel kiểm tra ID tới service; File kiểm tra bytes PNG, MIME type và cache header. Sau sửa, toàn bộ backend PASS 228/228; `gradlew check` PASS. Đây là kiểm thử backend/MockMvc/H2 và cấu hình đường dẫn, chưa phải xác minh UI hoặc SQL Server thật sau restart.
+
+## 11. Cài đặt và chỉnh sửa Server (`CONFIRMED`, 2026-10-15)
+
+Người dùng duyệt kế hoạch bằng “tiến hành”, gồm Backend và FE. Contract dùng `PUT` theo prefix Controller hiện có, thống nhất mục 4.5/5.2; không đổi các API Server khác.
+
+### 11.1 REST, DTO và quyền
+
+- `PUT /api/v1/servers/{serverId}`, JSON `UpdateServerDTO`; `serverId` phải là số dương. Authentication/JWT hiện có; chỉ User active có ID trùng `Server.ownerId` được sửa. Không dùng role admin toàn hệ thống hay membership để thay thế kiểm tra Owner.
+- `name` bắt buộc, không null/rỗng/toàn khoảng trắng Unicode; tối đa 100 đơn vị UTF-16 trên request trước chuẩn hóa. `iconUrl` tối đa 255 đơn vị UTF-16; null, bỏ qua field, rỗng hoặc chỉ gồm khoảng trắng mà `String.strip()` loại bỏ sẽ gỡ ảnh. Hai trường được chuẩn hóa bằng `String.strip()` trước lưu. Đây là cập nhật toàn bộ thông tin có thể chỉnh sửa, FE gửi cả hai field.
+- Thành công `200`, thông báo `Cập nhật Server thành công`; `ServerResponseDTO` trong `RestResponse.data` với `id`, `name`, `iconUrl`, `ownerId`, `createdDate`. FE đọc `response.data.data`.
+- Lỗi dùng Problem Details hiện có: `400` JSON/ID/validation không hợp lệ, `401` JWT/session/tài khoản không hợp lệ hoặc inactive, `403` không phải Owner, `404` Server không tồn tại. Request hợp lệ vẫn không được nhận Owner/ngày tạo từ client; chỉ cập nhật tên và ảnh.
+- `ServerService.updateServer` tái sử dụng `getActiveCurrentUser`, kiểm tra DTO cả khi gọi trực tiếp Service, thực hiện trong transaction hiện có. `saveAndFlush` ghi dữ liệu và audit trước khi rời request đã xác thực. Giữ Entity, schema, membership, Channel và WebSocket; không thêm event broadcast hoặc migration. Mapping/giới hạn cũ được đối chiếu tại docs/03 mục 4.5.
+
+### 11.2 UI và đồng bộ dữ liệu
+
+- Owner mở nút bánh răng `Cài đặt Server` ở heading sidebar nhóm; trên mobile mở drawer Kênh trước. Dùng `ServerSettingsModal` trong `components/common`, CSS riêng có scope; không thêm route hay dependency.
+- Bố cục tham khảo cách tổ chức cài đặt Discord: điều hướng Tổng quan, form tên và ảnh, preview và thanh Lưu/Hủy khi có thay đổi. Dùng Ant Design, Plus Jakarta Sans và tokens nền tối/cyan/indigo hiện có. Mobile thu gọn một cột.
+- Upload tái sử dụng `POST /api/v1/files/upload`, folder `servers`, nhận URL trong wrapper hoặc response upload cũ. Chỉ JPG/JPEG/PNG/WebP/GIF, tối đa 5 MB theo service hiện có. Gỡ ảnh gửi null. Upload không tự đổi Server; chỉ PUT thành công mới thay đổi thông tin Server.
+- Chặn lưu khi upload/submit đang chờ, có guard chống gửi trùng; lỗi giữ draft. Hủy khôi phục dữ liệu đã lưu; đóng draft chưa lưu có xác nhận. Chuyển Server đóng settings; response upload/save cũ không được thay đổi phiên/modal hoặc Server mới. Response upload mới nhất thắng.
+- Sau PUT thành công, cập nhật detail của GroupChatPage và danh sách `setServers` trong Outlet context, đồng bộ header/sidebar/dock. Không xóa file upload đã bỏ chọn hoặc ảnh cũ vì file có thể được dùng chung; vòng đời file ngoài phạm vi task.
+
+### 11.3 Verification và giới hạn
+
+- Backend: `gradlew.bat test check` PASS 259/259, gồm 31 cases mới cho update: Service, binding không có compiler parameter metadata, JWT/role/active account, validation, lưu H2, audit email 53/254 và bảo toàn identity/membership.
+- FE: 17 settings browser tests PASS trên Edge headless với API mock; 23 group UI regression tests PASS trong lượt chạy kết hợp. Đã xem screenshot desktop 1440 và mobile 375; kiểm tra thêm viewport 320/768. `npm run build` PASS; không có script npm lint/test được cấu hình.
+- Playwright dùng runtime sẵn có theo mục 8.2; có thể lưu screenshot qua `SERVER_SETTINGS_ARTIFACT_DIR`, mặc định thư mục tạm `denhub-server-settings`. Không gửi fixture JWT tới backend thật.
+- Chưa kiểm thử FE → backend → SQL Server thật và chưa apply schema/audit script. Mock/H2 không chứng minh SQL Server hiện tại phù hợp mapping. Các warning Ant Design cũ và bundle lớn vẫn có sẵn.
+
+## 12. Xóa Server (`IMPLEMENTED`, 2026-10-21)
+
+### 12.1 REST và điều kiện đủ
+
+- Người dùng duyệt kế hoạch kiểm tra trước đó bằng yêu cầu triển khai Delete Server, cảnh báo và countdown 3 giây; sau đó yêu cầu tiếp tục đúng tính năng. Giữ nguyên code khởi tạo tài khoản ngoài phạm vi.
+- `DELETE /api/v1/servers/{serverId}`; không có request body hoặc DTO mới. JWT/session dùng Security hiện có; Service dùng `getActiveCurrentUser`, xác nhận User tồn tại/active. ID phải là số dương và Server tồn tại. Chỉ `currentUser.id == Server.ownerId` được xóa; không dựa vào membership role hoặc `ROLE_ADMIN`.
+- Thành công `204 No Content`, body rỗng; `ResFormatResponse` bỏ wrapper cho HTTP 204, áp dụng đúng convention mục 4.1 cho cả các endpoint 204 hiện có.
+- Lỗi `application/problem+json`: `400` ID sai/không chuyển được sang Long; `401` token/session/tài khoản không hợp lệ; `403` không phải Owner; `404` Server không còn tồn tại (kể cả xóa lặp); `409` phát hiện tin Channel có `conversationId` hoặc được `Conversation.lastMessageId` tham chiếu. Lỗi storage ngoài dự kiến đi qua handler 500 đã có; không lộ chi tiết hạ tầng.
+- Không yêu cầu Server rỗng hoặc đuổi hết thành viên. Kiểm tra quyền và tham chiếu chéo hoàn tất trước khi xóa bất kỳ dữ liệu nào.
+
+### 12.2 Transaction và ghi dữ liệu đồng thời
+
+- `ServerService.deleteServer` chạy trong transaction Service hiện có: lấy `ServerRepository.findByIdForUpdate` (`PESSIMISTIC_WRITE`), kiểm quyền/tham chiếu, bulk-delete tin Channel của Server (chỉ `conversationId IS NULL`), Channel, Invite, ServerMember, rồi xóa/flush Server. Một bước thất bại rollback cả giao dịch.
+- Entity dùng ID scalar, không thêm JPA relationship/cascade hoặc migration. Giữ User, dữ liệu Server khác, Conversation và tin riêng; không sửa ConversationService hoặc xóa file ảnh/media vật lý.
+- Do database hiện không có FK, các luồng ghi liên quan lấy cùng khóa Server trước khi mutate: update/join/join-invite/create-invite trong ServerService; create/update Channel trong ChannelService; send Message trong MessageService. Các GET giữ nguyên cách đọc. Request đã đọc Channel/Invite trước khi chờ khóa vẫn phải kiểm tra Server tồn tại sau khi lấy khóa; nếu Server đã xóa thì không ghi dữ liệu con.
+- Khóa tuần tự hóa ghi trong cùng Server để tránh dữ liệu mồ côi; có thể giảm khả năng ghi song song. Bảo đảm này áp dụng các luồng ứng dụng đã phối hợp khóa, không thay thế FK cho SQL ghi trực tiếp từ bên ngoài.
+
+### 12.3 Giao diện và countdown
+
+- Owner mở Cài đặt Server, chọn Xóa Server. `DeleteServerModal` hiển thị tên Server đã lưu, cảnh báo xóa vĩnh viễn Channel (kể cả general), tin nhắn Channel, membership và mã mời; mọi thành viên mất quyền truy cập.
+- Mỗi lần mở mới tạo deadline `performance.now() + 3000`; nút hiện `Xác nhận xóa (3s)` rồi giảm dần. Button disabled và handler tự kiểm deadline để Enter/click sớm không gửi DELETE. Đây là xác nhận UX phía client; quyền và điều kiện dữ liệu luôn được kiểm lại ở backend.
+- Trong lúc DELETE chờ: ref chặn request trùng, nút xác nhận/hủy/đóng bị khóa. Không đồng thời lưu hoặc upload ảnh. Lỗi giữ hộp thoại và thông báo an toàn, không tự loại Server khỏi danh sách; lỗi mạng nói rõ chưa thể xác nhận kết quả xóa.
+- Thành công gọi callback loại Server khỏi state MainLayout, vô hiệu response GET danh sách cũ, tải lại danh sách nếu đang có request chờ, đóng Settings và về Home bằng `replace`. Response xóa của Server cũ vẫn loại đúng ID khỏi dock nhưng không điều hướng khỏi Server mới hoặc hiển thị toast ở phiên cũ.
+- Không thêm destination/payload WebSocket khi topic quản trị Server còn TBD. Các phiên thành viên khác chưa nhận thông báo xóa tức thời.
+
+### 12.4 Kiểm chứng và giới hạn
+
+- Backend: `ServerDeleteServiceTest`, `ServerDeleteIT` và regression binding/204 trong ServerResourceTest; cập nhật mocks các luồng ghi dùng khóa. Kiểm auth/Owner/ID, graph cleanup, bảo toàn DM/Server khác, tham chiếu chéo 409, rollback sau khi đã chạy DELETE con, và hai thứ tự giao tranh khóa giữa xóa/tạo Channel. Hai concurrency cases và rollback chạy ngoài transaction test để kiểm commit/rollback Service thật trên H2.
+- Toàn bộ backend `gradlew.bat test check` PASS 322/322. Browser suite Server Settings/Group PASS 51/51; logic Node PASS 35/35; production build PASS. Screenshot cảnh báo desktop 1440/mobile 375 được kiểm tra; fixture browser dùng Playwright clock để kiểm countdown và animations riêng.
+- Sau tinh chỉnh clock/animation của fixture, chạy lại riêng `node --test tests/server-settings.browser.test.mjs` PASS 28/28; các 23 Group cases giữ kết quả PASS của lượt kết hợp. Không thêm production dependency cho browser tests.
+- SQL Server chỉ được kiểm tra metadata bằng SELECT, không xóa dữ liệu thật, không chạy DDL hoặc khởi động app bằng cấu hình SQL Server. H2 và API mock không chứng minh FE → BE → SQL Server thật; cần kiểm thử trên môi trường thử nghiệm của nhóm.
+
+## 13. Tương tác Thích Bài Viết (Post Like) (`CONFIRMED / IMPLEMENTED`, 2026-10-24)
+
+### 13.1 REST API Contract
+- **Endpoint**: `POST /api/posts/{postId}/like`
+- **Authentication**: Bắt buộc (JWT Bearer Token qua Spring Security).
+- **Quyền hạn & Privacy Rule**:
+  - `PUBLIC`: Bất kỳ user đã kích hoạt tài khoản nào cũng có thể like/unlike.
+  - `FRIENDS_ONLY`: Chỉ tác giả hoặc bạn bè của tác giả (xác thực qua `friendshipRepository.getAllFriendIdsByUserId`) mới được like/unlike.
+  - `PRIVATE`: Chỉ tác giả bài viết mới được tương tác like/unlike.
+  - Trả về `403 Forbidden` (`AccessDeniedException`) nếu vi phạm quyền riêng tư hoặc chưa đăng nhập.
+  - Trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`) nếu bài viết không tồn tại.
+  - Trả về `400 Bad Request` (`BadRequestResourceException` `notactivated`) nếu tài khoản bị khóa/chưa kích hoạt.
+- **Response**: `ApiResponse<LikeResponseDTO>`
+  ```json
+  {
+    "code": 200,
+    "message": "Thành công",
+    "data": {
+      "liked": true,
+      "totalLikes": 1
+    }
+  }
+  ```
+
+### 13.2 Cơ chế Lưu trữ & Đồng bộ Redis - SQL Server
+- Sử dụng Redis Set với key: `post:{postId}:likes`, lưu trữ tập các `userId` dạng String.
+- Kiểm tra trạng thái đã like: `stringRedisTemplate.opsForSet().isMember(redisKey, userStrId)`.
+- Toggle hành động: nếu đã like thì `opsForSet().remove`, ngược lại `opsForSet().add`.
+- Đồng bộ tính toàn vẹn: Cập nhật trường `like_counts` trong SQL Server Database (`post.setLikeCounts((int) safeTotalLikes); postRepository.save(post)`) để đảm bảo các query Newsfeed hiển thị chính xác số like.
+- Feed DTO: Bổ sung trường `Boolean isLiked` trong `DisplayPostDTO`, được `PostService.getAllPost` tra cứu từ Redis Set theo `userId` người dùng hiện tại để giao diện hiển thị trạng thái trái tim chính xác khi reload trang.
+
+### 13.3 Tích hợp Frontend & Micro-animations
+- `postApi.toggleLike(postId)`: Gọi `POST /api/posts/{postId}/like`.
+- `useFriendPosts`:
+  - Thực hiện Optimistic Update để toggle trạng thái icon và cập nhật `likeCounts` ngay tức thì.
+  - Đồng bộ lại dữ liệu chuẩn từ server khi có response (`liked`, `totalLikes`).
+  - Tự động rollback về trạng thái trước đó và hiển thị thông báo lỗi `message.error` nếu request thất bại.
+- `PostCard`: Thêm hiệu ứng micro-animation (bouncy scale spring effect và Cyber Red glow filter `drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))`) mang phong cách Discord Cyber Glassmorphism.
+
+## 14. Chỉnh sửa và Xóa Bài Viết (Post Edit & Delete) (`CONFIRMED / IMPLEMENTED`, 2026-10-25)
+
+### 14.1 REST API Contracts
+- **Cập nhật bài viết**: `PUT /api/posts/{postId}`
+  - **Authentication**: Bắt buộc (JWT Bearer Token qua Spring Security).
+  - **Quyền hạn**: Duy nhất tác giả của bài viết (`post.userId == currentUserId`).
+  - **Request Body**: `UpdatePostDTO`
+    ```json
+    {
+      "content": "Nội dung bài viết mới...",
+      "privacy": "PUBLIC",
+      "mediaUrl": "https://..."
+    }
+    ```
+  - **Validation**:
+    - `content` và `mediaUrl` không được đồng thời rỗng (trả về `400 Bad Request` `emptyPost`).
+    - `content` tối đa 120 ký tự (trả về `400 Bad Request` `contentTooLong`).
+    - `mediaUrl` tối đa 1000 ký tự (trả về `400 Bad Request` `mediaUrlTooLong`).
+    - `privacy` phải thuộc `PUBLIC`, `FRIENDS_ONLY`, `PRIVATE` (trả về `400 Bad Request` `invalidformat`).
+    - Không phải tác giả trả về `403 Forbidden` (`AccessDeniedException` `postNotOwner`).
+    - Bài viết không tồn tại trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`).
+  - **Response**: `200 OK` kèm `DisplayPostDTO`.
+
+- **Xóa bài viết**: `DELETE /api/posts/{postId}`
+  - **Authentication**: Bắt buộc (JWT Bearer Token).
+  - **Quyền hạn**: Duy nhất tác giả bài viết (`post.userId == currentUserId`).
+  - **Xử lý**:
+    - Xóa bản ghi trong SQL Server database (`postRepository.delete(post)`).
+    - Dọn dẹp key Redis Set lưu likes của bài viết (`stringRedisTemplate.delete("post:{postId}:likes")`).
+    - Không phải tác giả trả về `403 Forbidden` (`AccessDeniedException` `postNotOwner`).
+    - Bài viết không tồn tại trả về `400 Bad Request` (`BadRequestResourceException` `postNotFound`).
+  - **Response**: `204 No Content` (body rỗng).
+
+### 14.2 Giao diện & Tích hợp Frontend
+- **PostCard**:
+  - Nhận biết tác giả bài viết qua `currentUser.id === post.userId`.
+  - Hiển thị menu `...` (MoreOutlined) góc trên bên phải thẻ bài viết cho tác giả.
+  - Dropdown menu gồm: "Chỉnh sửa bài viết" (EditOutlined) và "Xóa bài viết" (DeleteOutlined, màu đỏ nguy hiểm).
+  - Thao tác Xóa: Kích hoạt hộp thoại xác nhận `Modal.confirm` trước khi gọi xóa.
+- **EditPostModal**:
+  - Thiết kế Cyber Glassmorphism với Avatar tác giả, Dropdown quyền riêng tư, Textarea đếm 120 ký tự.
+  - Quản lý ảnh đính kèm: preview ảnh, nút gỡ ảnh, nút tải ảnh mới qua `fileApi.upload`.
+  - Disable nút Lưu khi dữ liệu rỗng hoặc đang upload/submit.
+- **useFriendPosts Hook**:
+  - `editPost(postId, payload)`: Gọi `postApi.updatePost`, cập nhật state bài viết tương ứng và toast thành công.
+  - `deletePost(postId)`: Cập nhật lạc quan (loại bỏ bài viết khỏi danh sách ngay lập tức), gọi `postApi.deletePost`, tự động rollback nếu server trả lỗi.
+
+---
+
+## 15. CONTRACT API LOẠI THÀNH VIÊN KHỎI SERVER (TASK 2.19)
+
+### 15.1 Endpoint & Authentication
+- **Endpoint**: `DELETE /api/v1/servers/{serverId}/members/{userId}`
+- **Authentication**: Bắt buộc (JWT Bearer Token qua header `Authorization: Bearer <token>`).
+- **Quyền hạn**: Duy nhất Server Owner (`currentUser.id == server.ownerId`).
+- **Response**: `204 No Content` (body rỗng).
+
+### 15.2 Quy tắc nghiệp vụ & Mã lỗi
+1. **Tham số hợp lệ**: `serverId` và `userId` phải là số nguyên dương (`> 0`). Nếu null hoặc `<= 0` $\rightarrow$ `400 Bad Request`.
+2. **Server tồn tại**: Kiểm tra Server với pessimistic write lock `findByIdForUpdate(serverId)`. Nếu không tìm thấy $\rightarrow$ `404 Not Found` ("Không tìm thấy Server").
+3. **Kiểm tra quyền**: Người thực hiện phải là Owner của Server. Nếu không $\rightarrow$ `403 Forbidden` ("Chỉ chủ sở hữu Server mới có quyền loại thành viên").
+4. **Quy tắc bảo vệ Owner**: Không được phép loại chủ sở hữu khỏi Server qua endpoint này (kể cả Owner tự kick mình) $\rightarrow$ `400 Bad Request` ("Không thể loại chủ sở hữu khỏi Server"). Thành viên muốn tự rời Server phải dùng endpoint Leave Server (`POST /api/v1/servers/{serverId}/leave` hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`).
+5. **Thành viên tồn tại**: `targetUserId` phải là thành viên hiện tại của Server trong bảng `server_member`. Nếu không $\rightarrow$ `404 Not Found` ("Thành viên không tồn tại trong Server").
+6. **Xóa thành viên**: Thực hiện `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)`.
+
+### 15.3 Ma trận phân quyền & Chống giả mạo (Task 2.34)
+- **Ma trận quyền hạn (Authorization Matrix)**:
+  | Caller Role / Identity | Target Member | Kết quả HTTP | Ghi chú nghiệp vụ |
+  | :--- | :--- | :--- | :--- |
+  | **Server Owner** | Regular Member | `204 No Content` | Loại thành viên thành công, xóa bản ghi `server_member` |
+  | **Server Owner** | Chính Owner | `400 Bad Request` | Chủ sở hữu không thể tự loại mình khỏi Server |
+  | **Server Owner** | Không thuộc Server | `404 Not Found` | Thành viên không tồn tại trong Server |
+  | **Regular Member** | Regular Member khác | `403 Forbidden` | Chỉ chủ sở hữu Server mới có quyền loại thành viên |
+  | **Outsider** (không trong Server) | Regular Member | `403 Forbidden` | Không có quyền quản lý Server |
+  | **Global Admin** (`ROLE_ADMIN`) | Regular Member | `403 Forbidden` | Quyền quản trị Server DenHub gắn liền với `server.ownerId`, không dùng authority toàn cục để vượt quyền |
+  | **Inactive User** (`activated=false`) | Bất kỳ | `401 Unauthorized` | Phiên đăng nhập không hợp lệ |
+  | **Unauthenticated** (thiếu JWT) | Bất kỳ | `401 Unauthorized` | Yêu cầu đăng nhập |
+- **Cơ chế chống giả mạo danh tính & quyền hạn**:
+  - Backend tuyệt đối không tin cậy các tham số query, body hoặc header giả mạo từ client (như `callerId`, `isOwner`, `role`). Caller identity luôn được trích xuất độc quyền từ Spring `SecurityContextHolder`.
+  - Frontend kiểm soát chặt chẽ qua `canRemoveMember`, chỉ hiển thị nút loại thành viên khi `String(server.ownerId) === String(currentUser.id)` và người bị loại không phải Owner.
+- **Bảo toàn tính toàn vẹn dữ liệu**:
+  - Mọi trường hợp thất bại phân quyền (401, 403, 400, 404) không gọi thao tác xóa; bản ghi thành viên mục tiêu trong `server_member` luôn được nguyên vẹn.
+
+---
+
+## 16. QUY TẮC CHẶN THAM GIA SERVER NHIỀU LẦN (TASK 2.29)
+
+### 16.1 Phạm vi áp dụng & Endpoints
+- `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp vào Server.
+- `POST /api/v1/servers/join-invite/{code}`: Tham gia Server thông qua mã mời hợp lệ.
+
+### 16.2 Cơ chế bảo vệ chống trùng lặp 2 lớp (Two-layer Duplicate Prevention)
+1. **Lớp 1 — Application Validation & Row Lock**:
+   - Khóa Server bằng pessimistic lock: `serverRepository.findByIdForUpdate(serverId)` để tuần tự hóa các thao tác thay đổi membership của Server.
+   - Kiểm tra thành viên hiện tại qua `serverMemberRepository.existsByServerIdAndUserId(serverId, userId)`:
+     - Nếu đã tồn tại: từ chối ngay với HTTP `400 Bad Request`.
+     - Với `joinServer`: `BadRequestAlertException("User is already a member of this server", "server", "alreadymember")`.
+     - Với `joinServerByInviteCode`: `ResponseStatusException(HttpStatus.BAD_REQUEST, "Bạn đã là thành viên của Server này rồi")`.
+2. **Lớp 2 — Database Unique Constraint & Concurrency Guard**:
+   - Bảng `server_member` có ràng buộc duy nhất `ux_server_member(server_id, user_id)`.
+   - Khi lưu bản ghi mới, gọi `serverMemberRepository.saveAndFlush(member)` bên trong khối `try ... catch (DataIntegrityViolationException ex)`.
+   - Nếu xảy ra tranh chấp dữ liệu đồng thời (race condition) vượt qua lớp 1, lỗi vi phạm unique constraint từ database sẽ được bắt và chuyển đổi thành HTTP `400 Bad Request` tiêu chuẩn, tuyệt đối không để lộ lỗi `500 Internal Server Error`.
+
+### 16.3 Cho phép tham gia lại sau khi rời hoặc bị loại (Rejoin Support)
+- Do cơ chế thành viên sử dụng hard-delete (`deleteByServerIdAndUserId`) khi rời nhóm (`leaveServer`) hoặc bị Server Owner loại (`removeMember`), toàn bộ bản ghi membership của người dùng đó được xóa hoàn toàn khỏi bảng `server_member`.
+- Khi người dùng nhận được lời mời hợp lệ hoặc tham gia lại, hệ thống cho phép tạo lại bản ghi thành viên mới duy nhất (1 bản ghi) và không bị xung đột khóa.
+
+---
+
+## 17. QUY TẮC XÁC MINH DANH SÁCH THÀNH VIÊN SAU KHI THAM GIA (TASK 3.04)
+
+### 17.1 Endpoints & Luồng dữ liệu thành viên
+- **Tham gia Server**:
+  - `POST /api/v1/servers/{serverId}/join`: Tham gia trực tiếp (`204 No Content`).
+  - `POST /api/v1/servers/join-invite/{code}`: Tham gia bằng mã mời (`200 OK`, trả về `ServerResponseDTO`).
+- **Danh sách thành viên**:
+  - `GET /api/v1/servers/{serverId}/members`: Lấy danh sách thành viên của Server (`200 OK`, `ResFormatResponse<List<ServerMemberResponseDTO>>`).
+
+### 17.2 Quy tắc tính toàn vẹn dữ liệu thành viên (Data Integrity & Lifecycle)
+1. **Trước khi tham gia (Pre-join Guard)**:
+   - Outsider (người dùng chưa tham gia Server) tuyệt đối không được phép xem danh sách thành viên $\rightarrow$ `403 Forbidden` ("Bạn không có quyền xem danh sách thành viên của Server này").
+2. **Sau khi tham gia (Post-join Visibility)**:
+   - Ngay sau khi lệnh tham gia (trực tiếp hoặc qua invite code) thành công, quyền thành viên được kích hoạt ngay lập tức.
+   - Thành viên mới gọi `GET /api/v1/servers/{serverId}/members` $\rightarrow$ `200 OK`.
+   - Bản ghi của thành viên mới xuất hiện đầy đủ trong danh sách với các trường:
+     - `userId`: ID định danh người dùng.
+     - `username`: Tên đăng nhập.
+     - `name`: Tên đầy đủ.
+     - `nickname`: Tên hiển thị trong Server (mặc định lấy từ User.name).
+     - `avatar`: URL ảnh đại diện.
+     - `role`: `"MEMBER"` (chỉ `server.ownerId` mới có vai trò `"OWNER"`).
+   - Server Owner và các thành viên khác khi tải lại danh sách thành viên đều thấy thành viên mới.
+3. **Phía Frontend (UI State Management)**:
+   - `client/src/utils/serverMember.js` cung cấp các hàm hỗ trợ:
+     - `findMemberByUserId`: Tra cứu thành viên theo ID.
+     - `mergeNewMemberIntoList`: Hợp nhất an toàn thành viên mới vào state, ngăn chặn trùng lặp và bảo toàn vai trò `OWNER`/`MEMBER`.
+     - `getMemberCountDisplay`: Hiển thị số lượng chuẩn `Thành viên (N)`.
+     - `formatMemberDisplayName`: Ưu tiên `nickname` > `name` > `username` > fallback `Thành viên`.
+
+---
+
+## 18. QUY TẮC RỜI SERVER VÀ BIẾN MẤT KHỎI DANH SÁCH (TASK 3.09)
+
+### 18.1 Endpoints & Quyền hạn
+- **Endpoint rời Server chính thức**: `POST /api/v1/servers/{serverId}/leave` (trả về `204 No Content`).
+- **Endpoint alias**: `DELETE /api/v1/servers/{serverId}/members/me` (trả về `204 No Content`).
+- **Quyền hạn**: Chỉ dành cho thành viên thông thường (`MEMBER` / `ADMIN`).
+- **Quy tắc bảo vệ Owner (BR-SRV-01)**: Chủ sở hữu (`currentUser.id == server.ownerId`) bị cấm tuyệt đối không được tự rời Server $\rightarrow$ `400 Bad Request` ("Chủ sở hữu không thể rời khỏi Server. Bạn chỉ có thể chuyển quyền sở hữu hoặc xóa Server").
+
+### 18.2 Cơ chế xóa thành viên và biến mất khỏi danh sách Server
+1. **Xóa bản ghi membership**:
+   - Khi thành viên rời Server, `serverMemberRepository.deleteByServerIdAndUserId(serverId, currentUser.getId())` được thực thi.
+2. **Biến mất khỏi `GET /api/v1/servers`**:
+   - Truy vấn danh sách Server của user:
+     `SELECT DISTINCT s FROM Server s WHERE s.ownerId = :userId OR s.id IN (SELECT sm.serverId FROM ServerMember sm WHERE sm.userId = :userId) ORDER BY s.id DESC`.
+   - Do bản ghi membership đã bị xóa và người dùng không phải là Owner, Server lập tức biến mất khỏi danh sách Server trả về.
+3. **Thu hồi quyền truy cập (Access Revocation)**:
+   - Các API chi tiết Server (`GET /api/v1/servers/{serverId}`) và danh sách thành viên (`GET /api/v1/servers/{serverId}/members`) đều kiểm tra quyền `existsByServerIdAndUserId`.
+   - Do đó, ngay sau khi rời Server, người dùng bị chặn toàn bộ với mã lỗi `403 Forbidden`.
+4. **Phía Frontend**:
+   - Khi `LeaveServerModal` nhận tín hiệu thành công từ API:
+     - Gọi `handleServerDeleted(serverId)`: cập nhật `setServers(prev => prev.filter(s => String(s.id) !== String(serverId)))`.
+     - Điều hướng an toàn về trang chủ: `navigate('/', { replace: true })`.
+
+---
+
+## 19. QUY TẮC CHẶN TOÀN DIỆN THÀNH VIÊN BỊ LOẠI KHỎI SERVER (TASK 3.14)
+
+### 19.1 Endpoints & Quyền hạn
+- **Endpoint loại thành viên**: `DELETE /api/v1/servers/{serverId}/members/{userId}` (trả về `204 No Content`).
+- **Phân quyền thực thi**: Chỉ Chủ sở hữu Server (`server.ownerId == currentUser.id`) mới có quyền gọi API này.
+- **Ràng buộc**: Không được loại chính mình và không được loại Owner (`400 Bad Request`).
+
+### 19.2 Cơ chế thu hồi quyền truy cập toàn diện (Complete Access Revocation)
+Ngay sau khi thành viên bị loại thành công:
+1. **Xóa Membership**:
+   - `serverMemberRepository.deleteByServerIdAndUserId(serverId, userId)` xóa triệt để bản ghi khỏi bảng `server_member`.
+2. **Chặn truy vấn Server (`403 Forbidden`)**:
+   - `GET /api/v1/servers/{serverId}`: Phương thức `getServerDetail()` kiểm tra membership. Vì người dùng không còn là Owner hay Member, ném `AccessDeniedException` $\rightarrow$ `403 Forbidden`.
+   - `GET /api/v1/servers/{serverId}/members`: Phương thức `getServerMembers()` ném `AccessDeniedException` $\rightarrow$ `403 Forbidden`.
+3. **Biến mất khỏi danh sách Server (`GET /api/v1/servers`)**:
+   - Query lọc theo `ownerId OR sm.userId` tự động loại bỏ Server khỏi danh sách Server của thành viên bị loại.
+4. **Chặn thao tác Kênh Chat (`400 Bad Request - forbidden`)**:
+   - `GET /api/v1/servers/{serverId}/channels`: `ChannelService.validateServerAccess()` kiểm tra quyền. Không tìm thấy membership $\rightarrow$ ném `BadRequestAlertException("You do not have permission to access channels in this server", "channel", "forbidden")` (HTTP 400).
+   - `POST /api/v1/channels`: Thao tác tạo kênh bị chặn với cùng lỗi HTTP 400.
+5. **Chặn thao tác Tin Nhắn (`400 Bad Request - forbidden`)**:
+   - `POST /api/v1/channels/{channelId}/messages` và `GET /api/v1/channels/{channelId}/messages`: `MessageService` kiểm tra `serverMemberRepository.existsByServerIdAndUserId()`. Nếu không phải thành viên $\rightarrow$ ném HTTP 400 forbidden.
+6. **Chặn gọi rời Server (`400 Bad Request`)**:
+   - `POST /api/v1/servers/{serverId}/leave`: `ServerService.leaveServer()` kiểm tra membership. Không tìm thấy $\rightarrow$ ném `BadRequestAlertException` với thông báo không phải là thành viên của Server.
+
+### 19.3 Cơ chế xử lý an toàn ở Frontend (`client/src/utils/serverMember.js`)
+- `isMemberAllowedAccess(server, currentUser, members)`: Kiểm tra nhanh quyền truy cập ở giao diện trước khi render thông tin nhạy cảm.
+- `getRemovedMemberAccessErrorMessage(err)`: Chuyển đổi các mã lỗi 403, 400, 404, 401 thành thông báo tiếng Việt trực quan ("Bạn không còn là thành viên của Server này hoặc đã bị loại").
+- `filterActiveServersAfterRemoval(serverList, removedServerId)`: Cập nhật state loại bỏ Server ra khỏi sidebar.
+- `resolveRemovalRedirectPath(currentServerId, removedServerId, remainingServers)`: Tự động điều hướng an toàn người dùng sang Server kế tiếp hoặc trang `/servers` để tránh crash UI.
+
+---
+
+## 20. QUY TẮC KIỂM TRA MÃ MỜI VÀ QUYỀN THÀNH VIÊN (TASK 3.24)
+
+### 20.1 Endpoints & Luồng mã mời
+- **Tạo mã mời**: `POST /api/v1/servers/{serverId}/invites`
+  - Phân quyền: Duy nhất Server Owner (`server.ownerId == currentUser.id`). Thành viên thường, người ngoài, hoặc tài khoản có `ROLE_ADMIN` hệ thống nhưng không phải chủ sở hữu Server đều bị từ chối với HTTP `403 Forbidden`.
+  - Cơ chế sinh mã: 8 ký tự Base62 ngẫu nhiên an toàn qua `SecureRandom`, kiểm tra chống trùng lặp tối đa 5 lần.
+  - Thời hạn: Cho phép truyền `expiresAt` trong tương lai; từ chối `expiresAt` trong quá khứ với HTTP `400 Bad Request`. Mặc định `null` là vĩnh viễn.
+  - Giới hạn số lượt dùng (`usage_limit`): Trong schema MVP hiện tại, bảng `invites` chỉ quản lý trạng thái (`status`) và thời hạn (`expires_at`), chưa hỗ trợ `max_uses` hay `use_count`.
+- **Tham gia bằng mã mời**: `POST /api/v1/servers/join-invite/{code}`
+  - Yêu cầu: Đăng nhập (`Bearer JWT`), tài khoản `activated == true`.
+  - Xác thực mã: Mã không tồn tại $\rightarrow$ `404 Not Found`; mã hết hạn $\rightarrow$ `400 Bad Request`; mã bị vô hiệu hóa (`status != ACTIVE`) $\rightarrow$ `400 Bad Request`.
+  - Server liên kết bị xóa: Nếu Server đã bị xóa sau khi tạo mã $\rightarrow$ `404 Not Found` ("Không tìm thấy Server liên kết với mã mời").
+  - Chống trùng 2 lớp: Nếu người dùng đã là thành viên $\rightarrow$ từ chối ngay với HTTP `400 Bad Request` ("Bạn đã là thành viên của Server này rồi").
+- **Kích hoạt quyền tức thì (Immediate Permission Activation)**:
+  - Ngay khi gọi `POST /api/v1/servers/join-invite/{code}` thành công, bản ghi `ServerMember` được lưu xuống DB với role `MEMBER`.
+  - Người dùng ngay lập tức có quyền đọc chi tiết Server (`GET /api/v1/servers/{serverId}`), xem danh sách thành viên (`GET /api/v1/servers/{serverId}/members`), và truy cập danh sách kênh (`GET /api/v1/servers/{serverId}/channels`).
+  - Khi chưa tham gia (Outsider): Bị chặn `403 Forbidden` trên Server và thành viên, chặn `400 Bad Request (channel forbidden)` trên kênh.
+
+### 20.2 Ranh giới REST và WebSocket/STOMP đối với Member
+- Phân quyền Server Member được áp dụng nhất quán trên toàn bộ REST endpoints (Server, Member, Channel, Channel Message).
+- Inbound STOMP WebSocket (`/ws`) trong kiến trúc DenHub chỉ phục vụ tin nhắn riêng 1-1 (`/app/conversations/send`) và bảng tin bài viết (`/app/post`). Gửi tin nhắn kênh chat Server sử dụng REST POST (`/api/channels/{channelId}/messages`), tại đây `MessageService` bắt buộc kiểm tra sự tồn tại của membership qua `serverMemberRepository.existsByServerIdAndUserId`.
+
+---
+
+## 21. QUY TẮC THAM GIA VÀ RỜI SERVER (TASK 4.04)
+
+### 21.1 Endpoints & Luồng nghiệp vụ
+- **Tham gia Server trực tiếp**: `POST /api/v1/servers/{serverId}/join`
+  - Yêu cầu: Đăng nhập (`Bearer JWT`), tài khoản `activated == true`.
+  - Kết quả thành công: Trả về HTTP `204 No Content`. Bản ghi `ServerMember` được lưu với vai trò `MEMBER`.
+  - Chống trùng lặp (2 lớp): Nếu user đã là thành viên $\rightarrow$ từ chối ngay với HTTP `400 Bad Request` (`BadRequestAlertException("User is already a member of this server", "server", "alreadymember")`).
+  - Đồng bộ danh sách: Server xuất hiện ngay trong danh sách Server của user (`GET /api/v1/servers`); user xuất hiện trong danh sách thành viên của Server (`GET /api/v1/servers/{serverId}/members`).
+- **Tự rời khỏi Server**: `POST /api/v1/servers/{serverId}/leave` (hoặc alias `DELETE /api/v1/servers/{serverId}/members/me`)
+  - Yêu cầu: Đăng nhập (`Bearer JWT`), đang là thành viên của Server.
+  - Kết quả thành công: Trả về HTTP `204 No Content`. Bản ghi trong `server_member` bị xóa.
+  - Quy tắc Chủ sở hữu (BR-SRV-01): Server Owner không được tự rời Server của mình. Nếu Owner gọi API $\rightarrow$ bị từ chối với HTTP `400 Bad Request` (`BadRequestAlertException("Chủ sở hữu không thể tự rời khỏi Server", "server", "owner_cannot_leave")`).
+  - Kiểm tra thành viên: Nếu người dùng không phải là thành viên của Server $\rightarrow$ từ chối với HTTP `400 Bad Request` (`BadRequestAlertException("Bạn không phải là thành viên của Server này", "server", "not_a_member")`).
+  - Đồng bộ danh sách: Server biến mất khỏi danh sách Server của user (`GET /api/v1/servers`); các Server khác của user vẫn được bảo toàn nguyên vẹn.
+  - Thu hồi quyền: Ngay sau khi leave, user bị chặn khi gọi chi tiết Server (`403 Forbidden`), danh sách thành viên (`403 Forbidden`) và danh sách kênh chat (`400 Bad Request - forbidden`).
+
+### 21.2 Cơ chế đồng bộ trạng thái ở Frontend
+- **Ngăn ngừa hiển thị trạng thái giả (False State Prevention)**:
+  - Khi gọi `join` thất bại (400, 404, network error): Frontend giữ nguyên state, tuyệt đối không thêm Server vào sidebar hoặc thêm user vào danh sách thành viên.
+  - Khi gọi `leave` thất bại (400, network error): Frontend không xóa Server khỏi state.
+- **Tuân thủ phân quyền giao diện (UI Protection)**:
+  - Helper `canLeaveServer(server, currentUser)` kiểm tra `server.ownerId == currentUser.id`. Nếu là Owner, thuộc tính `canLeave` trả về `false` kèm lý do ("Chủ sở hữu không thể tự rời Server. Hãy chuyển quyền sở hữu hoặc xóa Server"), nút rời Server trên giao diện bị ẩn hoặc disable.
+
+---
+
+## 22. QUY TẮC VÀ BẢO ĐẢM AN TOÀN KHI LOẠI THÀNH VIÊN (TASK 4.09)
+
+### 22.1 Đặc tả API và Ma trận phân quyền
+- **Endpoint**: `DELETE /api/v1/servers/{serverId}/members/{userId}`
+  - **Quyền hạn bắt buộc**: Chỉ chủ sở hữu Server (`server.ownerId == currentUser.id`).
+  - **Kiểm soát phân quyền nghiêm ngặt (Strict RBAC)**:
+    - Member thường gọi $\rightarrow$ `403 Forbidden` (`"Chỉ chủ sở hữu Server mới có quyền loại thành viên"`).
+    - Outsider (người dùng chưa tham gia Server) $\rightarrow$ `403 Forbidden`.
+    - Quản trị viên toàn cục (`ROLE_ADMIN`) không phải Server Owner $\rightarrow$ `403 Forbidden` (tuân thủ ranh giới chủ quyền Server của DenHub).
+    - Payload giả mạo (`isOwner=true`, query param `role=OWNER`) $\rightarrow$ bị bỏ qua, xác thực hoàn toàn dựa trên JWT Principal và DB entity.
+  - **Quy tắc bảo vệ chủ sở hữu**: Owner không thể tự loại chính mình (`userId == server.ownerId`) $\rightarrow$ `400 Bad Request` (`"Không thể loại chủ sở hữu khỏi Server"`).
+  - **Xác thực tồn tại & Xóa lặp lại (Consecutive Deletion Idempotency)**:
+    - Target member không thuộc server $\rightarrow$ `404 Not Found` (`"Thành viên không tồn tại trong Server"`).
+    - Target member đã bị loại trước đó $\rightarrow$ gọi lại lần 2 trả về `404 Not Found`.
+
+### 22.2 Thu hồi quyền tức thì & Cô lập đa thành viên (Multi-Member Isolation)
+- Ngay sau khi bản ghi `server_member` bị xóa:
+  1. `GET /api/v1/servers/{serverId}` $\rightarrow$ trả về `403 Forbidden`.
+  2. `GET /api/v1/servers/{serverId}/members` $\rightarrow$ trả về `403 Forbidden`.
+  3. `GET /api/v1/servers/{serverId}/channels` $\rightarrow$ trả về `400 Bad Request` (kênh bị cấm).
+  4. `POST /api/channels/{channelId}/messages` $\rightarrow$ trả về `400 Bad Request` (không thể gửi tin nhắn).
+  5. `POST /api/v1/servers/{serverId}/leave` $\rightarrow$ trả về `400 Bad Request` (`"Bạn không phải là thành viên của Server này"`).
+  6. `GET /api/v1/servers` (Server list của target) $\rightarrow$ Server bị loại lập tức biến mất.
+- **Tính độc lập của các thành viên còn lại**:
+  - Việc loại một thành viên không làm ảnh hưởng đến quyền hạn, kênh trò chuyện, lịch sử chat hay danh sách thành viên của các member khác và Server Owner.
+
+### 22.3 Cơ chế đồng bộ trạng thái và Rollback ở Frontend
+- **State Synchronization an toàn (No unverified optimistic mutation)**:
+  - Client chỉ xóa target khỏi danh sách `members` (`setMembers(prev => prev.filter(...))`) khi API `serverApi.removeMember` trả về thành công (HTTP 204).
+  - Khi API trả về lỗi (400, 401, 403, 404, 500, Timeout, Network Error): State `members` được giữ nguyên 100%, modal xác nhận giữ nguyên hiển thị thông báo lỗi để người dùng nắm rõ nguyên nhân hoặc thử lại.
+- **Phòng chống Race Condition & Double Submit**:
+  - `submittingRef` khóa request ngay khi nhấn "Loại thành viên", vô hiệu hóa nút bấm và chặn mọi thao tác click liên tiếp trong lúc request đang xử lý.
+  - Quản lý phiên giao diện (`sessionRef`): Nếu người dùng đóng modal hoặc chuyển sang server khác trong lúc request đang gửi, phản hồi cũ bị huỷ bỏ, tránh rò rỉ cập nhật state sai vị trí.
+
+## 23. Tìm kiếm Server và chế độ công khai/riêng tư (2026-10-31)
+
+### 23.1 REST và DTO (`CONFIRMED / IMPLEMENTED`)
+
+- `GET /api/v1/servers/discover?q=&page=0&size=20`: yêu cầu Authentication và User active như các API Server hiện có. `page` bắt đầu từ 0; `size` từ 1 đến 50, mặc định 20. `q` sau strip tối đa 100 đơn vị UTF-16, không phân biệt hoa/thường; rỗng liệt kê Server công khai mới nhất. Sai tham số trả `400`; thiếu/sai identity hoặc User inactive trả `401`.
+- Thành công HTTP `200`, một wrapper `RestResponse` theo mục 4.1. `data` là `ServerDiscoveryDTO`: `items`, `page`, `size`, `totalElements`, `totalPages`. Mỗi item chỉ có `id`, `name`, `iconUrl`, `joined`; giữ format DTO, `joined` luôn false vì kết quả đã loại Owner và người có membership. Không trả Entity, owner ID, audit, email, member list, kênh hoặc nội dung chat.
+- Repository chỉ chọn `visibility = PUBLIC`; khớp chuỗi con bằng LIKE có tham số. `%`, `_`, `!`, `[` trong input được escape thành ký tự thường, bao gồm cú pháp bracket của SQL Server. Thứ tự: trùng tên hoàn toàn → bắt đầu bằng từ khóa → chứa từ khóa, sau đó `id DESC`. Không có từ khóa thì dùng `id DESC`. Không bổ sung xử lý bỏ dấu riêng; collation SQL Server thật cần kiểm chứng khi triển khai.
+- Phân trang ở backend; cả query dữ liệu và count đều có `s.ownerId <> :userId` và `NOT EXISTS` membership theo Server/current User. `userId` chỉ lấy từ Authentication qua User active, không nhận danh tính từ query client. Không lọc sau khi phân trang, không query membership riêng từng Server hoặc theo trang nữa.
+- `CreateServerDTO.visibility`: enum `PUBLIC`/`PRIVATE`, bỏ qua thì mặc định `PRIVATE`; explicit null hoặc giá trị không hợp lệ bị từ chối. `UpdateServerDTO.visibility` bỏ qua/null thì giữ chế độ hiện tại để tương thích client cũ; giá trị enum khác bị từ chối. Owner là người duy nhất cập nhật được chế độ.
+- `ServerResponseDTO` thêm `visibility` cho create/list/detail/update/join-invite. Các trường cũ giữ nguyên.
+- `POST /api/v1/servers/{id}/join`: chỉ Server `PUBLIC` được tham gia trực tiếp, thành công `204`. Server `PRIVATE` trả `403`; backend kiểm tra sau `findByIdForUpdate`, trước khi ghi membership. Invite vẫn dùng `/join-invite/{code}` cho cả hai chế độ, giữ kiểm tra hạn/mã thu hồi/chống trùng hiện có.
+- `getServerDetail`, Channel, Message, member list vẫn kiểm Owner/membership; không mở quyền đọc nội dung cho người tìm thấy Server. Không thêm API public detail hoặc destination/payload WebSocket.
+
+### 23.2 Frontend
+
+- Theo điều chỉnh người dùng đã chốt, Home bỏ input/state/filter tìm tên, giữ danh sách do `MainLayout` sở hữu như trước và chỉ thêm link chữ “Khám phá server”. Giữ riêng loading/error/retry/empty của danh sách; không lọc dock. Helper `serverSearch.js` và 4 unit tests chỉ phục vụ tính năng Home đã bỏ được gỡ cùng entry trong npm test.
+- Route `/discover` nằm trong `ProtectedRoute` và `MainLayout`. Dock giữ link kính lúp “Tìm server”; Home dùng React Router `Link` thuần chữ đến `/discover`, có keyboard focus. Kết quả chỉ là Server công khai chưa sở hữu/tham gia, nhãn “Server công khai” và nút “Tham gia”; trạng thái rỗng mặc định là “Chưa có server mới để khám phá”.
+- Truy vấn được debounce 300 ms khi có từ khóa, hủy bằng AbortController và có request counter; input/phân trang vô hiệu hóa response cũ ngay khi thao tác. Có loading, empty, error/retry, phân trang 20 kết quả. Từ khóa mới reset về trang 0.
+- Join khóa ref trước request để chống submit trùng; chỉ sau HTTP thành công mới cập nhật danh sách chung, refresh nền và điều hướng. Kiểm tra visit token cùng URL thực tế trước navigate; response sau khi rời trang chỉ cập nhật danh sách chung. Lỗi được trình bày an toàn với hướng dẫn tải lại/nhập mã mời, không đưa detail hệ thống lên UI.
+- Form tạo mặc định riêng tư; cài đặt dùng draft/baseline và nút lưu/hủy cho cả tên, ảnh, chế độ. Label tham gia được đồng bộ thành “Nhập mã mời / ID”; phần giải thích nêu ID chỉ dùng cho Server công khai.
+- Responsive trên desktop/mobile; thu sidebar phụ trên màn nhỏ, giữ dock và focus bàn phím. Không cài thêm dependency.
+
+### 23.3 Schema và verification
+
+- Schema yêu cầu `servers.visibility` theo docs/03 mục 4.7. Script thủ công phải được review/apply trước khi chạy phiên bản code mới; không dựa vào Hibernate `ddl-auto=update` để chuyển dữ liệu cũ hoặc áp constraint/default.
+- Backend: `ServerDiscoveryIT` kiểm JWT/service/JPA/H2 cho phân trang, ranking, escape, tiếng Việt, dữ liệu công khai tối thiểu, quyền truy cập, default và thay đổi visibility, invite sau khi chuyển riêng tư. Fixture direct-join cũ được đặt `PUBLIC` rõ ràng.
+- Frontend: `server-search.browser.test.mjs` kiểm Home không còn ô tìm, giữ danh sách đầy đủ/link chữ (kể cả lỗi/rỗng), link hoạt động bằng Enter ở 1440/375px; Khám phá không có hàng Owner/đã tham gia, truy vấn lại sau Join không còn Server đó. Giữ regression debounce/response cũ, phân trang, lỗi, join/điều hướng, tạo/cài đặt và authentication. Test Back/Forward chờ workspace trung gian render thay vì chỉ chờ URL đổi trước khi React commit.
+- Kết quả lệnh cuối và giới hạn được ghi tại docs/00. Sau approval “áp dụng”, script đã được sửa tách batch ADD COLUMN/CHECK và apply vào local `denhubdb`; metadata/default/CHECK/backfill 2 Server cùng query LIKE/ESCAPE/CASE/OFFSET/FETCH smoke PASS trên SQL Server. HTTP không JWT trả 401; chưa kiểm HTTP authenticated, collation/locking đầy đủ. Kết quả H2/API mock vẫn không thay thế các kiểm chứng còn thiếu trên môi trường thật.
+
+## 24. Server không dùng Hibernate second-level cache (2026-11-01)
+
+- Người dùng cung cấp stack trace `ServerVisibility` không gán được vào field cùng tên khi Hibernate assemble `StandardCacheEntryImpl`, qua `loadFromSecondLevelCache` và `findById`. JVM local có nhiều bản `Server` qua các restart classloader; metadata SQL và giá trị `PUBLIC` của Server được kiểm tra hợp lệ. Đây là lỗi enum instance cũ trong cache sau DevTools reload, không phải lỗi schema hoặc quyền truy cập.
+- Kế hoạch bỏ cache riêng Server đã được người dùng duyệt bằng “làm đi”. `Server` bỏ Hibernate `@Cache(NONSTRICT_READ_WRITE)` và có JPA `@Cacheable(false)`. Các lần đọc Entity Server ở transaction/persistence context mới truy vấn database, không assemble trạng thái enum cũ từ Hibernate L2. Cache của Entity khác và cấu hình cache toàn ứng dụng không thay đổi; first-level cache trong một persistence context vẫn theo JPA hiện có.
+- `spring.cache.type=none` chỉ là cấu hình cache abstraction của Spring, không chứng minh Hibernate L2 bị tắt. Fix dùng mapping rõ ràng trên Server thay vì đổi cache toàn cục. Không thay Entity fields, enum, schema/DDL, DTO, API, quyền Owner/Member/outsider hoặc FE.
+- Đánh đổi: đọc Server qua các transaction khác nhau phát sinh SQL thay vì hit L2. Chưa benchmark hiệu năng trên SQL Server; không thêm cache thay thế hoặc dependency.
+- `ServerCacheIT` chủ động bật Hibernate L2/statistics trong môi trường test để tránh kiểm chứng nhầm khi cache vô tình tắt toàn cục. Hai ca PUBLIC/PRIVATE commit fixture, đọc qua các transaction riêng, cập nhật enum bằng JDBC chỉ trong H2 để giữ nguyên bất kỳ cache cũ, rồi kiểm giá trị mới, SQL read và không có cache hit/entry cho Server. Trước fix hai ca này thất bại vì đọc trạng thái cache cũ; sau fix PASS.
+- Hai ca PUBLIC/PRIVATE khác gọi lặp lại GET detail/channels/members qua JWT/MockMvc bằng Owner và Member, và kiểm outsider tiếp tục bị từ chối theo status hiện có. Fixture được commit/cleanup trong H2, có guard không chạy JDBC mutation trên SQL Server local. Tests không khởi động JVM DevTools thật hoặc mô phỏng thay classloader trực tiếp; chúng kiểm cơ chế bỏ đọc Server từ L2 và regression API/quyền.
+- Khi nhận thay đổi này, Stop hẳn backend trong IDE rồi Run lại một lần để SessionFactory/mapping mới được nạp và cache cũ trong JVM được bỏ. Không cần chạy lại SQL visibility. Không tự dừng/khởi động lại tiến trình IDE của người dùng trong lượt sửa; HTTP có JWT trên JVM local sau restart còn cần xác minh.
+
+---
+
+## 25. QUY TẮC XỬ LÝ MÃ MỜI SAI VÀ CHỐNG THAM GIA TRÙNG LẶP (TASK 4.14)
+
+### 25.1 Phân loại lỗi mã mời không hợp lệ
+| Trường hợp | Điều kiện phát hiện | HTTP Status | Thông điệp Backend | Thông điệp hiển thị Frontend |
+|---|---|:---:|---|---|
+| **Trống / Khoảng trắng** | `rawCode.isBlank()` hoặc regex không khớp Base62 | `400 Bad Request` | `"Mã mời không được để trống"` | `"Vui lòng nhập Mã mời hoặc Server ID."` |
+| **Không tồn tại** | `inviteRepository.findByCode` rỗng | `404 Not Found` | `"Mã mời không tồn tại"` | `"Mã mời không tồn tại hoặc không chính xác!"` |
+| **Đã bị vô hiệu hóa** | `invite.status != ACTIVE` (`REVOKED`) | `400 Bad Request` | `"Mã mời đã bị vô hiệu hóa hoặc không còn hiệu lực"` | `"Mã mời này đã bị vô hiệu hóa!"` |
+| **Đã hết hạn** | `invite.expiresAt < now` | `400 Bad Request` | `"Mã mời đã hết hạn"` | `"Mã mời này đã hết hạn sử dụng!"` |
+| **Server đã bị xóa** | `serverRepository.findByIdForUpdate` rỗng | `404 Not Found` | `"Không tìm thấy Server liên kết với mã mời"` | `"Không tìm thấy Server với thông tin này. Vui lòng kiểm tra lại!"` |
+
+### 25.2 Cơ chế bảo vệ chống tham gia trùng lặp 2 lớp (Two-tier Duplicate Join Defense)
+- **Lớp 1 (Application Guard)**:
+  - Trước khi lưu bản ghi, service truy vấn `serverMemberRepository.existsByServerIdAndUserId(serverId, userId)`.
+  - Nếu đã tồn tại $\rightarrow$ từ chối ngay với HTTP `400 Bad Request`.
+  - Áp dụng bình đẳng cho mọi kênh tham gia: Join Direct ID (`POST /api/v1/servers/{id}/join`), Join Invite Code (`POST /api/v1/servers/join-invite/{code}`), và Owner gia nhập chính server của mình.
+  - Tham gia chéo kênh (Cross-channel duplicate join) được ngăn chặn toàn diện: User đã join qua Direct ID không thể join lại qua Invite Code và ngược lại.
+- **Lớp 2 (Database Unique Constraint Guard)**:
+  - Bảng `server_member` được thiết lập chỉ mục duy nhất `ux_server_member(server_id, user_id)`.
+  - Trong trường hợp 2 request gửi đồng thời vượt qua lớp 1 (Race condition), DB kích hoạt vi phạm toàn vẹn dữ liệu.
+  - Khối `try-catch (DataIntegrityViolationException)` tại `ServerService` lập tức bắt lỗi và chuyển đổi sang HTTP `400 Bad Request` thay vì trả về lỗi 500 sập hệ thống.
+
+### 25.3 Bảo vệ State và Giao diện Frontend
+- **Không tạo Membership giả**: Khi API join trả về lỗi (400, 404, 500, Network error), Client tuyệt đối không tự ý thêm Server vào danh sách hoặc redirect giả lập.
+- **Ngăn chặn Double Click**: Cờ `submittingRef` khóa request ngay khi click "Tham gia", vô hiệu hóa nút bấm và chống race condition submit trùng lặp từ giao diện.
+
+---
+
+## 24. CHUẨN HÓA VÀ SỬA LỖI QUẢN LÝ THÀNH VIÊN (TASK 4.19)
+
+### 24.1 Quy tắc gán Nickname mặc định
+- Khi tạo Server mới (`createServer`): Creator là chủ sở hữu, được gán vai trò `OWNER` và fallback nickname là `"Owner"` (`ownerNickname(name)`).
+- Khi tham gia Server qua mã mời (`joinServerByInviteCode`) hoặc tham gia trực tiếp (`joinServer`): Joiner là thành viên thông thường, được gán vai trò `MEMBER` và fallback nickname là `"Member"` (`generatedNickname(name, "Member")`).
+- Tên hiển thị tối đa 20 ký tự, hỗ trợ an toàn ký tự Unicode / Surrogate Pair UTF-16.
+
+### 24.2 Chuẩn hóa tham số truy vấn Server ID
+- Các API truy vấn danh sách thành viên (`GET /api/v1/servers/{serverId}/members`) và chi tiết Server (`GET /api/v1/servers/{serverId}`) bắt buộc kiểm tra `serverId > 0`.
+- Nếu `serverId == null || serverId <= 0` $\rightarrow$ trả về HTTP `400 Bad Request` (`"Server ID không hợp lệ"`).
+
+### 24.3 Chuẩn hóa hiển thị tên thành viên trên Frontend
+- `formatMemberDisplayName(member)` áp dụng thứ tự ưu tiên: `nickname.trim() > name.trim() > username.trim() > 'Thành viên'`.
+- Chuỗi chỉ chứa khoảng trắng rỗng (`"   "`, `"\t"`) được loại bỏ hoàn toàn, không hiển thị khoảng trắng vô nghĩa trên giao diện và đảm bảo ký tự viết tắt đại diện (`initial`) luôn hợp lệ.
+- So sánh vai trò `role` được chuẩn hóa không phân biệt chữ hoa/thường (`toUpperCase()`), bảo đảm ngăn chặn loại nhầm chủ sở hữu (`OWNER` / `owner`).

@@ -60,12 +60,68 @@ export function AuthProvider({ children }) {
     }
 
     setTokens(accessToken, refreshToken);
-
     // Normalize user object
     const authorities = Array.isArray(user?.authorities)
       ? user.authorities
       : (typeof user?.authorities === 'string' && user.authorities ? [user.authorities] : []);
+    const normalizedUser = {
+      id: user?.id,
+      email: user?.email,
+      name: user?.name,
+      displayName: user?.name || user?.email?.split('@')[0] || 'User',
+      authorities,
+      role: authorities.includes('ROLE_ADMIN') ? 'ADMIN' : 'USER',
+    };
 
+    localStorage.setItem('denhub_user', JSON.stringify(normalizedUser));
+    setCurrentUser(normalizedUser);
+    return normalizedUser;
+  }, []);
+
+  const loginWithGoogle = useCallback(async (googleData) => {
+    const res = await authApi.googleLogin(googleData);
+    const payload = res.data?.data || res.data;
+    const accessToken = payload?.accessToken;
+    const refreshToken = payload?.refreshToken;
+    const user = payload?.user;
+
+    if (!accessToken) {
+      throw new Error('Không nhận được Access Token hợp lệ từ máy chủ');
+    }
+
+    setTokens(accessToken, refreshToken);
+    const authorities = Array.isArray(user?.authorities)
+      ? user.authorities
+      : (typeof user?.authorities === 'string' && user.authorities ? [user.authorities] : []);
+    const normalizedUser = {
+      id: user?.id,
+      email: user?.email,
+      name: user?.name,
+      displayName: user?.name || user?.email?.split('@')[0] || 'User',
+      authorities,
+      role: authorities.includes('ROLE_ADMIN') ? 'ADMIN' : 'USER',
+    };
+
+    localStorage.setItem('denhub_user', JSON.stringify(normalizedUser));
+    setCurrentUser(normalizedUser);
+    return normalizedUser;
+  }, []);
+
+  const loginWithSocial = useCallback(async ({ accessToken, code, type }) => {
+    const res = await authApi.socialLogin({ accessToken, code, type });
+    const payload = res.data?.data || res.data;
+    const newAccessToken = payload?.accessToken;
+    const refreshToken = payload?.refreshToken;
+    const user = payload?.user;
+
+    if (!newAccessToken) {
+      throw new Error('Không nhận được Access Token hợp lệ từ máy chủ');
+    }
+
+    setTokens(newAccessToken, refreshToken);
+    const authorities = Array.isArray(user?.authorities)
+      ? user.authorities
+      : (typeof user?.authorities === 'string' && user.authorities ? [user.authorities] : []);
     const normalizedUser = {
       id: user?.id,
       email: user?.email,
@@ -86,13 +142,28 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
   }, []);
 
+  const updateCurrentUser = useCallback((userData) => {
+    if (!userData) return;
+    setCurrentUser((prev) => {
+      const merged = { ...prev, ...userData };
+      if (merged.authorities) {
+        merged.role = merged.authorities.includes('ROLE_ADMIN') ? 'ADMIN' : (merged.role || 'USER');
+      }
+      localStorage.setItem('denhub_user', JSON.stringify(merged));
+      return merged;
+    });
+  }, []);
+
   const value = {
     currentUser,
     isAuthenticated: !!currentUser,
     role: currentUser?.role || (currentUser?.authorities?.includes('ROLE_ADMIN') ? 'ADMIN' : 'USER'),
     loading,
     login,
+    loginWithGoogle,
+    loginWithSocial,
     logout,
+    updateCurrentUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

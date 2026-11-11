@@ -11,7 +11,10 @@ import java.io.Serializable;
 @Table(name = "channels", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"name", "server_id"}, name = "ux_name_server")
 })
-
+@AttributeOverrides({
+    @AttributeOverride(name = "createdBy", column = @Column(name = "created_by", length = 254, updatable = false)),
+    @AttributeOverride(name = "lastModifiedBy", column = @Column(name = "last_modified_by", length = 254))
+})
 public class Channel extends AbstractAuditingEntity<Long> implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;

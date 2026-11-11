@@ -14,12 +14,15 @@ import RegisterPage from '../pages/auth/RegisterPage';
 
 // Main pages
 import HomePage from '../pages/home/HomePage';
+import DiscoverServersPage from '../pages/servers/DiscoverServersPage';
 import RoomsPage from '../pages/rooms/RoomsPage';
 import ChatPage from '../pages/chat/ChatPage';
 import GroupChatPage from '../pages/chat/GroupChatPage';
 import MeetingsPage from '../pages/meetings/MeetingsPage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
 import ProfilePage from '../pages/profile/ProfilePage';
+import DirectMessagePage from '../pages/direct/DirectMessagePage';
+import FriendRequestPage from '../pages/direct/FriendRequestPage';
 
 // Admin pages
 import AdminUsersPage from '../pages/admin/AdminUsersPage';
@@ -36,6 +39,7 @@ export default function AppRoutes() {
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/api/auth/callback/github" element={<LoginPage />} />
       </Route>
 
       {/* Error pages (accessible without auth) */}
@@ -46,12 +50,16 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/discover" element={<DiscoverServersPage />} />
           <Route path="/servers/:serverId" element={<GroupChatPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
           <Route path="/rooms/:roomSlug" element={<ChatPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/direct" element={<DirectMessagePage />} />
+          <Route path="/direct/:conversationId" element={<DirectMessagePage />} />
+          <Route path="/friends" element={<FriendRequestPage />} />
 
           {/* Admin-only routes */}
           <Route element={<AdminRoute />}>

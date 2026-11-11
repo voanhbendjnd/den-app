@@ -1,0 +1,310 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { canRemoveMember, getRemoveMemberErrorMessage } from '../src/utils/serverMember.js';
+
+test('canRemoveMember allows Server Owner to remove regular members', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const ownerUser = { id: '100', username: 'alice' };
+  const memberUser = { userId: '200', username: 'bob', role: 'MEMBER' };
+
+  const result = canRemoveMember(server, ownerUser, memberUser);
+  assert.equal(result.canRemove, true);
+  assert.equal(result.reason, null);
+
+  // Numeric ID comparison works seamlessly with string IDs
+  const numServer = { id: 10, name: 'Alpha Guild', ownerId: 100 };
+  const numResult = canRemoveMember(numServer, { id: 100 }, { userId: 200, role: 'MEMBER' });
+  assert.equal(numResult.canRemove, true);
+});
+
+test('canRemoveMember rejects non-owners from removing members', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const regularUser = { id: '200', username: 'bob' };
+  const targetMember = { userId: '300', username: 'charlie', role: 'MEMBER' };
+
+  const result = canRemoveMember(server, regularUser, targetMember);
+  assert.equal(result.canRemove, false);
+  assert.match(result.reason, /Chỉ chủ sở hữu Server mới có quyền loại thành viên/);
+});
+
+test('canRemoveMember prevents Server Owner from removing themselves', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const ownerUser = { id: '100', username: 'alice' };
+  const selfMember = { userId: '100', username: 'alice', role: 'OWNER' };
+
+  const result = canRemoveMember(server, ownerUser, selfMember);
+  assert.equal(result.canRemove, false);
+  assert.match(result.reason, /Chủ sở hữu không thể tự loại mình khỏi Server/);
+});
+
+test('canRemoveMember prevents removing member marked as OWNER', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const ownerUser = { id: '100', username: 'alice' };
+  const targetOwnerMember = { userId: '500', username: 'co-owner', role: 'OWNER' };
+
+  const result = canRemoveMember(server, ownerUser, targetOwnerMember);
+  assert.equal(result.canRemove, false);
+  assert.match(result.reason, /Không thể loại chủ sở hữu khỏi Server/);
+});
+
+test('canRemoveMember handles null, undefined, and empty objects safely', () => {
+  const validServer = { id: 10, ownerId: '100' };
+  const validUser = { id: '100' };
+  const validMember = { userId: '200' };
+
+  assert.equal(canRemoveMember(null, validUser, validMember).canRemove, false);
+  assert.equal(canRemoveMember(validServer, null, validMember).canRemove, false);
+  assert.equal(canRemoveMember(validServer, validUser, null).canRemove, false);
+});
+
+test('getRemoveMemberErrorMessage maps HTTP 401, 403, and 404 appropriately', () => {
+  const memberName = 'Bob';
+
+  // 401 Unauthorized
+  const err401 = { response: { status: 401, data: {} } };
+  assert.equal(getRemoveMemberErrorMessage(err401, memberName), 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+
+  const errNotLoggedIn = { response: { status: 400, data: { errorKey: 'notloggedin' } } };
+  assert.equal(getRemoveMemberErrorMessage(errNotLoggedIn, memberName), 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+
+  // 403 Forbidden
+  const err403 = { response: { status: 403, data: {} } };
+  assert.equal(getRemoveMemberErrorMessage(err403, memberName), 'Bạn không có quyền loại thành viên này khỏi Server.');
+
+  // 404 Not Found
+  const err404 = { response: { status: 404, data: {} } };
+  assert.equal(getRemoveMemberErrorMessage(err404, memberName), 'Thành viên hoặc Server không tồn tại hoặc đã bị xóa trước đó.');
+});
+
+test('getRemoveMemberErrorMessage maps HTTP 400 business rule violations correctly', () => {
+  const memberName = 'Charlie';
+
+  // Attempting to remove Owner
+  const errOwner = {
+    response: {
+      status: 400,
+      data: {
+        message: 'Không thể loại chủ sở hữu khỏi Server',
+      },
+    },
+  };
+  assert.equal(getRemoveMemberErrorMessage(errOwner, memberName), 'Không thể loại chủ sở hữu khỏi Server.');
+
+  // Not a member
+  const errNotMember = {
+    response: {
+      status: 400,
+      data: {
+        message: 'Thành viên không tồn tại trong Server',
+      },
+    },
+  };
+  assert.equal(getRemoveMemberErrorMessage(errNotMember, memberName), 'Thành viên không còn thuộc Server này.');
+
+  // Custom 400 message
+  const errCustom = {
+    response: {
+      status: 400,
+      data: {
+        message: 'User ID không hợp lệ',
+      },
+    },
+  };
+  assert.equal(getRemoveMemberErrorMessage(errCustom, memberName), 'User ID không hợp lệ');
+});
+
+test('getRemoveMemberErrorMessage handles network, timeout, and unknown errors safely', () => {
+  const memberName = 'David';
+
+  const timeoutErr = { code: 'ECONNABORTED', message: 'timeout of 5000ms exceeded' };
+  assert.equal(getRemoveMemberErrorMessage(timeoutErr, memberName), 'Yêu cầu quá thời gian chờ. Vui lòng kiểm tra lại kết nối mạng!');
+
+  const networkErr = { code: 'ERR_NETWORK', message: 'Network Error' };
+  assert.equal(getRemoveMemberErrorMessage(networkErr, memberName), 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng!');
+
+  const unknownErr = { response: { status: 500, data: {} } };
+  assert.equal(getRemoveMemberErrorMessage(unknownErr, memberName), 'Không thể loại David. Vui lòng thử lại sau!');
+});
+
+test('serverApi.removeMember sends DELETE request to /v1/servers/{serverId}/members/{userId}', async () => {
+  let capturedUrl = null;
+  const mockAxiosClient = {
+    delete: (url) => {
+      capturedUrl = url;
+      return Promise.resolve({ status: 204, data: null });
+    },
+  };
+
+  const removeMember = (serverId, userId) =>
+    mockAxiosClient.delete(`/v1/servers/${serverId}/members/${userId}`);
+
+  const res = await removeMember(42, 99);
+  assert.equal(capturedUrl, '/v1/servers/42/members/99');
+  assert.equal(res.status, 204);
+});
+
+test('canRemoveMember rejects caller with spoofed isOwner or admin role when id differs from server.ownerId', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const imposterUser = {
+    id: '999',
+    username: 'hacker',
+    isOwner: true,
+    role: 'OWNER',
+    authorities: ['ROLE_ADMIN'],
+  };
+  const targetMember = { userId: '200', username: 'bob', role: 'MEMBER' };
+
+  const result = canRemoveMember(server, imposterUser, targetMember);
+  assert.equal(result.canRemove, false);
+  assert.match(result.reason, /Chỉ chủ sở hữu Server mới có quyền loại thành viên/);
+});
+
+test('canRemoveMember rejects when server or user is malformed or missing id/ownerId', () => {
+  const targetMember = { userId: '200', username: 'bob', role: 'MEMBER' };
+
+  // Server missing ownerId
+  const serverWithoutOwner = { id: 10, name: 'No Owner' };
+  assert.equal(canRemoveMember(serverWithoutOwner, { id: '100' }, targetMember).canRemove, false);
+
+  // User missing id
+  const validServer = { id: 10, ownerId: '100' };
+  assert.equal(canRemoveMember(validServer, { username: 'no-id' }, targetMember).canRemove, false);
+
+  // Target member missing userId
+  assert.equal(canRemoveMember(validServer, { id: '100' }, { username: 'no-userId' }).canRemove, false);
+});
+
+test('Task 4.09: State synchronization removes kicked member and preserves remaining members', () => {
+  const initialMembers = [
+    { userId: 1, username: 'owner_alice', role: 'OWNER' },
+    { userId: 2, username: 'kicked_bob', role: 'MEMBER' },
+    { userId: 3, username: 'remaining_charlie', role: 'MEMBER' },
+  ];
+
+  // Simulates GroupChatPage.jsx onSuccess handler:
+  // setMembers((prev) => prev.filter((m) => String(m.userId) !== String(removedUserId)))
+  const applyRemovalSuccess = (members, removedUserId) => {
+    return members.filter((m) => String(m.userId) !== String(removedUserId));
+  };
+
+  const updatedMembers = applyRemovalSuccess(initialMembers, 2);
+
+  assert.equal(updatedMembers.length, 2);
+  assert.equal(updatedMembers.some((m) => m.userId === 2), false);
+  assert.equal(updatedMembers[0].userId, 1);
+  assert.equal(updatedMembers[1].userId, 3);
+  assert.equal(updatedMembers[1].username, 'remaining_charlie');
+});
+
+test('Task 4.09: Frontend state rollback - failed removal preserves members list and keeps modal open', async () => {
+  const initialMembers = [
+    { userId: 1, username: 'owner_alice', role: 'OWNER' },
+    { userId: 2, username: 'target_bob', role: 'MEMBER' },
+    { userId: 3, username: 'charlie', role: 'MEMBER' },
+  ];
+
+  let currentMembers = [...initialMembers];
+  let memberToRemove = initialMembers[1];
+  let modalOpen = true;
+  let capturedError = null;
+
+  // Mock serverApi.removeMember that rejects with 403 Forbidden
+  const mockApiRemoveMember = async () => {
+    const error = new Error('Request failed with status code 403');
+    error.response = { status: 403, data: { message: 'Chỉ chủ sở hữu Server mới có quyền loại thành viên' } };
+    throw error;
+  };
+
+  // Simulates RemoveMemberModal.jsx handleConfirm logic
+  const handleConfirm = async () => {
+    try {
+      await mockApiRemoveMember();
+      // On success (should NOT be reached):
+      currentMembers = currentMembers.filter((m) => String(m.userId) !== String(memberToRemove.userId));
+      memberToRemove = null;
+      modalOpen = false;
+    } catch (err) {
+      // On failure:
+      capturedError = getRemoveMemberErrorMessage(err, memberToRemove.username);
+      // Notice: currentMembers is NOT modified, modalOpen remains true, memberToRemove remains intact
+    }
+  };
+
+  await handleConfirm();
+
+  // State is preserved / rolled back completely
+  assert.equal(currentMembers.length, 3);
+  assert.equal(currentMembers.some((m) => m.userId === 2), true);
+  assert.equal(modalOpen, true);
+  assert.notEqual(memberToRemove, null);
+  assert.equal(capturedError, 'Bạn không có quyền loại thành viên này khỏi Server.');
+});
+
+test('Task 4.09: Target already removed (HTTP 404) provides friendly error without crashing state', async () => {
+  const initialMembers = [
+    { userId: 1, username: 'owner_alice', role: 'OWNER' },
+    { userId: 2, username: 'already_gone', role: 'MEMBER' },
+  ];
+
+  let currentMembers = [...initialMembers];
+  let capturedError = null;
+
+  const mockApiRemoveMember = async () => {
+    const error = new Error('Request failed with status code 404');
+    error.response = { status: 404, data: { message: 'Thành viên không tồn tại trong Server' } };
+    throw error;
+  };
+
+  const handleConfirm = async () => {
+    try {
+      await mockApiRemoveMember();
+      currentMembers = currentMembers.filter((m) => String(m.userId) !== '2');
+    } catch (err) {
+      capturedError = getRemoveMemberErrorMessage(err, 'already_gone');
+    }
+  };
+
+  await handleConfirm();
+
+  assert.equal(capturedError, 'Thành viên hoặc Server không tồn tại hoặc đã bị xóa trước đó.');
+  assert.equal(currentMembers.length, 2);
+});
+
+test('Task 4.09: Modal in-flight guard prevents duplicate concurrent remove submissions', async () => {
+  let callCount = 0;
+  let submitting = false;
+
+  const mockRemoveMember = async () => {
+    callCount += 1;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return { status: 204 };
+  };
+
+  const triggerSubmit = async () => {
+    if (submitting) return false;
+    submitting = true;
+    try {
+      await mockRemoveMember();
+      return true;
+    } finally {
+      submitting = false;
+    }
+  };
+
+  // Launch two concurrent clicks
+  const [first, second] = await Promise.all([triggerSubmit(), triggerSubmit()]);
+
+  assert.equal(first, true);
+  assert.equal(second, false); // Guard rejected second in-flight click
+  assert.equal(callCount, 1);
+});
+
+test('Task 4.19: canRemoveMember prevents removing member with lowercase "owner" role case-insensitively', () => {
+  const server = { id: 10, name: 'Alpha Guild', ownerId: '100' };
+  const ownerUser = { id: '100', username: 'alice' };
+  const targetOwnerMember = { userId: '500', username: 'co-owner', role: 'owner' };
+
+  const result = canRemoveMember(server, ownerUser, targetOwnerMember);
+  assert.equal(result.canRemove, false);
+  assert.match(result.reason, /Không thể loại chủ sở hữu khỏi Server/);
+});

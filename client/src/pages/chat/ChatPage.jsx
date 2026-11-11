@@ -111,6 +111,17 @@ export default function ChatPage() {
         if (msgRes.status === 'fulfilled') {
           const data = msgRes.value.data?.content || msgRes.value.data || [];
           setMessages(data);
+          userScrolledUp.current = false;
+          requestAnimationFrame(() => {
+            if (containerRef.current) {
+              containerRef.current.scrollTop = containerRef.current.scrollHeight;
+              setTimeout(() => {
+                if (containerRef.current) {
+                  containerRef.current.scrollTop = containerRef.current.scrollHeight;
+                }
+              }, 60);
+            }
+          });
         }
         if (memberRes.status === 'fulfilled') {
           setMembers(memberRes.value.data?.content || memberRes.value.data || []);
@@ -137,7 +148,7 @@ export default function ChatPage() {
     if (!container) return;
     const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
     if (!userScrolledUp.current || isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
 
@@ -256,14 +267,7 @@ export default function ChatPage() {
           <Text strong style={{ fontSize: 15 }}>
             # {room?.name}
           </Text>
-          <Tooltip title={connected ? 'Connected' : 'Disconnected'}>
-            <Tag
-              color={connected ? 'success' : 'error'}
-              icon={connected ? <WifiOutlined /> : <DisconnectOutlined />}
-            >
-              {connected ? 'Live' : 'Offline'}
-            </Tag>
-          </Tooltip>
+
         </div>
 
         {/* Messages area */}

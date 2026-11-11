@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Modal, Form, Input, Button, Typography, message, Avatar, Tooltip, Spin } from 'antd';
+import { Modal, Form, Input, Button, Typography, message, Avatar, Tooltip, Spin, Select } from 'antd';
 import { 
   RocketOutlined, 
   BookOutlined, 
@@ -11,7 +11,6 @@ import {
 } from '@ant-design/icons';
 import serverApi from '../../api/serverApi';
 import fileApi from '../../api/fileApi';
-import { useAuth } from '../../hooks/useAuth';
 
 const { Title, Text } = Typography;
 
@@ -60,17 +59,28 @@ const AVATAR_SUGGESTIONS = [
   'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=150&auto=format&fit=crop&q=80',
 ];
 
-export default function CreateServerModal({ open, onClose, onSuccess }) {
-  const { currentUser } = useAuth();
+export default function CreateServerModal({ open, onClose, onSuccess, onOpenServer }) {
   const [form] = Form.useForm();
   const fileInputRef = useRef(null);
+  const uploadRequestRef = useRef(0);
+  const uploadPendingRef = useRef(false);
+  const createSession = useRef(0);
+  const createPending = useRef(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
   const [avatarUrl, setAvatarUrl] = useState(AVATAR_SUGGESTIONS[0]);
 
+  const invalidateUpload = () => {
+    uploadRequestRef.current += 1;
+    uploadPendingRef.current = false;
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   // Chọn template mẫu
   const handleSelectTemplate = (tmpl) => {
+    invalidateUpload();
     setSelectedTemplate(tmpl.id);
     setAvatarUrl(tmpl.iconUrl);
     form.setFieldsValue({
@@ -80,6 +90,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   };
 
   const handleIconSelect = (url) => {
+    invalidateUpload();
     setAvatarUrl(url);
     form.setFieldsValue({ iconUrl: url });
   };
@@ -99,9 +110,14 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
       return;
     }
 
+    const requestId = ++uploadRequestRef.current;
+    uploadPendingRef.current = true;
     setUploading(true);
+    // Clear immediately so the same file can be selected for a later request.
+    e.target.value = '';
     try {
       const res = await fileApi.upload(file, 'servers');
+      if (requestId !== uploadRequestRef.current) return;
       const uploadedUrl = res.data?.url || res.data?.data?.url;
       if (uploadedUrl) {
         setAvatarUrl(uploadedUrl);
@@ -111,16 +127,23 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
         message.error('Không nhận được đường dẫn ảnh từ máy chủ');
       }
     } catch (err) {
+      if (requestId !== uploadRequestRef.current) return;
       const errMsg = err.response?.data?.message || err.response?.data?.detail || 'Không thể tải ảnh lên. Vui lòng thử lại!';
       message.error(errMsg);
     } finally {
-      setUploading(false);
-      if (e.target) e.target.value = '';
+      if (requestId === uploadRequestRef.current) {
+        uploadPendingRef.current = false;
+        setUploading(false);
+      }
     }
   };
 
   // Reset form và khôi phục ảnh đại diện về preset mặc định mỗi khi mở modal
   useEffect(() => {
+    createSession.current += 1;
+    createPending.current = null;
+    setLoading(false);
+    invalidateUpload();
     if (open) {
       setSelectedTemplate('custom');
       setAvatarUrl(AVATAR_SUGGESTIONS[0]);
@@ -128,14 +151,24 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
       form.setFieldsValue({
         name: TEMPLATE_PRESETS[0].defaultName,
         iconUrl: AVATAR_SUGGESTIONS[0],
+        visibility: 'PRIVATE',
       });
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
+    return () => {
+      createSession.current += 1;
+      uploadRequestRef.current += 1;
+      uploadPendingRef.current = false;
+    };
   }, [open, form]);
 
   const handleClose = () => {
+    createSession.current += 1;
+    createPending.current = null;
+    setLoading(false);
+    invalidateUpload();
     setSelectedTemplate('custom');
     setAvatarUrl(AVATAR_SUGGESTIONS[0]);
     form.resetFields();
@@ -146,22 +179,33 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
   };
 
   const handleSubmit = async (values) => {
+    if (uploadPendingRef.current || createPending.current !== null) return;
+    const session = createSession.current;
+    createPending.current = session;
     setLoading(true);
     try {
       const res = await serverApi.create({
         name: values.name.trim(),
         iconUrl: values.iconUrl?.trim() || avatarUrl || null,
+        visibility: values.visibility || 'PRIVATE',
       });
-      message.success('Khởi tạo không gian Server thành công!');
       const serverData = res.data?.data || res.data;
+      // A committed Server belongs in the list even if its form was closed.
       if (onSuccess) onSuccess(serverData);
+      if (session !== createSession.current) return;
+      message.success('Khởi tạo không gian Server thành công!');
       handleClose();
+      onOpenServer?.(serverData.id);
     } catch (err) {
+      if (session !== createSession.current) return;
       const fieldError = err.response?.data?.fieldErrors?.[0]?.message;
       const errorMsg = fieldError || err.response?.data?.message || err.response?.data?.detail || 'Không thể tạo server. Vui lòng thử lại!';
       message.error(errorMsg);
     } finally {
-      setLoading(false);
+      if (session === createSession.current) {
+        createPending.current = null;
+        setLoading(false);
+      }
     }
   };
 
@@ -364,22 +408,30 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
           }}
         >
           {/* Ẩn input iconUrl ngầm */}
+          <Form.Item name="visibility" label="Chế độ Server" initialValue="PRIVATE"
+            extra="Riêng tư cần mã mời. Công khai xuất hiện trong Khám phá và cho phép tham gia trực tiếp.">
+            <Select aria-label="Chế độ Server" disabled={loading} options={[
+              { value: 'PRIVATE', label: 'Riêng tư — tham gia bằng mã mời' },
+              { value: 'PUBLIC', label: 'Công khai — cho phép tìm và tham gia' },
+            ]} />
+          </Form.Item>
           <Form.Item name="iconUrl" hidden>
             <Input />
           </Form.Item>
 
           <Form.Item
             name="name"
-            label={<Text style={{ color: '#94A3B8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tên Server (Tối đa 20 ký tự)</Text>}
+            label={<Text style={{ color: '#94A3B8', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tên Server (Tối đa 100 ký tự)</Text>}
             rules={[
-              { required: true, message: 'Vui lòng đặt tên cho Server' },
-              { max: 20, message: 'Tên Server không được vượt quá 20 ký tự' },
+              { required: true, whitespace: true, message: 'Vui lòng đặt tên cho Server' },
+              { validator: (_, value) =>
+                !value || value.length <= 100 ? Promise.resolve() : Promise.reject(new Error('Tên Server không được vượt quá 100 ký tự')) },
             ]}
           >
             <Input 
               placeholder="Ví dụ: Nhóm Học SBA301" 
               size="large"
-              maxLength={20}
+              maxLength={100}
               showCount
               style={{ height: 44, fontSize: 14 }}
             />
@@ -407,6 +459,7 @@ export default function CreateServerModal({ open, onClose, onSuccess }) {
           type="primary" 
           onClick={() => form.submit()} 
           loading={loading}
+          disabled={uploading}
           style={{ 
             height: 40,
             padding: '0 24px', 

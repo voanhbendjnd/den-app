@@ -16,6 +16,7 @@ import com.denhub.service.dto.ResLoginDTO;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -110,6 +111,50 @@ public class SecurityUtils {
         userToken.setId(userLogin.getId());
         userToken.setEmail(userLogin.getEmail());
         return userToken;
+    }
+
+    public static Optional<Long> getCurrentUserId() {
+        return Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication())
+                .map(Authentication::getPrincipal).filter((principal) -> principal instanceof Jwt)
+                .map((principal) -> (Jwt) principal).map((jwt) -> jwt.getClaim("user"))
+                .filter((userClaim) -> userClaim instanceof Map<?,?>).map((userClaim) -> ((Map<?, ?>) userClaim).get("id"))
+                .flatMap((id) -> {
+                    if (id instanceof Number n) {
+                        return Optional.of(n.longValue());
+                    } else if (id instanceof String s) {
+                        try {
+                            return Optional.of(Long.parseLong(s));
+                        } catch (NumberFormatException var4) {
+                            return Optional.empty();
+                        }
+                    } else {
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    public static Long getCurrentUserIdOrNull() {
+        Optional<Long> userId = getCurrentUserId();
+        return (Long) userId.orElse(null);
+    }
+    /*
+    * get id from access token at security context holder
+    * */
+    public static Long getCurrentUserIdAtHolder() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+            Object userClaim = jwt.getClaim("user");
+            if(userClaim instanceof Map<?,?> userMap){
+                Object idObj = userMap.get("id");
+                if(idObj instanceof Number n) {
+                    return n.longValue();
+                }
+                if(idObj instanceof String s) {
+                    return Long.parseLong(s);
+                }
+            }
+        }
+        return null;
     }
 
 }

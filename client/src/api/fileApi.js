@@ -11,6 +11,11 @@ const fileApi = {
       },
     });
   },
+  getFileUrl: (folder, filename) => {
+    if (!filename) return '';
+    if (filename.startsWith('http')) return filename;
+    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}/v1/files/${folder}/${filename}`;
+  },
 };
 
 export default fileApi;

@@ -1,5 +1,6 @@
 package com.denhub.web.rest;
 
+import com.denhub.web.rest.vm.SocialLoginVM;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
@@ -25,8 +26,13 @@ import com.denhub.security.CustomUserDetails;
 import com.denhub.service.AuthService;
 import com.denhub.service.MailService;
 import com.denhub.service.UserService;
+import com.denhub.service.dto.ChangePasswordDTO;
+import com.denhub.service.dto.GoogleLoginReqDTO;
+import com.denhub.service.dto.RegisterReqDTO;
 import com.denhub.service.dto.ResLoginDTO;
+import com.denhub.service.dto.UserDTO;
 import com.denhub.service.errors.InvalidPasswordException;
+import com.denhub.util.anotation.ApiMessage;
 import com.denhub.web.rest.vm.KeyAndPasswordVM;
 import com.denhub.web.rest.vm.LoginVM;
 import com.denhub.web.rest.vm.ManagedUserVM;
@@ -56,6 +62,101 @@ public class AccountResource {
             super(message);
         }
     }
+
+    @PostMapping({"/register", "/auth/register"})
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiMessage("Đăng ký tài khoản thành công")
+    @Operation(summary = "Đăng ký tài khoản", description = "Đăng ký tài khoản người dùng mới.")
+    public ResponseEntity<UserDTO> registerAccount(@Valid @RequestBody RegisterReqDTO req) {
+        User user = userService.registerUser(req);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(user));
+    }
+    @PostMapping("/social-login")
+    @ApiMessage("Đăng nhập bằng mạng xã hội thành công")
+    @Operation(summary = "Đăng nhập bằng mạng xã hội", description = "Đăng nhập hoặc đăng ký tài khoản thông qua mạng xã hội (Google, GitHub).")
+    public ResponseEntity<ResLoginDTO> socialLogin(@RequestBody @Valid SocialLoginVM req) {
+        if ((req.getAccessToken() == null || req.getAccessToken().isBlank()) && (req.getCode() == null || req.getCode().isBlank())) {
+            throw new AccountResourceException("accessToken hoặc code là bắt buộc");
+        }
+        var res = userService.loginWithSocialMedia(req.getAccessToken(), req.getCode(), req.getType());
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", res.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(refreshTokenExpiration)
+                .sameSite("Strict")
+                .build();
+        res.setRefreshToken(null);
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(res);
+    }
+
+    @PostMapping({"/auth/google", "/login/google"})
+    @ApiMessage("Đăng nhập bằng Google thành công")
+    @Operation(summary = "Đăng nhập bằng Google", description = "Đăng nhập hoặc đăng ký tài khoản thông qua Google OAuth.")
+    public ResponseEntity<ResLoginDTO> loginWithGoogle(@RequestBody GoogleLoginReqDTO req) {
+        String email = req.getEmail();
+        String name = req.getName();
+        String picture = req.getAvatar();
+        String googleId = req.getGoogleId();
+
+        if (req.getCredential() != null && !req.getCredential().isBlank()) {
+            try {
+                com.nimbusds.jwt.SignedJWT signedJWT = com.nimbusds.jwt.SignedJWT.parse(req.getCredential());
+                com.nimbusds.jwt.JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
+                if (claims.getClaim("email") != null) {
+                    email = (String) claims.getClaim("email");
+                }
+                if (claims.getClaim("name") != null) {
+                    name = (String) claims.getClaim("name");
+                }
+                if (claims.getClaim("picture") != null) {
+                    picture = (String) claims.getClaim("picture");
+                }
+                if (claims.getSubject() != null) {
+                    googleId = claims.getSubject();
+                }
+            } catch (Exception ex) {
+                log.warn("Could not parse Google ID token credential as SignedJWT: {}", ex.getMessage());
+            }
+        }
+
+        if (email == null || email.isBlank()) {
+            throw new AccountResourceException("Google email is required");
+        }
+
+        User user = userService.processGoogleUser(email, name, picture, googleId);
+        ResLoginDTO res = authService.generateResLoginDTO(user);
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", res.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(refreshTokenExpiration)
+                .sameSite("Strict")
+                .build();
+        res.setRefreshToken(null);
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(res);
+    }
+
+    @GetMapping({"/account", "/users/me"})
+    public ResponseEntity<ResLoginDTO.UserLogin> getAccount() {
+        return userService.getUserWithAuthorities()
+                .map(user -> {
+                    ResLoginDTO.UserLogin userLogin = new ResLoginDTO.UserLogin();
+                    userLogin.setId(user.getId());
+                    userLogin.setEmail(user.getEmail());
+                    userLogin.setName(user.getName());
+                    if (user.getAuthorities() != null) {
+                        userLogin.setAuthorities(
+                                user.getAuthorities().stream()
+                                        .map(com.denhub.domain.Authority::getName)
+                                        .collect(java.util.stream.Collectors.toSet())
+                        );
+                    }
+                    return ResponseEntity.ok(userLogin);
+                })
+                .orElseThrow(() -> new AccountResourceException("User could not be found"));
+    }
+
     @GetMapping(path = "/activate")
     @Operation(summary = "Kích hoạt tài khoản", description = "Kích hoạt tài khoản người dùng thông qua mã xác nhận.")
     public void activateAccount(@RequestParam(value = "key") String key) {
@@ -92,6 +193,14 @@ public class AccountResource {
     /*
     * vm: username, password
     * */
+    @PostMapping(path = "/account/change-password")
+    @Operation(summary = "Đổi mật khẩu tài khoản", description = "Thay đổi mật khẩu của tài khoản đang đăng nhập.")
+    @ApiMessage("Đổi mật khẩu thành công")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto) {
+        userService.changePassword(dto);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Đăng nhập", description = "Xác thực người dùng và nhận về Access Token cùng Refresh Token (cookie).")
     public ResponseEntity<ResLoginDTO> loginWithEmail(@Valid @RequestBody LoginVM vm) {

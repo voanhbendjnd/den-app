@@ -49,8 +49,8 @@ public class FileResource {
     @GetMapping("/{folder}/{filename:.+}")
     @Operation(summary = "Lấy file tĩnh", description = "Phục vụ file tĩnh (ảnh) cho trình duyệt. Endpoint này công khai, không cần JWT.")
     public ResponseEntity<Resource> getFile(
-            @PathVariable String folder,
-            @PathVariable String filename,
+            @PathVariable("folder") String folder,
+            @PathVariable("filename") String filename,
             HttpServletRequest request
     ) {
         Resource resource = fileService.loadFileAsResource(folder, filename);
