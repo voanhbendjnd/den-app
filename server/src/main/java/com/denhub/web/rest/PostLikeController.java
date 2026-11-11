@@ -16,7 +16,7 @@ public class PostLikeController {
     LikeService likeService;
     @PostMapping("/{postId}/like")
     public ResponseEntity<LikeResponseDTO> toggleLike(
-            @PathVariable Long postId) {
+            @PathVariable("postId") Long postId) {
 
         LikeResponseDTO response = likeService.toggleLike(postId);
         return ResponseEntity.ok(response);

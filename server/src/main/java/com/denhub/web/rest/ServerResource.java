@@ -35,9 +35,9 @@ public class ServerResource {
     @GetMapping("/discover")
     @Operation(summary = "Tìm Server công khai", description = "Yêu cầu tài khoản active. Chỉ trả thông tin giới thiệu, không cấp quyền đọc nội dung Server.")
     public ResponseEntity<ServerDiscoveryDTO> discoverServers(
-            @RequestParam(defaultValue = "") String q,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "q", defaultValue = "") String q,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(serverService.discoverServers(q, page, size));
     }
 
@@ -85,7 +85,7 @@ public class ServerResource {
 
     @PostMapping("/{serverId}/join")
     @Operation(summary = "Tham gia Server công khai", description = "Tham gia qua ID chỉ áp dụng cho Server PUBLIC. Server PRIVATE yêu cầu mã mời. Yêu cầu tài khoản active.")
-    public ResponseEntity<Void> joinServer(@PathVariable Long serverId) {
+    public ResponseEntity<Void> joinServer(@PathVariable("serverId") Long serverId) {
         serverService.joinServer(serverId);
         return ResponseEntity.noContent().build();
     }
