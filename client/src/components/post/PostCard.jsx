@@ -335,37 +335,37 @@ export default function PostCard({ post, onLike, onEdit, onDelete }) {
           </Button>
 
           {/* Comment button */}
-          <Tooltip title="Bình luận (sắp ra mắt)">
-            <Button
-              type="text"
-              icon={<CommentOutlined style={{ color: '#94A3B8', fontSize: 17 }} />}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                color: '#94A3B8',
-                fontWeight: 600,
-                fontSize: 13,
-                padding: '4px 10px',
-                borderRadius: 8,
-              }}
-            >
-              <span>Bình luận</span>
-            </Button>
-          </Tooltip>
+          {/*<Tooltip title="Bình luận (sắp ra mắt)">*/}
+          {/*  <Button*/}
+          {/*    type="text"*/}
+          {/*    icon={<CommentOutlined style={{ color: '#94A3B8', fontSize: 17 }} />}*/}
+          {/*    style={{*/}
+          {/*      display: 'inline-flex',*/}
+          {/*      alignItems: 'center',*/}
+          {/*      gap: 6,*/}
+          {/*      color: '#94A3B8',*/}
+          {/*      fontWeight: 600,*/}
+          {/*      fontSize: 13,*/}
+          {/*      padding: '4px 10px',*/}
+          {/*      borderRadius: 8,*/}
+          {/*    }}*/}
+          {/*  >*/}
+          {/*    <span>Bình luận</span>*/}
+          {/*  </Button>*/}
+          {/*</Tooltip>*/}
         </div>
 
         {/* Share button */}
-        <Tooltip title="Chia sẻ">
-          <Button
-            type="text"
-            icon={<ShareAltOutlined style={{ color: '#94A3B8', fontSize: 16 }} />}
-            style={{
-              borderRadius: 8,
-              color: '#94A3B8',
-            }}
-          />
-        </Tooltip>
+        {/*<Tooltip title="Chia sẻ">*/}
+        {/*  <Button*/}
+        {/*    type="text"*/}
+        {/*    icon={<ShareAltOutlined style={{ color: '#94A3B8', fontSize: 16 }} />}*/}
+        {/*    style={{*/}
+        {/*      borderRadius: 8,*/}
+        {/*      color: '#94A3B8',*/}
+        {/*    }}*/}
+        {/*  />*/}
+        {/*</Tooltip>*/}
       </div>
 
       {/* Edit Post Modal */}
