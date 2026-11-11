@@ -1661,3 +1661,145 @@ test('message delete shows Popconfirm and removes message on confirmation', asyn
 });
 
 
+
+// Exercise the real STOMP client and React hook against an in-memory broker.
+async function mockChannelBroker(page) {
+  const sockets = [], sends = [], waiters = [];
+  const notify = () => {
+    for (const waiter of [...waiters]) {
+      if (waiter.check()) { clearTimeout(waiter.timer); waiters.splice(waiters.indexOf(waiter), 1); waiter.resolve(); }
+    }
+  };
+  const waitFor = check => check() ? Promise.resolve() : new Promise((resolve, reject) => {
+    const waiter = { check, resolve, timer: setTimeout(() => reject(new Error('Mock broker timed out')), 10000) };
+    waiters.push(waiter);
+  });
+  await page.routeWebSocket('ws://localhost:8080/ws', socket => {
+    const session = { socket, subscriptions: new Map() }; sockets.push(session);
+    socket.onMessage(raw => {
+      const text = raw.toString().replace(/^\n+/, '');
+      const command = text.split('\n')[0];
+      const headers = Object.fromEntries(text.split('\n\n')[0].split('\n').slice(1).filter(Boolean).map(line => {
+        const index = line.indexOf(':'); return [line.slice(0, index), line.slice(index + 1)];
+      }));
+      if (command === 'CONNECT') socket.send('CONNECTED\nversion:1.2\nheart-beat:0,0\n\n\0');
+      if (command === 'SUBSCRIBE') session.subscriptions.set(headers.destination, headers.id);
+      if (command === 'UNSUBSCRIBE') {
+        for (const [destination, id] of session.subscriptions) if (id === headers.id) session.subscriptions.delete(destination);
+      }
+      if (command === 'SEND') sends.push({ session, headers, body: JSON.parse(text.split('\n\n').slice(1).join('\n\n').replace(/\0$/, '')) });
+      notify();
+    });
+  });
+  const deliver = (session, destination, body) => {
+    const subscription = session.subscriptions.get(destination);
+    assert.ok(subscription, `missing subscription ${destination}`);
+    session.socket.send(`MESSAGE\nsubscription:${subscription}\nmessage-id:mock-${Date.now()}\ndestination:${destination}\ncontent-type:application/json\n\n${JSON.stringify(body)}\0`);
+  };
+  return { sends, sockets, waitFor, deliver,
+    channelSession: () => sockets.findLast(s => s.subscriptions.has('/topic/channels/1010')) };
+}
+
+test('WebSocket composer shows typed text, retains rejected draft, and clears only after saved result', async () => {
+  const { page, errors, requests } = await openScopedChat();
+  const broker = await mockChannelBroker(page);
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await broker.waitFor(() => broker.channelSession());
+  const input = page.getByRole('textbox', { name: 'Nội dung tin nhắn' });
+  await input.fill('Xin chào nhóm có dấu');
+  const colors = await input.evaluate(el => ({ color: getComputedStyle(el).color, placeholder: getComputedStyle(el, '::placeholder').color }));
+  assert.equal(colors.color, 'rgb(241, 245, 249)');
+  assert.equal(colors.placeholder, 'rgb(140, 154, 178)');
+  await input.press('Enter');
+  await broker.waitFor(() => broker.sends.length === 1);
+  assert.equal(await input.inputValue(), 'Xin chào nhóm có dấu');
+  assert.equal(await input.getAttribute('readonly'), '');
+  const first = broker.sends[0];
+  assert.match(first.headers['request-id'], /^[A-Za-z0-9_-]{1,100}$/);
+  assert.deepEqual(first.body, { content: 'Xin chào nhóm có dấu' });
+  broker.deliver(first.session, '/user/queue/channel-message-results', {
+    requestId: first.headers['request-id'], channelId: 1010, statusCode: 403, message: null,
+  });
+  await page.getByRole('alert').filter({ hasText: 'Bạn không có quyền gửi' }).waitFor();
+  assert.equal(await input.inputValue(), 'Xin chào nhóm có dấu');
+  await input.press('Enter'); await broker.waitFor(() => broker.sends.length === 2);
+  const second = broker.sends[1];
+  const saved = { id: 9000, channelId: '1010', senderId: 100, content: second.body.content, createdAt: '2026-11-11T12:00:00Z' };
+  broker.deliver(second.session, '/topic/channels/1010', saved);
+  await page.locator('.group-message-content').filter({ hasText: saved.content }).waitFor();
+  assert.equal(await input.inputValue(), saved.content);
+  broker.deliver(second.session, '/user/queue/channel-message-results', {
+    requestId: second.headers['request-id'], channelId: 1010, statusCode: 201, message: { ...saved, id: '9000' },
+  });
+  await page.waitForFunction(() => document.querySelector('textarea[aria-label="Nội dung tin nhắn"]').value === '');
+  assert.equal(await page.locator('.group-message-content').filter({ hasText: saved.content }).count(), 1);
+  assert.equal(requests.some(r => r.method === 'POST' && r.path.includes('/messages')), false);
+  assert.deepEqual(errors, []);
+});
+
+test('WebSocket disconnect keeps draft and reconnect reloads missed history', async () => {
+  let reconnectHistory = false;
+  const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+    if (!reconnectHistory || pathname !== '/api/channels/1010/messages') return false;
+    await route.fulfill({ json: { data: { items: [{ id: 9900, channelId: 1010, senderId: 300, content: 'Tin trong lúc mất kết nối', createdAt: '2026-11-11T12:00:00Z' }], hasMore: false, nextCursor: null } } });
+    return true;
+  } });
+  const broker = await mockChannelBroker(page);
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await broker.waitFor(() => broker.channelSession());
+  const input = page.getByRole('textbox', { name: 'Nội dung tin nhắn' });
+  await input.fill('Bản nháp cần giữ'); await input.press('Enter');
+  await broker.waitFor(() => broker.sends.length === 1);
+  const original = broker.channelSession();
+  reconnectHistory = true;
+  original.socket.close({ code: 1001, reason: 'Test reconnect' });
+  await page.getByRole('alert').filter({ hasText: 'kiểm tra lịch sử' }).waitFor();
+  assert.equal(await input.inputValue(), 'Bản nháp cần giữ');
+  await broker.waitFor(() => broker.channelSession() && broker.channelSession() !== original);
+  await page.locator('.group-message-content').filter({ hasText: 'Tin trong lúc mất kết nối' }).waitFor();
+  assert.equal(await input.inputValue(), 'Bản nháp cần giữ');
+  assert.equal(broker.sends.length, 1);
+  assert.deepEqual(errors, []);
+});
+
+test('WebSocket message received during initial history survives the history response', async t => {
+  const history = deferred(t);
+  const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+    if (pathname !== '/api/channels/1010/messages') return false;
+    await history.promise;
+    await route.fulfill({ json: { data: { items: [{ id: 7000, channelId: 1010, senderId: 300, content: 'Tin lịch sử cũ', createdAt: '2026-11-11T12:00:00Z' }], hasMore: false, nextCursor: null } } });
+    return true;
+  } });
+  const broker = await mockChannelBroker(page);
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await broker.waitFor(() => broker.channelSession());
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', {
+    id: 7001, channelId: 1010, senderId: 300, content: 'Tin realtime trong khi tải', createdAt: '2026-11-11T12:01:00Z',
+  });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  history.resolve();
+  await page.locator('.group-message-content').filter({ hasText: 'Tin lịch sử cũ' }).waitFor();
+  await page.locator('.group-message-content').filter({ hasText: 'Tin realtime trong khi tải' }).waitFor();
+  assert.deepEqual(errors, []);
+});
+
+test('WebSocket edit and delete update the open channel without reload', async () => {
+  const { page, errors } = await openScopedChat();
+  const broker = await mockChannelBroker(page);
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await broker.waitFor(() => broker.channelSession());
+  await page.locator('.group-message-content').filter({ hasText: 'Alpha message' }).waitFor();
+  const message = { id: '1010', channelId: 1010, senderId: 300, content: 'Nội dung đã sửa realtime', createdAt: '2026-10-26T12:00:00Z', updatedAt: '2026-11-11T12:00:00Z' };
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', message);
+  await page.locator('.group-message-content').filter({ hasText: message.content }).waitFor();
+  assert.equal(await page.locator('.group-message-content').count(), 1);
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', { ...message, content: 'Bản sửa cũ', updatedAt: '2026-11-10T12:00:00Z' });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  assert.equal(await page.locator('.group-message-content').filter({ hasText: message.content }).count(), 1);
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', { eventType: 'DELETED', id: 1010, channelId: 1010 });
+  await page.locator('.group-message-content').waitFor({ state: 'detached' });
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', message);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  assert.equal(await page.locator('.group-message-content').count(), 0);
+  assert.deepEqual(errors, []);
+});
