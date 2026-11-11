@@ -289,6 +289,29 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 
 ## 10. CURRENT PROJECT PROGRESS
 
+### Cập nhật Logo thương hiệu mới "DEN" (2026-11-12)
+
+- Người dùng duyệt bằng "ok". Đã bổ sung asset logo DEN (`/den-logo.png`).
+- Cập nhật nút Home trên dock máy chủ (`MainLayout`) thay thế icon tia sét bằng logo DEN 48x48px bo góc động chuẩn Discord dock.
+- Cập nhật trang đăng nhập / đăng ký (`AuthLayout`) thay thế SVG tay cầm game bằng logo DEN 36x36px bo góc 10px kèm tiêu đề "DenHub".
+- Cập nhật favicon (`index.html`) trỏ tới logo DEN.
+- Verification: npm test 151/151 tests PASS; npm run build PASS. Chưa commit/push.
+
+### Tinh chỉnh Channel Header và Thanh Tin Ghim giống Zalo Web & Discord (2026-11-12)
+
+- Người dùng duyệt kế hoạch bằng "ok". Đã loại bỏ hoàn toàn hàng toolbar riêng biệt phía trên Header, tích hợp toàn bộ các icon công cụ trực tiếp vào bên phải Channel Header: 🔍 Tìm kiếm (`SearchOutlined`), 🔖 Tin đã lưu (`BookOutlined`), 🔔 Thông báo (`BellOutlined` / `BellFilled` hiển thị rõ trạng thái bật/tắt), 👥 Thành viên (`TeamOutlined`), ⚙️ Cài đặt kênh (`SettingOutlined`).
+- Tất cả icon đều có Tooltip tiếng Việt khi hover. Tiêu đề Header bên trái chuẩn hóa dạng `# general | Không Gian Của Tôi`.
+- Thiết kế lại `PinnedMessagesBanner` theo đúng mockup đính kèm: thanh ngang mỏng 50-52px, nền dark navy `#202234` bo góc 8px, viền siêu mỏng. Bố cục 2 dòng: dòng 1 `Tác giả · Tin nhắn đã ghim` (bold), dòng 2 nội dung tin nhắn (tự rút gọn `...`, bấm để cuộn đến tin gốc và sáng 2 giây). Bên phải là nút `Xem tất cả ▾` mở rộng danh sách cuộn nhẹ nhàng (180ms), cho phép cuộn và bỏ ghim.
+- Verification: npm test chạy 151/151 tests PASS (thêm test formatPinnedTitle); npm run build PASS không lỗi cú pháp hay bundle. Giữ nguyên logic backend/schema; chưa commit/push.
+
+### Năm UC Group Chat realtime — code/test hoàn tất, chờ schema và QA runtime (2026-11-11–12)
+
+- Đã triển khai tìm kiếm Channel, pin Owner, saved cá nhân, reply cùng Channel và preference thông báo. REST kiểm quyền, topic Channel đồng bộ phần chung; private queue /user/queue/channel-features đồng bộ saved/preference giữa các phiên cùng User. Reconnect reload trạng thái; không thêm push/offline notification.
+- Tự động kiểm thử: full backend 646/646 PASS + check PASS; sau bổ sung test rollback mới, ChannelMessagingTest 29/29 và check PASS. Frontend 147/147 PASS, build PASS; browser nhóm liên quan 26/26 PASS, gồm 5 UC, 2 phiên và search race. Broker/API browser giả lập; chưa chứng minh SQL Server runtime bằng hai tài khoản thật.
+- Script SQL chỉ preview. IDE/Hibernate local ddl-auto=update đã tạo 3 bảng/cột reply trong lúc source thay đổi; agent không chạy apply. Metadata hiện có 0 FK feature. User đã xác nhận yêu cầu dừng backend. Có script reconcile preview để hoàn thiện constraints/index, chưa duyệt áp dụng. Không đánh dấu deployment/schema hoàn tất.
+- Chưa stage/commit/push, không đổi branch/dependency/credential. Xem log FIVE-CHANNEL-USE-CASES và docs/02 mục 26, docs/03 mục 4.8.
+
+
 ### UI smoke gửi tin thật (2026-11-11, 23:06)
 
 - Theo yêu cầu “gửi kko dc test man hinh di”, thao tác trực tiếp cửa sổ Chrome đang đăng nhập tại localhost:3000/servers/1, #general. Nhập QA_TEST_chat_20261111_2305 và kiểm tra Enter; nhập QA_TEST_button_20261111_2306 rồi bấm Gửi. Cả hai xuất hiện trong danh sách, ô nhập trống và bộ đếm 0/4000; screenshot xác nhận. Không tái hiện lỗi gửi tại thời điểm smoke. Không khẳng định transport là STOMP vì chưa đọc network frame; không kiểm hai tài khoản.
@@ -555,6 +578,24 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### [2026-11-11–12] FIVE-CHANNEL-USE-CASES — Triển khai 5 UC và đồng bộ realtime
+
+- Approval: user “ok” cho 5 UC, sau đó yêu cầu tất cả realtime và “ok” kế hoạch điều chỉnh; riêng cảnh báo IDE ddl-auto=update được trả lời “ok” cho yêu cầu dừng backend. Không có ủy quyền commit/push hoặc apply DDL.
+- Backend: thêm Entity/Repository cho MessagePin, SavedMessage, ChannelNotificationPreference; ChannelFeaturesService/Resource cho search/pins/saved/preference; DTO reply nullable; MessageService dùng chung cho REST/STOMP, chỉ reply cùng Channel và tin gốc tồn tại. Service mutations khóa Server, unique/idempotent thao tác ghim/lưu; chỉ Owner pin, membership bắt buộc đọc dữ liệu; saved lọc quyền trước phân trang.
+- Realtime: ChannelMessageDelivery phát PINS_CHANGED tới topic Channel, SAVED_CHANGED/PREFERENCE_CHANGED tới queue riêng của User sau commit (numeric Principal hoặc email fallback); queue không mang nội dung. WebSocketConfig chặn queue vật lý/namespace User khác, kiểm active User/expiry trước nhận. Edit/delete, rời/kick và cleanup Channel/Server invalidation saved; bulk cleanup không nạp toàn bộ Message vào RAM. Direct module giữ luồng hiện có.
+- Frontend: ChannelTools drawer search/pins/saved và toggle preference; row actions reply/save/pin; composer giữ draft, quote; hook notification Channel riêng. Invalidation/reconnect refresh, debounce/request generation bỏ response cũ; merge canonical updatedAt/tombstone bảo vệ nội dung và quote. Lỗi preference có retry, fail-quiet cho audio. Đã sửa guard pagination sau lỗi để scroll không tự retry làm mất nút Thử lại; đây là regression lộ ra sau thêm thanh công cụ.
+- Tests mới/cập nhật: MessageSecurityIT thêm search literal/pagination/invalid/membership, pin Owner/idempotency, saved privacy/revocation, preference isolation/validation, reply valid/cross-channel/direct/missing/deletion, cleanup Message/Channel/Server, no-auth; ChannelMessagingTest thêm after-commit private/topic, chặn physical/other-user queue/inactive recipient và rollback. Unit service update/delete bổ sung lock stubs, Service deletion tests có mock cleanup. Frontend tests thêm private reconnect/stale events, notification exclusions và quote merge; browser thêm 5 UC, 2 session tài khoản, stale search; assertions quyền row được cập nhật cho reply/save hợp lệ, edit/delete vẫn cấm.
+- Lệnh thực tế:
+  - Từ server: `.\gradlew.bat test check --no-daemon` — full suite cuối lượt này 646/646 PASS, 0 fail/error/skip, check PASS (đã gồm cleanup và khóa Server mới).
+  - Sau thêm riêng regression rollback cuối: `.\gradlew.bat test --tests com.denhub.config.ChannelMessagingTest check --no-daemon` — 29/29 PASS, check PASS. Không gọi full suite đã chạy 647 khi chưa chạy lại full sau test bổ sung.
+  - Từ client: `npm test` — 147/147 PASS; `npm run build` — PASS, cảnh báo bundle >500kB.
+  - Từ root: `node --test --test-name-pattern='five channel features|two account sessions|search response|WebSocket|composer|history|pagination|message|messages' client/tests/group-chat.browser.test.mjs` — lượt cuối 26/26 PASS. Dùng NODE_PATH node_modules của bundled runtime Codex 26.1110.11613, không cài dependency. Còn cảnh báo Ant Design/deprecated props/unsupported style từ module hiện có; browser assertions không có pageerror.
+  - SQL Server: chạy nguyên script fresh và reconcile qua SqlClient với @ApplyChanges=0, preview PASS; đọc metadata xác nhận cột/type/nullability và 0 feature FK. Script fresh từ chối apply nếu schema đã tồn tại; reconcile kiểm schema và chỉ chuẩn bị unique/index/FK còn thiếu. Chưa chạy @ApplyChanges=1.
+  - git diff --check, git diff --staged --check, git status và review diff/file mới: không stage/commit/push.
+- Lỗi trong quá trình làm đã xử lý: compile Lombok Builder cần overload constructor Message; DTO create phải giữ updatedAt=null; browser control loading độc lập và aria-label ổn định; test quyền row cần hover để thấy action mới; pagination auto-retry do scroll được chặn sau lỗi. Các lượt FAIL trước không được coi là PASS, kết quả cuối nêu ở trên.
+- Docs cập nhật đủ 00/01/02/03/04. Chưa deploy hoặc xác minh 2 account trên SQL Server thật. Còn cần review/apply reconcile khi backend dừng và ddl-auto=none, sau đó runtime smoke với account do user cung cấp/đăng nhập. Không tự rollback các bảng Hibernate đã tạo, không xóa dữ liệu hoặc đổi credential.
+
 
 ### UI smoke gửi tin thật (2026-11-11, 23:06)
 
@@ -3526,6 +3567,14 @@ Docs Updated:
 ---
 
 ## 12. CURRENT WORK / HANDOFF
+
+### Handoff — Chờ duyệt đối soát schema cho 5 UC realtime (2026-11-12)
+
+- Code và tests của cả 5 UC đã có; full backend 646 PASS + ChannelMessaging 29 PASS, frontend 147 PASS, browser 26 PASS, build/check PASS. Không coi mock browser thay thế QA backend thật.
+- Local denhubdb đã có message_pins/saved_messages/channel_notification_preferences và messages.reply_to_message_id do hiện tượng phù hợp Hibernate ddl-auto=update; agent chỉ chạy scripts preview. Chưa có feature FK. User đã xác nhận dừng backend; cần đảm bảo ddl-auto=none trước khi chạy lại để không tự DDL.
+- Review file server/scripts/sql/2026-11-11-channel-features-reconcile.sql (mặc định @ApplyChanges=0). Phần còn lại: duyệt áp dụng constraints/index không cascade, rồi khởi động backend với cấu hình hiện có và QA 2 tài khoản. Script fresh chỉ dùng database chưa có các bảng/cột; không chạy fresh chồng lên local hiện tại.
+- Không có ủy quyền commit/push/apply. HEAD và các commit có trước đợt này không do agent tạo. Không chuyển branch hoặc hủy thay đổi có sẵn.
+
 
 ### UI smoke gửi tin thật (2026-11-11, 23:06)
 

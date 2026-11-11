@@ -1215,3 +1215,18 @@ Ngay sau khi thành viên bị loại thành công:
 - `formatMemberDisplayName(member)` áp dụng thứ tự ưu tiên: `nickname.trim() > name.trim() > username.trim() > 'Thành viên'`.
 - Chuỗi chỉ chứa khoảng trắng rỗng (`"   "`, `"\t"`) được loại bỏ hoàn toàn, không hiển thị khoảng trắng vô nghĩa trên giao diện và đảm bảo ký tự viết tắt đại diện (`initial`) luôn hợp lệ.
 - So sánh vai trò `role` được chuẩn hóa không phân biệt chữ hoa/thường (`toUpperCase()`), bảo đảm ngăn chặn loại nhầm chủ sở hữu (`OWNER` / `owner`).
+
+
+## 26. Năm UC Channel — code đã triển khai, chờ hoàn thiện schema/QA runtime (2026-11-11–12)
+
+- Scope: tìm kiếm trong Channel; ghim chỉ Owner; saved cá nhân; reply cùng Channel; notification preference cá nhân. User duyệt kế hoạch cả 5 và bổ sung tất cả realtime bằng hai lần “ok”. Không thêm DM/thread/push/offline notification.
+- REST mới: GET /api/channels/{channelId}/messages/search?q=&before=&limit=; GET /api/channels/{channelId}/pins?before=&limit=; GET /api/messages/saved?before=&limit=. Cursor theo ID Message giảm dần, limit mặc định 30, 1–100. Search trim, 1–200 UTF-16, case-insensitive, escape LIKE !/%/_/[; chưa tìm không dấu.
+- PUT/DELETE /api/messages/{messageId}/pin: Owner ghim/bỏ ghim, idempotent. PUT/DELETE /api/messages/{messageId}/saved: lưu/bỏ lưu của tài khoản JWT, idempotent. GET/PUT /api/channels/{channelId}/notification-preference: {channelId,muted}; PUT body {muted:boolean}, mặc định false. Các GET/PUT có dữ liệu dùng wrapper hiện có; thao tác pin/saved không có response body.
+- SendMessageRequest thêm replyToMessageId nullable, positive; MessageResponse thêm replyTo nullable {id,senderId,content}. REST và STOMP cùng kiểm tra tin gốc tồn tại, không là DM và cùng kênh; khi xóa tin gốc detach FK và gỡ quote, giữ câu trả lời. Không lưu snapshot nội dung đã xóa.
+- Sau commit: /topic/channels/{channelId} thêm invalidation {eventType:PINS_CHANGED,channelId}. Client reload panel search/pins/saved khi có sự kiện Channel (new/update/delete/pins) với request generation/debounce để bỏ response cũ. Quote theo ID cập nhật khi nhận sửa/xóa tin gốc.
+- SUBSCRIBE /user/queue/channel-features: private invalidation {eventType:SAVED_CHANGED,channelId:null} hoặc {eventType:PREFERENCE_CHANGED,channelId}. Phát cho các phiên cùng Principal user ID (fallback email). Không gửi nội dung tin hoặc danh sách người nhận trong event. Chặn subscribe queue vật lý/namespace người khác; kiểm active User và expiry trước nhận. Client reload danh sách saved/preference khi reconnect hoặc nhận invalidation.
+- Membership là bắt buộc để đọc/search/pin/save/preference. Saved query lọc membership trước phân trang, không lộ nội dung Server đã rời. Owner không thay thế membership khi đọc nội dung. Chỉ servers.owner_id cấp quyền ghim; không dựng thêm role hierarchy.
+- Notification chỉ tin mới từ người khác ở Channel đang mở, tab không focus; không ping history/edit/delete/own/duplicate. Cấu hình muted áp dụng sau xác nhận, đồng bộ bằng private invalidation; lỗi tải preference thì tạm im lặng. Không chặn nhận tin khi muted; browser có thể chặn audio.
+- Schema phải review/apply trước khi backend mới chạy trên SQL Server. server/scripts/sql/2026-11-11-channel-features.sql mặc định preview, không gắn vào startup. Cấu hình local ddl-auto=update được phát hiện, đã yêu cầu dừng IDE backend trong khi chuẩn bị; chưa cho phép tự apply.
+
+- Verification mới nhất và schema runtime: xem docs/00 log FIVE-CHANNEL-USE-CASES. Local ddl-auto=update đã tự tạo bảng/cột; agent chỉ chạy SQL preview. Có script reconcile preview cho constraint/index còn thiếu, chưa được duyệt apply. Không coi có bảng là deployment hoặc schema integration đã hoàn tất.
