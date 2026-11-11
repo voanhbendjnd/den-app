@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import dayjs from 'dayjs';
 import {
   sortMessagesChronological,
+  mergeChannelMessages,
   mergeMessagePages,
   formatMessageTime,
   formatCompactTime,
@@ -256,3 +257,11 @@ test('error state does not wipe existing message list or reset cursor', () => {
 
 
 
+
+test('reply previews follow newest edits and never restore deleted targets from history', () => {
+  const current = [{ id: 1, content: 'Latest', updatedAt: '2026-11-11T12:00:00Z' }, { id: 2, content: 'Reply', replyTo: { id: '1', content: 'Old' } }];
+  const merged = mergeChannelMessages(current, [{ id: '1', content: 'Stale', updatedAt: '2026-11-10T12:00:00Z' }]);
+  assert.equal(merged[1].replyTo.content, 'Latest');
+  const deleted = mergeChannelMessages(merged, current, new Set(['1']));
+  assert.equal(deleted.length, 1); assert.equal(deleted[0].replyTo, null);
+});

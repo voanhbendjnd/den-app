@@ -151,3 +151,17 @@ export function calculateScrollAfterPrepend(prevScrollTop = 0, prevScrollHeight 
 
 
 
+
+// Merge canonical messages before updating quotes, so stale edits/history cannot
+// restore a deleted target or overwrite a newer quote.
+export function mergeChannelMessages(previous, incoming, deletedIds = new Set()) {
+  const rows = sortMessagesChronological([...previous, ...incoming]).filter(item => !deletedIds.has(String(item.id)));
+  const byId = new Map(rows.map(item => [String(item.id), item]));
+  return rows.map(item => {
+    if (!item.replyTo) return item;
+    const id = String(item.replyTo.id);
+    if (deletedIds.has(id)) return { ...item, replyTo: null };
+    const target = byId.get(id);
+    return target ? { ...item, replyTo: { ...item.replyTo, content: target.content } } : item;
+  });
+}

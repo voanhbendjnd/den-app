@@ -97,3 +97,31 @@ test('history, REST result and broadcast merge once across numeric/string IDs', 
   assert.deepEqual(merged.map(m => m.content), ['history', 'saved', 'live']);
   assert.equal(sortMessagesChronological([...merged, { id: '12', content: 'live' }]).length, 3);
 });
+
+test('channel feature queue reconnects and ignores stale private events', t => {
+  const features = [];
+  const s = setup(t, { onFeature: event => features.push(event) }); s.connect();
+  const oldQueue = s.subscriptions.find(sub => sub.destination === '/user/queue/channel-features');
+  assert.ok(oldQueue);
+  s.emit(oldQueue, { eventType: 'SAVED_CHANGED', channelId: null });
+  assert.equal(features.length, 1);
+  s.close(); s.connect();
+  s.emit(oldQueue, { eventType: 'PREFERENCE_CHANGED', channelId: 5 });
+  assert.equal(features.length, 1);
+  s.emit(s.subscriptions.findLast(sub => sub.destination === '/user/queue/channel-features'), { eventType: 'PREFERENCE_CHANGED', channelId: 5 });
+  assert.equal(features.length, 2);
+});
+
+
+test('channel notifications exclude own, muted, focused, edited and unrelated messages', async () => {
+  const { shouldNotifyChannel } = await import('../src/utils/channelNotifications.js');
+  const message = { id: 1, channelId: 5, senderId: 2 };
+  const state = { channelId: '5', userId: 1, muted: false, focused: false };
+  assert.equal(shouldNotifyChannel(message, state), true);
+  for (const patch of [{ muted: true }, { focused: true }, { userId: '2' }, { channelId: 6 }]) {
+    assert.equal(shouldNotifyChannel(message, { ...state, ...patch }), false);
+  }
+  assert.equal(shouldNotifyChannel({ ...message, updatedAt: '2026-11-11' }, state), false);
+  assert.equal(shouldNotifyChannel({ ...message, eventType: 'DELETED' }, state), false);
+  assert.equal(shouldNotifyChannel({ ...message, eventType: 'PINS_CHANGED' }, state), false);
+});

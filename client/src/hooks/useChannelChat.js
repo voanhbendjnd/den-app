@@ -5,11 +5,11 @@ import { createChannelChatTransport } from '../utils/channelChatTransport';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws';
 
-export function useChannelChat(channelId, onMessage, onConnected) {
+export function useChannelChat(channelId, onMessage, onConnected, onFeature) {
   const [connected, setConnected] = useState(false);
   const transportRef = useRef(null);
-  const callbacks = useRef({ onMessage, onConnected });
-  callbacks.current = { onMessage, onConnected };
+  const callbacks = useRef({ onMessage, onConnected, onFeature });
+  callbacks.current = { onMessage, onConnected, onFeature };
   const channelRef = useRef(channelId);
   channelRef.current = channelId;
 
@@ -20,6 +20,7 @@ export function useChannelChat(channelId, onMessage, onConnected) {
       onMessage: (message) => callbacks.current.onMessage?.(message),
       onConnected: () => callbacks.current.onConnected?.(),
       onState: setConnected,
+      onFeature: event => callbacks.current.onFeature?.(event),
     });
     transportRef.current = transport;
     transport.setChannel(channelRef.current);

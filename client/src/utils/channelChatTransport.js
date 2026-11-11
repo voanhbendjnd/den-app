@@ -7,7 +7,7 @@ function uncertainDelivery() {
 }
 
 // Test the same connection and acknowledgement lifecycle that the React hook uses.
-export function createChannelChatTransport({ createClient, getToken, onMessage, onConnected, onState,
+export function createChannelChatTransport({ createClient, getToken, onMessage, onConnected, onState, onFeature,
   timeoutMs = 15000, makeRequestId = () => globalThis.crypto.randomUUID() }) {
   let channelId = null;
   let topicSubscription;
@@ -67,6 +67,10 @@ export function createChannelChatTransport({ createClient, getToken, onMessage, 
         clearTimeout(entry.timer);
         if (result.statusCode === 201) entry.resolve(result.message);
         else entry.reject({ response: { status: result.statusCode } });
+      });
+      if (onFeature) client.subscribe('/user/queue/channel-features', frame => {
+        if (stopped || !ready || version !== connection) return;
+        try { onFeature(JSON.parse(frame.body)); } catch { /* Ignore malformed frames. */ }
       });
       subscribeChannel();
       ready = true;

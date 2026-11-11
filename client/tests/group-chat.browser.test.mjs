@@ -120,6 +120,7 @@ async function fulfillServerRequest(route, createdServers = []) {
   const request = route.request();
   assert.equal(request.method(), 'GET');
   const pathname = new URL(request.url()).pathname;
+  if (pathname.endsWith('/notification-preference')) return route.fulfill({ json: { data: { muted: false } } });
   if (pathname === '/api/v1/conversations') {
     return route.fulfill({ json: { statusCode: 200, error: null, message: 'OK', data: [] } });
   }
@@ -159,6 +160,7 @@ async function openScopedChat({ owner = true, handler } = {}) {
   return openPage({ handler: async route => {
     const pathname = new URL(route.request().url()).pathname;
     if (handler && await handler(route, pathname)) return;
+    if (pathname.endsWith('/notification-preference')) return route.fulfill({ json: { data: { muted: false } } });
     const data = scopedServers.map(server => ({ ...server, ownerId: owner ? 100 : 200 }));
     if (pathname === '/api/v1/servers') return route.fulfill({ json: { data } });
     if (/^\/api\/v1\/servers\/\d+$/.test(pathname)) return route.fulfill({ json: { data: data.find(server => String(server.id) === pathname.split('/').at(-1)) } });
@@ -1545,7 +1547,9 @@ test('author has edit and delete action buttons while server owner cannot edit o
   assert.equal(await ownRow.locator('button[aria-label="Xóa tin nhắn"]').isVisible(), true);
 
   const memberRow = page.locator('.group-message-row').filter({ hasText: 'Member message from another user' });
-  assert.equal(await memberRow.locator('.group-message-actions').count(), 0);
+  await memberRow.hover();
+  assert.equal(await memberRow.getByRole('button', { name: 'Trả lời tin nhắn', exact: true }).count(), 1);
+  assert.equal(await memberRow.getByRole('button', { name: 'Lưu tin nhắn', exact: true }).count(), 1);
   assert.equal(await memberRow.locator('button[aria-label="Chỉnh sửa tin nhắn"]').count(), 0);
   assert.equal(await memberRow.locator('button[aria-label="Xóa tin nhắn"]').count(), 0);
 
@@ -1801,5 +1805,138 @@ test('WebSocket edit and delete update the open channel without reload', async (
   broker.deliver(broker.channelSession(), '/topic/channels/1010', message);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   assert.equal(await page.locator('.group-message-content').count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('five channel features refresh from channel and private realtime events', async () => {
+  let pinned = false, saved = false, muted = false, queryRows = [], preferenceReads = 0;
+  const item = { id: 1010, channelId: 1010, senderId: 300, content: 'Alpha message', createdAt: '2026-11-11T12:00:00Z' };
+  const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+    const method = route.request().method();
+    if (pathname.endsWith('/notification-preference')) {
+      if (method === 'PUT') muted = route.request().postDataJSON().muted;
+      preferenceReads++;
+      await route.fulfill({ json: { data: { channelId: 1010, muted } } }); return true;
+    }
+    if (pathname === '/api/channels/1010/messages/search') {
+      assert.equal(new URL(route.request().url()).searchParams.get('q'), 'Alpha');
+      await route.fulfill({ json: { data: { items: queryRows, hasMore: false } } }); return true;
+    }
+    if (pathname === '/api/channels/1010/pins') {
+      await route.fulfill({ json: { data: { items: pinned ? [item] : [], hasMore: false } } }); return true;
+    }
+    if (pathname === '/api/messages/saved') {
+      await route.fulfill({ json: { data: { items: saved ? [item] : [], hasMore: false } } }); return true;
+    }
+    if (pathname === '/api/messages/1010/pin') { pinned = method === 'PUT'; await route.fulfill({ status: 200, body: '' }); return true; }
+    if (pathname === '/api/messages/1010/saved') { saved = method === 'PUT'; await route.fulfill({ status: 200, body: '' }); return true; }
+    return false;
+  } });
+  const broker = await mockChannelBroker(page);
+  await page.goto(`${origin}/servers/101`, { waitUntil: 'domcontentloaded' });
+  await broker.waitFor(() => broker.channelSession());
+  await page.locator('.group-message-content').filter({ hasText: 'Alpha message' }).waitFor();
+  await page.getByRole('button', { name: 'Tìm tin', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Từ khóa tìm tin nhắn' }).fill('Alpha');
+  await page.getByText('Chưa có tin nhắn phù hợp.', { exact: true }).waitFor();
+  queryRows = [{ ...item, content: 'Alpha xuất hiện realtime' }];
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', queryRows[0]);
+  await page.getByRole('list', { name: 'Kết quả công cụ tin nhắn' }).getByText('Alpha xuất hiện realtime', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Tin ghim', exact: true }).click();
+  await page.getByText('Chưa có tin nhắn phù hợp.', { exact: true }).waitFor();
+  pinned = true;
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', { eventType: 'PINS_CHANGED', channelId: 1010 });
+  await page.getByRole('button', { name: 'Bỏ ghim', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Bỏ ghim', exact: true }).click();
+  await page.getByText('Chưa có tin nhắn phù hợp.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Tin đã lưu', exact: true }).click();
+  await page.getByText('Chưa có tin nhắn phù hợp.', { exact: true }).waitFor();
+  saved = true;
+  broker.deliver(broker.channelSession(), '/user/queue/channel-features', { eventType: 'SAVED_CHANGED', channelId: null });
+  await page.getByRole('button', { name: 'Bỏ lưu', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Bỏ lưu', exact: true }).click();
+  await page.getByText('Chưa có tin nhắn phù hợp.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Tắt thông báo', exact: true }).click();
+  await page.getByRole('button', { name: 'Bật thông báo', exact: true }).waitFor();
+  muted = false;
+  broker.deliver(broker.channelSession(), '/user/queue/channel-features', { eventType: 'PREFERENCE_CHANGED', channelId: 1010 });
+  await page.getByRole('button', { name: 'Tắt thông báo', exact: true }).waitFor();
+  assert.ok(preferenceReads >= 3);
+  await page.locator('.group-message-row').first().hover();
+  await page.getByRole('button', { name: 'Trả lời tin nhắn', exact: true }).first().click();
+  await page.getByRole('status').filter({ hasText: 'Đang trả lời' }).waitFor();
+  await page.getByRole('textbox', { name: 'Nội dung tin nhắn' }).fill('Câu trả lời realtime');
+  await page.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click();
+  await broker.waitFor(() => broker.sends.length === 1);
+  assert.equal(broker.sends[0].body.replyToMessageId, 1010);
+  const response = { id: 1011, channelId: 1010, senderId: 100, content: 'Câu trả lời realtime', createdAt: '2026-11-11T12:01:00Z', replyTo: { id: 1010, senderId: 300, content: item.content } };
+  broker.deliver(broker.channelSession(), '/user/queue/channel-message-results', { requestId: broker.sends[0].headers['request-id'], channelId: 1010, statusCode: 201, message: response });
+  await page.getByLabel('Tin nhắn được trả lời').waitFor();
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', { ...item, content: 'Tin gốc đã sửa', updatedAt: '2026-11-11T12:02:00Z' });
+  await page.getByLabel('Tin nhắn được trả lời').getByText('Tin gốc đã sửa', { exact: true }).waitFor();
+  broker.deliver(broker.channelSession(), '/topic/channels/1010', { eventType: 'DELETED', id: 1010, channelId: 1010 });
+  await page.getByLabel('Tin nhắn được trả lời').waitFor({ state: 'detached' });
+  assert.equal(await page.getByText('Câu trả lời realtime', { exact: true }).count(), 1);
+  assert.deepEqual(errors, []);
+});
+
+test('saved messages and mute preference synchronize across two account sessions', async () => {
+  let saved = false, muted = false;
+  const item = { id: 1010, channelId: 1010, senderId: 300, content: 'Alpha message', createdAt: '2026-11-11T12:00:00Z' };
+  const handler = async (route, pathname) => {
+    if (pathname.endsWith('/notification-preference')) {
+      if (route.request().method() === 'PUT') muted = route.request().postDataJSON().muted;
+      await route.fulfill({ json: { data: { channelId: 1010, muted } } }); return true;
+    }
+    if (pathname === '/api/messages/saved') {
+      await route.fulfill({ json: { data: { items: saved ? [item] : [], hasMore: false } } }); return true;
+    }
+    return false;
+  };
+  const first = await openScopedChat({ handler }), second = await openScopedChat({ handler });
+  const brokerA = await mockChannelBroker(first.page), brokerB = await mockChannelBroker(second.page);
+  await Promise.all([first.page.goto(`${origin}/servers/101`), second.page.goto(`${origin}/servers/101`)]);
+  await Promise.all([brokerA.waitFor(() => brokerA.channelSession()), brokerB.waitFor(() => brokerB.channelSession())]);
+  for (const page of [first.page, second.page]) {
+    await page.getByRole('button', { name: 'Tin đã lưu', exact: true }).click();
+    await page.getByText('Chưa có tin nhắn phù hợp.', { exact: true }).waitFor();
+  }
+  saved = true;
+  for (const broker of [brokerA, brokerB]) broker.deliver(broker.channelSession(), '/user/queue/channel-features', { eventType: 'SAVED_CHANGED', channelId: null });
+  for (const page of [first.page, second.page]) {
+    await page.getByRole('button', { name: 'Bỏ lưu', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+  }
+  await first.page.getByRole('button', { name: 'Tắt thông báo', exact: true }).click();
+  await first.page.getByRole('button', { name: 'Bật thông báo', exact: true }).waitFor();
+  brokerB.deliver(brokerB.channelSession(), '/user/queue/channel-features', { eventType: 'PREFERENCE_CHANGED', channelId: 1010 });
+  await second.page.getByRole('button', { name: 'Bật thông báo', exact: true }).waitFor();
+  assert.deepEqual(first.errors, []); assert.deepEqual(second.errors, []);
+});
+
+test('search response from old channel cannot overwrite the next channel panel', async t => {
+  const old = deferred(t);
+  let started;
+  const requestStarted = new Promise(resolve => { started = resolve; });
+  const { page, errors } = await openScopedChat({ handler: async (route, pathname) => {
+    if (pathname !== '/api/channels/1010/messages/search') return false;
+    started(); await old.promise;
+    await route.fulfill({ json: { data: { items: [{ id: 5555, channelId: 1010, content: 'Obsolete search result' }], hasMore: false } } });
+    return true;
+  } });
+  await page.goto(`${origin}/servers/101`);
+  await page.getByRole('button', { name: 'Tìm tin', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Từ khóa tìm tin nhắn' }).fill('Alpha');
+  await requestStarted;
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await switchScopedServer(page, 'Beta');
+  const late = page.waitForResponse(response => response.url().includes('/channels/1010/messages/search'));
+  old.resolve(); await (await late).finished();
+  await page.getByRole('button', { name: 'Tìm tin', exact: true }).click();
+  assert.equal(await page.getByRole('textbox', { name: 'Từ khóa tìm tin nhắn' }).inputValue(), '');
+  assert.equal(await page.getByText('Obsolete search result', { exact: true }).count(), 0);
   assert.deepEqual(errors, []);
 });
