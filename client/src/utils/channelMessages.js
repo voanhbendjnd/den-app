@@ -9,7 +9,10 @@ export function sortMessagesChronological(items) {
   const map = new Map();
   for (const item of items) {
     if (item && item.id != null) {
-      map.set(item.id, item);
+      const previous = map.get(String(item.id));
+      if (!previous?.updatedAt || (item.updatedAt && new Date(item.updatedAt) >= new Date(previous.updatedAt))) {
+        map.set(String(item.id), item);
+      }
     }
   }
   return Array.from(map.values()).sort((a, b) => {
@@ -99,7 +102,7 @@ export function updateMessageInList(messages, updatedMessage) {
     return Array.isArray(messages) ? messages : [];
   }
   return messages.map((msg) =>
-    msg && msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
+    msg && String(msg.id) === String(updatedMessage.id) ? sortMessagesChronological([msg, { ...msg, ...updatedMessage }])[0] : msg
   );
 }
 

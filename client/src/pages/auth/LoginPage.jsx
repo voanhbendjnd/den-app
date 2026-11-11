@@ -204,25 +204,12 @@ export default function LoginPage() {
 
   return (
     <div className="discord-card" style={{
-      maxWidth: 784,
+      maxWidth: 480,
+      width: '100%',
       padding: '32px',
       margin: '0 auto',
     }}>
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'stretch',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 32,
-      }}>
-        {/* Left Column: Authentic Discord Login Form */}
-        <div style={{
-          flex: '1 1 414px',
-          maxWidth: 414,
-          minWidth: 280,
-        }}>
-          {/* Title Header */}
+      {/* Title Header */}
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
             <h2 style={{
               margin: '0 0 8px 0',
@@ -406,123 +393,6 @@ export default function LoginPage() {
               </div>
             </div>
           </Form>
-        </div>
-
-        {/* Right Column: Authentic Discord QR Code Login Panel */}
-        <div style={{
-          flex: '0 0 240px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          paddingLeft: 12,
-        }}>
-          {/* White QR Code Container */}
-          <div style={{
-            width: 176,
-            height: 176,
-            backgroundColor: '#ffffff',
-            borderRadius: 6,
-            padding: 8,
-            boxShadow: '0 2px 10px 0 rgba(0, 0, 0, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-          }}>
-            {/* Vector Discord QR Code with Logo Badge in center */}
-            <svg width="160" height="160" viewBox="0 0 160 160">
-              {/* Corner position markers */}
-              {/* Top-Left */}
-              <rect x="10" y="10" width="40" height="40" rx="4" fill="#000000" />
-              <rect x="16" y="16" width="28" height="28" rx="2" fill="#ffffff" />
-              <rect x="22" y="22" width="16" height="16" rx="2" fill="#000000" />
-
-              {/* Top-Right */}
-              <rect x="110" y="10" width="40" height="40" rx="4" fill="#000000" />
-              <rect x="116" y="16" width="28" height="28" rx="2" fill="#ffffff" />
-              <rect x="122" y="22" width="16" height="16" rx="2" fill="#000000" />
-
-              {/* Bottom-Left */}
-              <rect x="10" y="110" width="40" height="40" rx="4" fill="#000000" />
-              <rect x="16" y="116" width="28" height="28" rx="2" fill="#ffffff" />
-              <rect x="22" y="122" width="16" height="16" rx="2" fill="#000000" />
-
-              {/* Dense QR data modules pattern */}
-              <rect x="56" y="12" width="8" height="8" fill="#000000" />
-              <rect x="72" y="12" width="16" height="8" fill="#000000" />
-              <rect x="94" y="12" width="8" height="8" fill="#000000" />
-              <rect x="56" y="26" width="14" height="8" fill="#000000" />
-              <rect x="80" y="26" width="8" height="14" fill="#000000" />
-              <rect x="94" y="26" width="10" height="8" fill="#000000" />
-
-              <rect x="12" y="56" width="8" height="16" fill="#000000" />
-              <rect x="26" y="60" width="14" height="8" fill="#000000" />
-              <rect x="44" y="56" width="8" height="8" fill="#000000" />
-              <rect x="12" y="80" width="16" height="8" fill="#000000" />
-              <rect x="36" y="80" width="8" height="16" fill="#000000" />
-
-              <rect x="112" y="56" width="16" height="8" fill="#000000" />
-              <rect x="136" y="60" width="12" height="14" fill="#000000" />
-              <rect x="116" y="74" width="8" height="16" fill="#000000" />
-              <rect x="130" y="80" width="18" height="8" fill="#000000" />
-
-              <rect x="56" y="112" width="8" height="16" fill="#000000" />
-              <rect x="70" y="120" width="18" height="8" fill="#000000" />
-              <rect x="94" y="112" width="8" height="8" fill="#000000" />
-              <rect x="56" y="136" width="16" height="12" fill="#000000" />
-              <rect x="80" y="132" width="10" height="16" fill="#000000" />
-              <rect x="100" y="138" width="8" height="10" fill="#000000" />
-
-              <rect x="112" y="112" width="14" height="8" fill="#000000" />
-              <rect x="132" y="116" width="16" height="8" fill="#000000" />
-              <rect x="120" y="130" width="8" height="18" fill="#000000" />
-              <rect x="136" y="136" width="12" height="12" fill="#000000" />
-
-              {/* Center White Badge with Discord Mascot Icon */}
-              <circle cx="80" cy="80" r="22" fill="#ffffff" />
-              <circle cx="80" cy="80" r="18" fill="#5865F2" />
-              <path
-                d="M87.5,74.5 A15,15,0,0,0,83,73 a10,10,0,0,0-.5,1 A13,13,0,0,0,74.5,74 a10,10,0,0,0-.5-1 A15,15,0,0,0,69.5,74.5 C67,78 66.5,81.5 66.8,85 A15,15,0,0,0,71.5,87.5 a11,11,0,0,0,1-1.6 a10,10,0,0,1-1.5-.7 c.1-.1.3-.2.4-.3 a11,11,0,0,0,9.2,0 c.1.1.3.2.4.3 a10,10,0,0,1-1.5.7 a11,11,0,0,0,1,1.6 A15,15,0,0,0,86.2,85 C86.6,81.5 85.5,78 87.5,74.5 Z M72.8,83 A1.7,1.7,0,1,1,74.5,81.3,1.7,1.7,0,0,1,72.8,83 Z M81.2,83 A1.7,1.7,0,1,1,82.9,81.3,1.7,1.7,0,0,1,81.2,83 Z"
-                fill="#ffffff"
-              />
-            </svg>
-          </div>
-
-          {/* QR Code Title */}
-          <h3 style={{
-            margin: '24px 0 8px 0',
-            color: '#f2f3f5',
-            fontSize: 24,
-            fontWeight: 600,
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-          }}>
-            Đăng nhập bằng Mã QR
-          </h3>
-
-          {/* QR Code Instructions */}
-          <p style={{
-            color: '#b5bac1',
-            fontSize: 14,
-            lineHeight: '20px',
-            margin: 0,
-            maxWidth: 220,
-          }}>
-            Quét bằng <strong style={{ color: '#ffffff' }}>ứng dụng di động Discord</strong> để đăng nhập tức thì.
-          </p>
-
-          {/* QR Code Alternate Link */}
-          <a
-            href="#passkey"
-            onClick={(e) => { e.preventDefault(); setError('Tính năng đăng nhập bằng mã khóa đang được phát triển.'); }}
-            className="discord-link"
-            style={{ marginTop: 12, fontSize: 14 }}
-          >
-            Hoặc đăng nhập bằng mã khóa
-          </a>
-        </div>
-      </div>
 
       {/* GitHub Token Modal */}
       <Modal

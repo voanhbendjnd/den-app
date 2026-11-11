@@ -465,9 +465,9 @@
 .message-composer__box { display: flex; align-items: flex-end; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, .17); background: var(--color-bg-surface); }
 .message-composer__box:focus-within { border-color: #818cf8; }
 .message-composer__box--error { border-color: #f87171; }
-.message-composer__box .ant-input { resize: none; padding: 8px 6px; font-size: 13px; }
+.message-composer__box textarea.ant-input { resize: none; padding: 8px 6px; font-size: 13px; color: #f1f5f9 !important; caret-color: #00f2fe; }
 .message-composer__box .ant-input:disabled { background: transparent; color: var(--color-text-muted); }
-.message-composer__box .ant-input::placeholder { color: #8c9ab2; }
+.message-composer__box textarea.ant-input::placeholder { color: #8c9ab2 !important; opacity: 1; }
 .message-composer__box > .ant-btn { flex-shrink: 0; height: 36px; }
 .message-composer__help { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 0 2px; color: var(--color-text-muted); font-size: 10px; line-height: 1.7; }
 .message-composer__help > span:last-child { flex-shrink: 0; }

@@ -443,6 +443,7 @@ function ServerWorkspace({ serverId }) {
   const prevScrollTopRef = useRef(0);
   const activeChannelId = useRef(null);
   const channelSession = useRef(0);
+  const deletedMessageIds = useRef(new Set());
   const messagesRequest = useRef(0);
   const moreRequest = useRef(0);
   const morePending = useRef(false);
@@ -458,6 +459,7 @@ function ServerWorkspace({ serverId }) {
   useLayoutEffect(() => {
     activeChannelId.current = activeChannel?.id ?? null;
     channelSession.current += 1;
+    deletedMessageIds.current.clear();
     setMessages([]);
     setMessagesError(null);
     setMessagesLoading(Boolean(activeChannel?.id));
@@ -502,8 +504,8 @@ function ServerWorkspace({ serverId }) {
       if (!current()) return;
       const pageData = res.data?.data || res.data || {};
       const items = pageData.items || [];
-      const sorted = sortMessagesChronological(items);
-      setMessages(sorted);
+      // A topic event or send result may arrive while history is in flight.
+      setMessages((previous) => mergeMessagePages(previous, items.filter(item => !deletedMessageIds.current.has(String(item.id)))));
       setHasMore(Boolean(pageData.hasMore));
       setNextCursor(pageData.nextCursor ?? null);
       requestAnimationFrame(() => {
@@ -557,7 +559,7 @@ function ServerWorkspace({ serverId }) {
       if (!current()) return;
       const pageData = res.data?.data || res.data || {};
       const newItems = pageData.items || [];
-      setMessages((prev) => mergeMessagePages(prev, newItems));
+      setMessages((prev) => mergeMessagePages(prev, newItems.filter(item => !deletedMessageIds.current.has(String(item.id)))));
       setHasMore(Boolean(pageData.hasMore));
       setNextCursor(pageData.nextCursor ?? null);
       requestAnimationFrame(() => {
@@ -599,8 +601,9 @@ function ServerWorkspace({ serverId }) {
       throw new Error('Kênh đang chọn đã thay đổi.');
     }
     const session = channelSession.current;
-    // Ưu tiên WebSocket; tin nhắn được hiển thị khi server broadcast về topic của kênh.
-    if (sendChannelMessage(chId, payload)) return null;
+    // Await the persisted result; publishing a frame alone is not success.
+    const delivery = sendChannelMessage(chId, payload);
+    if (delivery) return await delivery;
     const res = await messageApi.sendMessage(chId, payload);
     if (currentServerId.current !== serverId || channelSession.current !== session || activeChannelId.current !== chId) return null;
     return res.data?.data || res.data;
@@ -610,8 +613,8 @@ function ServerWorkspace({ serverId }) {
     if (!sentMessage || currentServerId.current !== serverId || activeChannelId.current !== channelId) return;
     const session = channelSession.current;
     setMessages((prev) => {
-      if (prev.some((m) => m.id === sentMessage.id)) return prev;
-      return [...prev, sentMessage];
+      if (deletedMessageIds.current.has(String(sentMessage.id))) return prev;
+      return sortMessagesChronological([...prev, sentMessage]);
     });
     requestAnimationFrame(() => {
       if (currentServerId.current !== serverId || channelSession.current !== session) return;
@@ -625,7 +628,17 @@ function ServerWorkspace({ serverId }) {
   const handleSentMessageRef = useRef(handleSentMessage);
   handleSentMessageRef.current = handleSentMessage;
   const { sendChannelMessage } = useChannelChat(activeChannel?.id ?? null, (incoming) => {
-    if (isMessageForChannel(incoming, activeChannelId.current)) handleSentMessageRef.current(incoming, incoming.channelId);
+    if (!isMessageForChannel(incoming, activeChannelId.current)) return;
+    if (incoming.eventType === 'DELETED') {
+      deletedMessageIds.current.add(String(incoming.id));
+      setMessages(previous => removeMessageFromList(previous, incoming.id));
+      if (String(editingMessageId) === String(incoming.id)) handleCancelEdit();
+    } else {
+      handleSentMessageRef.current(incoming, activeChannelId.current);
+    }
+  }, () => {
+    // Also run on the first connection to cover the history/subscribe gap.
+    if (activeChannelId.current != null) fetchChannelMessages(activeChannelId.current);
   });
 
   const handleStartEdit = (msg) => {
@@ -709,6 +722,7 @@ function ServerWorkspace({ serverId }) {
     setDeletingMessageId(messageId);
     try {
       await messageApi.deleteMessage(messageId);
+      deletedMessageIds.current.add(String(messageId));
       setMessages((prev) => removeMessageFromList(prev, messageId));
       if (editingMessageId === messageId) {
         handleCancelEdit();
