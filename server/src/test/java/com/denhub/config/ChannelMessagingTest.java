@@ -11,7 +11,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.messaging.Message;
@@ -46,7 +45,7 @@ import static org.mockito.Mockito.*;
 /** Real transaction/event synchronization; interceptors exercise actual STOMP/SIMP headers. */
 @SpringJUnitConfig(ChannelMessagingTest.TestConfig.class)
 class ChannelMessagingTest {
-    @Configuration
+    // Registered explicitly by @SpringJUnitConfig; no component stereotype that an IDE app launch can scan.
     @org.springframework.transaction.annotation.EnableTransactionManagement
     static class TestConfig {
         @Bean SimpMessagingTemplate messaging() { return mock(SimpMessagingTemplate.class); }
@@ -81,6 +80,29 @@ class ChannelMessagingTest {
         config.configureClientOutboundChannel(output);
         inbound = input.interceptors().getFirst();
         outbound = output.interceptors().getFirst();
+    }
+
+    @Test
+    void editsAndDeletesBroadcastOnlyAfterCommit() {
+        MessageResponse updated = saved();
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            events.publishEvent(new ChannelMessageDelivery.Updated(updated));
+            events.publishEvent(new ChannelMessageDelivery.Deleted(101L, 5L));
+            verifyNoInteractions(messaging);
+        });
+        verify(messaging).convertAndSend("/topic/channels/5", updated);
+        verify(messaging).convertAndSend("/topic/channels/5",
+                Map.of("eventType", "DELETED", "id", 101L, "channelId", 5L));
+    }
+
+    @Test
+    void rollbackDoesNotBroadcastEditsOrDeletes() {
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            events.publishEvent(new ChannelMessageDelivery.Updated(saved()));
+            events.publishEvent(new ChannelMessageDelivery.Deleted(101L, 5L));
+            tx.setRollbackOnly();
+        });
+        verifyNoInteractions(messaging);
     }
 
     @Test

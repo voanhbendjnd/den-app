@@ -29,6 +29,28 @@ public class ChannelMessageDelivery {
         }
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void deliverUpdate(Updated event) {
+        try {
+            messaging.convertAndSend("/topic/channels/" + event.message().channelId(), event.message());
+        } catch (RuntimeException ex) {
+            log.warn("Could not broadcast committed channel update, messageId={}", event.message().id());
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void deliverDelete(Deleted event) {
+        try {
+            messaging.convertAndSend("/topic/channels/" + event.channelId(),
+                    java.util.Map.of("eventType", "DELETED", "id", event.id(), "channelId", event.channelId()));
+        } catch (RuntimeException ex) {
+            log.warn("Could not broadcast committed channel deletion, messageId={}", event.id());
+        }
+    }
+
+    public record Updated(MessageResponse message) {}
+    public record Deleted(Long id, Long channelId) {}
+
     public static final class Created {
         private final MessageResponse message;
 
