@@ -51,6 +51,22 @@ public class ChannelMessageDelivery {
     public record Updated(MessageResponse message) {}
     public record Deleted(Long id, Long channelId) {}
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void deliverFeature(com.denhub.service.ChannelFeaturesService.FeatureChanged event) {
+        java.util.Map<String,Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("eventType",event.eventType());
+        payload.put("channelId",event.channelId());
+        try {
+            if (event.userId() == null) messaging.convertAndSend("/topic/channels/"+event.channelId(),payload);
+            else {
+                messaging.convertAndSendToUser(event.userId().toString(),"/queue/channel-features",payload);
+                messaging.convertAndSendToUser(event.email(),"/queue/channel-features",payload);
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Could not broadcast committed channel feature change, type={}",event.eventType());
+        }
+    }
+
     public static final class Created {
         private final MessageResponse message;
 

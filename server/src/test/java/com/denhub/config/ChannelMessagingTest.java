@@ -106,6 +106,41 @@ class ChannelMessagingTest {
     }
 
     @Test
+    void featureEventsArePrivateOrChannelScopedAfterCommit() {
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            events.publishEvent(new com.denhub.service.ChannelFeaturesService.FeatureChanged(5L,null,null,"PINS_CHANGED"));
+            events.publishEvent(new com.denhub.service.ChannelFeaturesService.FeatureChanged(null,2L,"member@example.test","SAVED_CHANGED"));
+            verifyNoInteractions(messaging);
+        });
+        verify(messaging).convertAndSend("/topic/channels/5",Map.of("channelId",5L,"eventType","PINS_CHANGED"));
+        var payload=new java.util.LinkedHashMap<String,Object>(); payload.put("channelId",null); payload.put("eventType","SAVED_CHANGED");
+        verify(messaging).convertAndSendToUser("2","/queue/channel-features",payload);
+        verify(messaging).convertAndSendToUser("member@example.test","/queue/channel-features",payload);
+    }
+
+    @Test
+    void rollbackDoesNotSendPrivatePreferencesOrPins() {
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            events.publishEvent(new com.denhub.service.ChannelFeaturesService.FeatureChanged(5L,null,null,"PINS_CHANGED"));
+            events.publishEvent(new com.denhub.service.ChannelFeaturesService.FeatureChanged(5L,2L,"member@example.test","PREFERENCE_CHANGED"));
+            tx.setRollbackOnly();
+        });
+        verifyNoInteractions(messaging);
+    }
+
+    @Test
+    void privateFeatureQueueRejectsPhysicalAndOtherUserSubscriptions() {
+        connect("features-session",Instant.now().plusSeconds(60));
+        when(service.isActivePrincipal("2")).thenReturn(true);
+        assertNotNull(inbound.preSend(stomp(StompCommand.SUBSCRIBE,"features-session","/user/queue/channel-features"),channel));
+        for(String destination:List.of("/queue/channel-features-user-features-session","/user/other/queue/channel-features")) {
+            assertThrows(MessageDeliveryException.class,() -> inbound.preSend(stomp(StompCommand.SUBSCRIBE,"features-session",destination),channel));
+        }
+        when(service.isActivePrincipal("2")).thenReturn(false);
+        assertNull(outbound.preSend(delivery("features-session","/queue/channel-features-user-features-session"),channel));
+    }
+
+    @Test
     void broadcastsExactlyOnceOnlyAfterCommit() {
         MessageResponse message = saved();
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {

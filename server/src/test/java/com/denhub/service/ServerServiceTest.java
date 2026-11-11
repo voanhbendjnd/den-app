@@ -54,6 +54,8 @@ class ServerServiceTest {
     @Mock
     private com.denhub.repository.ChannelRepository channelRepository;
 
+    @org.mockito.Mock private com.denhub.service.ChannelFeatureCleanup featureCleanup;
+
     @InjectMocks
     private ServerService serverService;
 

@@ -32,6 +32,7 @@ public class ChannelService {
     ServerMemberRepository serverMemberRepository;
     UserRepository userRepository;
     MessageRepository messageRepository;
+    ChannelFeatureCleanup featureCleanup;
 
     public ChannelResponseDTO createChannel(CreateChannelDTO dto) {
         User currentUser = getCurrentUser();
@@ -108,6 +109,7 @@ public class ChannelService {
             throw new BadRequestAlertException("Không thể xóa an toàn vì dữ liệu tin nhắn đang liên kết với hội thoại riêng", "channel", "conflict");
         }
 
+        featureCleanup.channels(java.util.List.of(channelId));
         messageRepository.deleteByChannelId(channelId);
         channelRepository.delete(channel);
         channelRepository.flush();

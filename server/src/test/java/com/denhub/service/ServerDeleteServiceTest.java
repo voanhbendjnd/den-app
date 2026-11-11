@@ -28,6 +28,8 @@ class ServerDeleteServiceTest {
     @Mock ChannelRepository channelRepository;
     @Mock InviteRepository inviteRepository;
     @Mock UserRepository userRepository;
+    @org.mockito.Mock private com.denhub.service.ChannelFeatureCleanup featureCleanup;
+
     @InjectMocks ServerService service;
 
     @AfterEach void clearAuthentication() { SecurityContextHolder.clearContext(); }

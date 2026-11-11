@@ -535,6 +535,8 @@ class MessageServiceTest {
 
     @Test
     void updateMessage_Success_WhenAuthor() {
+        stubChannel(true);
+        when(messageRepository.existsById(101L)).thenReturn(true);
         authenticate(EMAIL);
         stubSender();
 
@@ -677,6 +679,8 @@ class MessageServiceTest {
 
     @Test
     void deleteMessage_Success_WhenAuthor() {
+        stubChannel(true);
+        when(messageRepository.existsById(101L)).thenReturn(true);
         authenticate(EMAIL);
         stubSender(); // User ID 2L
 

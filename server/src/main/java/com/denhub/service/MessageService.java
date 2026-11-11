@@ -135,14 +135,18 @@ public class MessageService {
         message.setChannelId(channel.getId());
         message.setAuthorId(sender.getId());
         message.setContent(request.content());
+        if (request.getReplyToMessageId() != null) {
+            Message target = messageRepository.findById(request.getReplyToMessageId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tin nhắn gốc không còn tồn tại"));
+            if (!channelId.equals(target.getChannelId()) || target.getConversationId() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ trả lời tin nhắn cùng kênh");
+            }
+            message.setReplyToMessageId(target.getId());
+        }
 
         Message savedMessage = messageRepository.save(message);
-        MessageResponse response = new MessageResponse(
-                savedMessage.getId(),
-                savedMessage.getChannelId(),
-                savedMessage.getAuthorId(),
-                savedMessage.getContent(),
-                savedMessage.getCreatedDate());
+        MessageResponse response = describeMessage(savedMessage);
+        response.setUpdatedAt(null);
         events.publishEvent(new ChannelMessageDelivery.Created(response));
         return response;
     }
@@ -191,15 +195,7 @@ public class MessageService {
             nextCursor = pagedMessages.get(pagedMessages.size() - 1).getId();
         }
 
-        List<MessageResponse> items = pagedMessages.stream()
-                .map(msg -> new MessageResponse(
-                        msg.getId(),
-                        msg.getChannelId(),
-                        msg.getAuthorId(),
-                        msg.getContent(),
-                        msg.getCreatedDate(),
-                        msg.getLastModifiedDate()))
-                .toList();
+        List<MessageResponse> items = pagedMessages.stream().map(this::describeMessage).toList();
 
         return new CursorPageResponse<>(items, nextCursor, hasMore, effectiveLimit);
     }
@@ -252,17 +248,15 @@ public class MessageService {
                     HttpStatus.FORBIDDEN, "Bạn không có quyền sửa tin nhắn này");
         }
 
+        lockChannelForMutation(message);
         message.setContent(request.content());
         Message savedMessage = messageRepository.saveAndFlush(message);
 
-        MessageResponse response = new MessageResponse(
-                savedMessage.getId(),
-                savedMessage.getChannelId(),
-                savedMessage.getAuthorId(),
-                savedMessage.getContent(),
-                savedMessage.getCreatedDate(),
-                savedMessage.getLastModifiedDate());
-        if (savedMessage.getChannelId() != null) events.publishEvent(new ChannelMessageDelivery.Updated(response));
+        MessageResponse response = describeMessage(savedMessage);
+        if (savedMessage.getChannelId() != null) {
+            events.publishEvent(new ChannelMessageDelivery.Updated(response));
+            invalidateSaved(java.util.List.of(savedMessage.getId()));
+        }
         return response;
     }
 
@@ -299,8 +293,45 @@ public class MessageService {
                     HttpStatus.FORBIDDEN, "Bạn không có quyền xóa tin nhắn này");
         }
 
+        lockChannelForMutation(message);
+        invalidateSaved(java.util.List.of(messageId));
+        messageRepository.cleanupMessages(java.util.List.of(messageId));
         messageRepository.delete(message);
         if (message.getChannelId() != null) events.publishEvent(new ChannelMessageDelivery.Deleted(message.getId(), message.getChannelId()));
     }
-}
 
+    private void lockChannelForMutation(Message message) {
+        if (message.getChannelId() == null) return;
+        Channel channel = channelRepository.findById(message.getChannelId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy kênh"));
+        serverRepository.findByIdForUpdate(channel.getServerId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy Server"));
+        if (!messageRepository.existsById(message.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Tin nhắn không còn tồn tại");
+        }
+    }
+
+    private void invalidateSaved(java.util.List<Long> ids) {
+        for (User user : messageRepository.savedUsers(ids)) events.publishEvent(
+                new ChannelFeaturesService.FeatureChanged(null,user.getId(),user.getEmail(),"SAVED_CHANGED"));
+    }
+
+    @Transactional(readOnly=true)
+    public boolean isActivePrincipal(String principal) {
+        try { resolveActiveUser(principal); return true; }
+        catch (RuntimeException ex) { return false; }
+    }
+
+    public MessageResponse describeMessage(Message message) {
+        var modified = message.getLastModifiedDate();
+        if (modified != null && message.getCreatedDate() != null && !modified.isAfter(message.getCreatedDate())) modified = null;
+        MessageResponse dto = new MessageResponse(message.getId(), message.getChannelId(), message.getAuthorId(),
+                message.getContent(), message.getCreatedDate(), modified);
+        if (message.getReplyToMessageId() != null) {
+            messageRepository.findById(message.getReplyToMessageId())
+                    .filter(target -> java.util.Objects.equals(target.getChannelId(), message.getChannelId()) && target.getConversationId() == null)
+                    .ifPresent(target -> dto.setReplyTo(new MessageResponse.ReplyPreview(target.getId(), target.getAuthorId(), target.getContent())));
+        }
+        return dto;
+    }
+}

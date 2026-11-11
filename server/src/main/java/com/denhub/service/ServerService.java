@@ -60,6 +60,7 @@ public class ServerService {
     InviteRepository inviteRepository;
     ChannelRepository channelRepository;
     MessageRepository messageRepository;
+    ChannelFeatureCleanup featureCleanup;
 
     @Transactional(readOnly = true)
     public ServerDiscoveryDTO discoverServers(String query, int page, int size) {
@@ -92,6 +93,7 @@ public class ServerService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Không thể xóa an toàn vì dữ liệu tin nhắn đang liên kết với hội thoại riêng. Vui lòng liên hệ quản trị viên.");
         }
+        featureCleanup.channels(messageRepository.channelIds(serverId));
         messageRepository.deleteChannelMessagesByServerId(serverId);
         channelRepository.deleteAllByServerId(serverId);
         inviteRepository.deleteAllByServerId(serverId);
@@ -355,6 +357,7 @@ public class ServerService {
         }
 
         serverMemberRepository.deleteByServerIdAndUserId(serverId, currentUser.getId());
+        featureCleanup.membership(currentUser.getId());
     }
 
     @Transactional
@@ -384,6 +387,7 @@ public class ServerService {
         }
 
         serverMemberRepository.deleteByServerIdAndUserId(serverId, userId);
+        featureCleanup.membership(userId);
     }
 
     public ServerResponseDTO joinServerByInviteCode(String rawCode) {
