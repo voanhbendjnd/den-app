@@ -48,6 +48,8 @@ class ChannelServiceTest {
     @Mock
     private MessageRepository messageRepository;
 
+    @org.mockito.Mock private com.denhub.service.ChannelFeatureCleanup featureCleanup;
+
     @InjectMocks
     private ChannelService channelService;
 

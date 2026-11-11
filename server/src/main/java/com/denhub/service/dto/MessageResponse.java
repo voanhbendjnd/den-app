@@ -17,7 +17,6 @@ import java.time.Instant;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 @EqualsAndHashCode
 @ToString
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -44,6 +43,16 @@ public class MessageResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     Instant updatedAt;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    ReplyPreview replyTo;
+
+    public record ReplyPreview(Long id, Long senderId, String content) {}
+
+    public MessageResponse(Long id, Long channelId, Long senderId, String content, Instant createdAt, Instant updatedAt) {
+        this(id, channelId, senderId, content, createdAt);
+        this.updatedAt = updatedAt;
+    }
 
     public MessageResponse(Long id, Long channelId, Long senderId, String content, Instant createdAt) {
         this.id = id;

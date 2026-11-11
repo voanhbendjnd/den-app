@@ -16,7 +16,6 @@ import lombok.experimental.FieldDefaults;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 @EqualsAndHashCode
 @ToString
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -28,6 +27,11 @@ public class SendMessageRequest {
     @Pattern(regexp = "(?sU).*\\S.*", message = "Nội dung tin nhắn không được để trống")
     @Size(max = 4000, message = "Nội dung tin nhắn không được vượt quá 4000 kí tự")
     String content;
+
+    @jakarta.validation.constraints.Positive
+    Long replyToMessageId;
+
+    public SendMessageRequest(String content) { this.content = content; }
 
     // Backward-compatible record-like accessor
     public String content() {

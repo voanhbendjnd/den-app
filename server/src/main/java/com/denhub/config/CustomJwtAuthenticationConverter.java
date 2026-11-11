@@ -35,11 +35,14 @@ public class CustomJwtAuthenticationConverter implements Converter<Jwt, Collecti
     public Collection<GrantedAuthority> convert(Jwt source) {
         String email = source.getSubject(); // username
         String sessionId = source.getClaimAsString("sessionId");
-        if(email != null && sessionId != null) {
-            boolean isValidSession = sessionManager.isValidSessionIdByEmail(email, sessionId);
-            if(!isValidSession) {
-                throw new BadCredentialsException("Invalid session id");
-            }
+        // GuestAwareJwtDecoder creates this token only for malformed bearer tokens on public URLs.
+        // Preserve that public fallback without treating incomplete signed access tokens as a session.
+        if ("anonymous_token".equals(source.getTokenValue())
+                && "anonymousUser".equals(email) && "none".equals(source.getHeaders().get("alg"))) {
+            return List.of();
+        }
+        if (!sessionManager.isValidSessionIdByEmail(email, sessionId)) {
+            throw new BadCredentialsException("Invalid session id");
         }
         Collection<String> authorities = source.getClaimAsStringList(authoritiesClaimName);
         if(authorities == null || authorities.isEmpty()) {

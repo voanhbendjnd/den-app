@@ -145,3 +145,15 @@ Người dùng duyệt kế hoạch cả Home và Khám phá bằng “triển k
 - **Phạm vi tìm kiếm:** tên Server, không phân biệt hoa/thường, bỏ khoảng trắng đầu/cuối từ khóa. Chưa có xử lý tìm không dấu riêng; không thêm tag, chủ đề, mô tả, số người online hoặc xếp hạng phổ biến.
 - Kết quả Khám phá chỉ có nút “Tham gia”; không có hàng “Đã tham gia” hoặc “Mở server” cho Server của mình/đã tham gia. Thành công cập nhật danh sách chung và mở Server trong phiên hiện tại; response sau khi đã rời trang chỉ đồng bộ danh sách. Truy vấn lại Khám phá sau Join không còn Server đó; rời một Server công khai thì có thể tìm thấy lại.
 - Bản triển khai có kiểm thử H2/API mock. Sau xác nhận “áp dụng”, script đã được chạy trên local `denhubdb`, 2 Server cũ PRIVATE và kiểm tra schema/query smoke PASS; chưa kiểm API có JWT trên database thật. Database khác cần review/apply riêng theo docs/03 mục 4.7.
+
+
+## 9. Năm UC bổ sung cho Group Chat — phạm vi đã duyệt (2026-11-11)
+
+- Người dùng duyệt kế hoạch 5 UC và yêu cầu tất cả realtime. Tên UC nghiệp vụ: tìm kiếm tin trong Channel; ghim/bỏ ghim; lưu/bỏ lưu cá nhân; trả lời tin; bật/tắt thông báo Channel. Không tự gán mã task/UC từ bảng phân công bên ngoài.
+- Tìm kiếm chỉ nội dung trong Channel đang có membership, có phân trang; literal substring, không phân biệt hoa/thường, chưa tìm không dấu/toàn hệ thống. Tin đã xóa không được trả về.
+- Chỉ Owner theo servers.owner_id được ghim/bỏ ghim; thành viên có quyền đọc xem danh sách ghim. Ghim lặp không tạo trùng.
+- Saved là danh sách riêng từng User, lưu/bỏ lưu idempotent. Chỉ trả nội dung nếu User còn membership của Server chứa tin; rời/kick không được tiếp tục đọc nội dung saved. Xóa Message dọn liên kết saved/pin.
+- Reply chỉ cùng Channel và tin gốc tồn tại, không dùng cho DM hoặc tạo thread. Nội dung câu trả lời vẫn là tin văn bản tối đa 4000 UTF-16. Sửa tin gốc cập nhật trích dẫn; xóa tin gốc gỡ trích dẫn, giữ câu trả lời. Không lưu snapshot của nội dung đã xóa.
+- Notification preference riêng User/Channel, mặc định không muted. Chỉ âm báo/tiêu đề tab khi có tin mới từ người khác trong Channel đang mở và tab không focus. Mute không chặn nhận/đọc/gửi tin. Không thêm push/offline hoặc subscribe mọi Channel.
+- Các phiên đang mở đồng bộ qua WebSocket: pin/search/reply theo kênh; saved/preference chỉ cùng tài khoản. REST vẫn là thao tác ghi kiểm quyền. Reconnect tải lại trạng thái; không có outbox/replay đảm bảo mọi event được nhận.
+- Trạng thái triển khai/kiểm thử và phần còn chờ review schema nằm ở docs/00; contracts payload ở docs/02 mục 26, schema ở docs/03 mục 4.8.

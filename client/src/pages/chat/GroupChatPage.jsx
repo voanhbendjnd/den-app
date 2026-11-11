@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { Link, Navigate, useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { Avatar, Button, Drawer, Grid, Input, message as antMessage, Popconfirm, Skeleton, Spin } from 'antd';
+import { Avatar, Button, Drawer, Grid, Input, message as antMessage, Popconfirm, Skeleton, Spin, Tooltip } from 'antd';
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
@@ -16,7 +16,13 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
+import { useChannelChat } from '../../hooks/useChannelChat';
+import { isMessageForChannel } from '../../utils/channelWebSocket';
 import MessageInput from '../../components/chat/MessageInput';
+import ChannelTools from '../../components/chat/ChannelTools';
+import PinnedMessagesBanner from '../../components/chat/PinnedMessagesBanner';
+import { channelFeaturesApi } from '../../api/channelFeaturesApi';
+import { useChannelNotification } from '../../hooks/useChannelNotification';
 import CreateChannelModal from '../../components/common/CreateChannelModal';
 import EditChannelModal from '../../components/common/EditChannelModal';
 import DeleteChannelModal from '../../components/common/DeleteChannelModal';
@@ -30,8 +36,7 @@ import messageApi from '../../api/messageApi';
 import { canDeleteChannel, isChannelDeletable } from '../../utils/channelUtils';
 import { canRemoveMember, formatMemberDisplayName } from '../../utils/serverMember';
 import {
-  sortMessagesChronological,
-  mergeMessagePages,
+  mergeChannelMessages,
   formatMessageTime,
   formatCompactTime,
   getAuthorInfo,
@@ -428,6 +433,10 @@ function ServerWorkspace({ serverId }) {
     }
   };
 
+  const [featureRevision, setFeatureRevision] = useState(0);
+  const [replyTarget, setReplyTarget] = useState(null);
+  const notification = useChannelNotification(activeChannel?.id, currentUser?.id);
+
   // Channel Messages state
   const [messages, setMessages] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -441,6 +450,7 @@ function ServerWorkspace({ serverId }) {
   const prevScrollTopRef = useRef(0);
   const activeChannelId = useRef(null);
   const channelSession = useRef(0);
+  const deletedMessageIds = useRef(new Set());
   const messagesRequest = useRef(0);
   const moreRequest = useRef(0);
   const morePending = useRef(false);
@@ -452,10 +462,14 @@ function ServerWorkspace({ serverId }) {
   const [editError, setEditError] = useState(null);
   const editInputRef = useRef(null);
   const [deletingMessageId, setDeletingMessageId] = useState(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+  const [isPinnedExpanded, setIsPinnedExpanded] = useState(false);
 
   useLayoutEffect(() => {
     activeChannelId.current = activeChannel?.id ?? null;
+    setReplyTarget(null);
     channelSession.current += 1;
+    deletedMessageIds.current.clear();
     setMessages([]);
     setMessagesError(null);
     setMessagesLoading(Boolean(activeChannel?.id));
@@ -469,6 +483,8 @@ function ServerWorkspace({ serverId }) {
     setEditLoading(false);
     setEditError(null);
     setDeletingMessageId(null);
+    setHighlightedMessageId(null);
+    setIsPinnedExpanded(false);
     return () => {
       activeChannelId.current = null;
       channelSession.current += 1;
@@ -500,8 +516,8 @@ function ServerWorkspace({ serverId }) {
       if (!current()) return;
       const pageData = res.data?.data || res.data || {};
       const items = pageData.items || [];
-      const sorted = sortMessagesChronological(items);
-      setMessages(sorted);
+      // A topic event or send result may arrive while history is in flight.
+      setMessages((previous) => mergeChannelMessages(previous, items, deletedMessageIds.current));
       setHasMore(Boolean(pageData.hasMore));
       setNextCursor(pageData.nextCursor ?? null);
       requestAnimationFrame(() => {
@@ -555,7 +571,7 @@ function ServerWorkspace({ serverId }) {
       if (!current()) return;
       const pageData = res.data?.data || res.data || {};
       const newItems = pageData.items || [];
-      setMessages((prev) => mergeMessagePages(prev, newItems));
+      setMessages((prev) => mergeChannelMessages(prev, newItems, deletedMessageIds.current));
       setHasMore(Boolean(pageData.hasMore));
       setNextCursor(pageData.nextCursor ?? null);
       requestAnimationFrame(() => {
@@ -586,7 +602,7 @@ function ServerWorkspace({ serverId }) {
 
   const handleChatScroll = () => {
     const el = chatContainerRef.current;
-    if (!el || loadingMore || !hasMore) return;
+    if (!el || loadingMore || !hasMore || loadMoreError) return;
     if (el.scrollTop < 60) {
       handleLoadMore();
     }
@@ -597,6 +613,10 @@ function ServerWorkspace({ serverId }) {
       throw new Error('Kênh đang chọn đã thay đổi.');
     }
     const session = channelSession.current;
+    if (replyTarget) payload = { ...payload, replyToMessageId: replyTarget.id };
+    // Await the persisted result; publishing a frame alone is not success.
+    const delivery = sendChannelMessage(chId, payload);
+    if (delivery) return await delivery;
     const res = await messageApi.sendMessage(chId, payload);
     if (currentServerId.current !== serverId || channelSession.current !== session || activeChannelId.current !== chId) return null;
     return res.data?.data || res.data;
@@ -606,8 +626,8 @@ function ServerWorkspace({ serverId }) {
     if (!sentMessage || currentServerId.current !== serverId || activeChannelId.current !== channelId) return;
     const session = channelSession.current;
     setMessages((prev) => {
-      if (prev.some((m) => m.id === sentMessage.id)) return prev;
-      return [...prev, sentMessage];
+      if (deletedMessageIds.current.has(String(sentMessage.id))) return prev;
+      return mergeChannelMessages(prev, [sentMessage], deletedMessageIds.current);
     });
     requestAnimationFrame(() => {
       if (currentServerId.current !== serverId || channelSession.current !== session) return;
@@ -616,6 +636,114 @@ function ServerWorkspace({ serverId }) {
         el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
       }
     });
+  };
+
+  const handleSentMessageRef = useRef(handleSentMessage);
+  handleSentMessageRef.current = handleSentMessage;
+  const { sendChannelMessage } = useChannelChat(activeChannel?.id ?? null, (incoming) => {
+    if (!isMessageForChannel(incoming, activeChannelId.current)) return;
+    setFeatureRevision(value => value + 1);
+    if (incoming.eventType === 'PINS_CHANGED') return;
+    notification.notify(incoming);
+    setReplyTarget(previous => previous && String(previous.id) === String(incoming.id)
+      ? incoming.eventType === 'DELETED' ? null : { ...previous, content: incoming.content } : previous);
+    if (incoming.eventType === 'DELETED') {
+      deletedMessageIds.current.add(String(incoming.id));
+      setMessages(previous => mergeChannelMessages(previous, [], deletedMessageIds.current));
+      if (String(editingMessageId) === String(incoming.id)) handleCancelEdit();
+    } else {
+      handleSentMessageRef.current(incoming, activeChannelId.current);
+    }
+  }, () => {
+    // Also run on the first connection to cover the history/subscribe gap.
+    if (activeChannelId.current != null) fetchChannelMessages(activeChannelId.current);
+    setFeatureRevision(value => value + 1);
+  }, event => {
+    if (event.eventType === 'SAVED_CHANGED' || String(event.channelId) === String(activeChannelId.current)) {
+      setFeatureRevision(value => value + 1);
+    }
+  });
+
+  const handleFeatureAction = async (action, messageId) => {
+    const session = channelSession.current;
+    try {
+      if (action === 'pin') await channelFeaturesApi.pin(messageId, true);
+      else await channelFeaturesApi.save(messageId, true);
+      if (session !== channelSession.current) return;
+      setFeatureRevision(value => value + 1);
+      antMessage.success(action === 'pin' ? 'Đã ghim tin nhắn.' : 'Đã lưu tin nhắn.');
+    } catch { if (session === channelSession.current) antMessage.error('Chưa thực hiện được. Hãy thử lại.'); }
+  };
+
+  const handleJumpToMessage = async (messageId) => {
+    if (!messageId || !activeChannel?.id) return;
+    const session = channelSession.current;
+    const strId = String(messageId);
+
+    // 1. If already in loaded messages
+    const existing = messages.find((m) => String(m.id) === strId);
+    if (existing) {
+      const el = document.getElementById(`group-message-${strId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightedMessageId(messageId);
+        setTimeout(() => {
+          setHighlightedMessageId((curr) => (String(curr) === strId ? null : curr));
+        }, 2500);
+        return;
+      }
+    }
+
+    // 2. Fetch older history until message is found or history ends
+    let cursor = nextCursor;
+    let found = false;
+    let currentHasMore = hasMore;
+    let accumulated = [...messages];
+    const hideLoading = antMessage.loading('Đang tìm tin nhắn trong lịch sử...', 0);
+
+    try {
+      while (!found && currentHasMore && cursor && session === channelSession.current) {
+        const res = await messageApi.getMessages(activeChannel.id, { before: cursor, limit: 30 });
+        if (session !== channelSession.current) break;
+        const pageData = res.data?.data || res.data || {};
+        const newItems = pageData.items || [];
+        cursor = pageData.nextCursor ?? null;
+        currentHasMore = Boolean(pageData.hasMore);
+        accumulated = mergeChannelMessages(accumulated, newItems, deletedMessageIds.current);
+
+        if (newItems.some((m) => String(m.id) === strId)) {
+          found = true;
+          break;
+        }
+      }
+
+      hideLoading();
+      if (session !== channelSession.current) return;
+
+      setMessages(accumulated);
+      setNextCursor(cursor);
+      setHasMore(currentHasMore);
+
+      if (found) {
+        setTimeout(() => {
+          const el = document.getElementById(`group-message-${strId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHighlightedMessageId(messageId);
+            setTimeout(() => {
+              setHighlightedMessageId((curr) => (String(curr) === strId ? null : curr));
+            }, 2500);
+          }
+        }, 120);
+      } else {
+        antMessage.info('Tin nhắn này không còn tồn tại trong kênh.');
+      }
+    } catch {
+      hideLoading();
+      if (session === channelSession.current) {
+        antMessage.error('Không thể tải lịch sử tin nhắn.');
+      }
+    }
   };
 
   const handleStartEdit = (msg) => {
@@ -699,6 +827,7 @@ function ServerWorkspace({ serverId }) {
     setDeletingMessageId(messageId);
     try {
       await messageApi.deleteMessage(messageId);
+      deletedMessageIds.current.add(String(messageId));
       setMessages((prev) => removeMessageFromList(prev, messageId));
       if (editingMessageId === messageId) {
         handleCancelEdit();
@@ -837,68 +966,102 @@ function ServerWorkspace({ serverId }) {
       </aside>
       <main className="group-chat">
         <header className="group-chat__header">
-          <Button className="group-mobile-channels" type="text" icon={<MenuOutlined />} aria-label="Mở danh sách kênh" onClick={() => setChannelsOpen(true)} />
-          <span className="group-header-hash" aria-hidden="true">#</span>
-          <div className="group-chat__title">
-            <strong>{activeChannel ? activeChannel.name : 'Trò chuyện nhóm'}</strong>
-            <span title={server.name}>{server.name}</span>
+          <div className="group-chat__header-left">
+            <Button className="group-mobile-channels" type="text" icon={<MenuOutlined />} aria-label="Mở danh sách kênh" onClick={() => setChannelsOpen(true)} />
+            <span className="group-header-hash" aria-hidden="true">#</span>
+            <div className="group-chat__title">
+              <strong>{activeChannel ? activeChannel.name : 'Trò chuyện nhóm'}</strong>
+              <span className="group-header-divider" aria-hidden="true">|</span>
+              <span className="group-header-server-name" title={server.name}>{server.name}</span>
+            </div>
           </div>
-          {activeChannel ? (
-            <span className="group-channel-badge">#{activeChannel.name}</span>
-          ) : (
-            <span className="group-pending-label">Chưa chọn kênh</span>
-          )}
-          {activeChannel && (
-            <Button
-              type="text"
-              className="group-header-edit-btn"
-              icon={<SettingOutlined />}
-              title={`Cài đặt kênh #${activeChannel.name}`}
-              aria-label={`Cài đặt kênh #${activeChannel.name}`}
-              onClick={() => setEditingChannel(activeChannel)}
-            />
-          )}
-          {activeChannel && activeChannel.name?.toLowerCase() !== 'general' && (
-            <Button
-              type="text"
-              danger
-              className="group-header-delete-btn"
-              icon={<DeleteOutlined />}
-              title={channels.length <= 1 ? 'Máy chủ phải có ít nhất 1 kênh' : `Xóa kênh #${activeChannel.name}`}
-              aria-label={`Xóa kênh #${activeChannel.name}`}
-              disabled={!isChannelDeletable(activeChannel, channels.length)}
-              onClick={() => setDeletingChannel(activeChannel)}
-            />
-          )}
-          {isOwner && (
-            <Button
-              type="text"
-              className="group-header-invite-btn"
-              icon={<UserAddOutlined />}
-              title="Mời thành viên vào Server"
-              aria-label="Mời thành viên vào Server"
-              onClick={() => setIsInviteOpen(true)}
-            />
-          )}
-          {!isOwner && (
-            <Button
-              type="text"
-              danger
-              className="group-header-leave-btn"
-              icon={<LogoutOutlined />}
-              title="Rời khỏi Server"
-              aria-label="Rời khỏi Server"
-              onClick={() => setIsLeaveOpen(true)}
-            />
-          )}
-          <Button
-            type="text"
-            icon={<TeamOutlined />}
-            aria-label={screens.xl ? (membersVisible ? 'Ẩn danh sách thành viên' : 'Hiện danh sách thành viên') : 'Mở danh sách thành viên'}
-            aria-expanded={screens.xl ? membersVisible : membersOpen}
-            onClick={() => screens.xl ? setMembersVisible((visible) => !visible) : setMembersOpen(true)}
-          />
+
+          <div className="group-chat__header-right">
+            {activeChannel && (
+              <ChannelTools
+                channelId={activeChannel.id}
+                isOwner={isOwner}
+                revision={featureRevision}
+                onPreference={notification.setMuted}
+                onJumpToMessage={handleJumpToMessage}
+              />
+            )}
+
+            <Tooltip title={screens.xl ? (membersVisible ? 'Ẩn danh sách thành viên' : 'Hiện danh sách thành viên') : 'Danh sách thành viên'} placement="bottom">
+              <Button
+                type="text"
+                className="group-header-tool-btn"
+                icon={<TeamOutlined />}
+                aria-label={screens.xl ? (membersVisible ? 'Ẩn danh sách thành viên' : 'Hiện danh sách thành viên') : 'Mở danh sách thành viên'}
+                aria-expanded={screens.xl ? membersVisible : membersOpen}
+                onClick={() => screens.xl ? setMembersVisible((visible) => !visible) : setMembersOpen(true)}
+              />
+            </Tooltip>
+
+            {activeChannel && (
+              <Tooltip title={`Cài đặt kênh #${activeChannel.name}`} placement="bottom">
+                <Button
+                  type="text"
+                  className="group-header-tool-btn group-header-edit-btn"
+                  icon={<SettingOutlined />}
+                  aria-label={`Cài đặt kênh #${activeChannel.name}`}
+                  onClick={() => setEditingChannel(activeChannel)}
+                />
+              </Tooltip>
+            )}
+
+            {activeChannel && activeChannel.name?.toLowerCase() !== 'general' && (
+              <Tooltip title={channels.length <= 1 ? 'Máy chủ phải có ít nhất 1 kênh' : `Xóa kênh #${activeChannel.name}`} placement="bottom">
+                <Button
+                  type="text"
+                  danger
+                  className="group-header-tool-btn group-header-delete-btn"
+                  icon={<DeleteOutlined />}
+                  aria-label={`Xóa kênh #${activeChannel.name}`}
+                  disabled={!isChannelDeletable(activeChannel, channels.length)}
+                  onClick={() => setDeletingChannel(activeChannel)}
+                />
+              </Tooltip>
+            )}
+
+            {isOwner && (
+              <Tooltip title="Mời thành viên vào Server" placement="bottom">
+                <Button
+                  type="text"
+                  className="group-header-tool-btn group-header-invite-btn"
+                  icon={<UserAddOutlined />}
+                  aria-label="Mời thành viên vào Server"
+                  onClick={() => setIsInviteOpen(true)}
+                />
+              </Tooltip>
+            )}
+
+            {!isOwner && (
+              <Tooltip title="Rời khỏi Server" placement="bottom">
+                <Button
+                  type="text"
+                  danger
+                  className="group-header-tool-btn group-header-leave-btn"
+                  icon={<LogoutOutlined />}
+                  aria-label="Rời khỏi Server"
+                  onClick={() => setIsLeaveOpen(true)}
+                />
+              </Tooltip>
+            )}
+          </div>
         </header>
+
+        {activeChannel && (
+          <PinnedMessagesBanner
+            channelId={activeChannel.id}
+            isOwner={isOwner}
+            members={members}
+            currentUser={currentUser}
+            serverOwnerId={server.ownerId}
+            revision={featureRevision}
+            onJumpToMessage={handleJumpToMessage}
+          />
+        )}
         <div
           className="group-chat__content"
           ref={chatContainerRef}
@@ -971,15 +1134,20 @@ function ServerWorkspace({ serverId }) {
                     const isEditing = editingMessageId === msg.id;
                     const canEdit = author.isOwn;
                     const canDelete = author.isOwn;
+                    const isHighlighted = String(highlightedMessageId) === String(msg.id);
 
                     return (
                       <div
+                        id={`group-message-${msg.id}`}
                         key={msg.id ?? `msg-${index}`}
-                        className={`group-message-row ${author.isOwn ? 'group-message-row--own' : ''} ${isGrouped ? 'group-message-row--grouped' : ''} ${isEditing ? 'group-message-row--editing' : ''}`}
+                        className={`group-message-row ${author.isOwn ? 'group-message-row--own' : ''} ${isGrouped ? 'group-message-row--grouped' : ''} ${isEditing ? 'group-message-row--editing' : ''} ${isHighlighted ? 'group-message-row--highlighted' : ''}`}
                         role="listitem"
                       >
-                        {(canEdit || canDelete) && !isEditing && (
+                        {!isEditing && (
                           <div className="group-message-actions">
+                            <button type="button" className="group-message-action-btn" aria-label="Trả lời tin nhắn" onClick={() => setReplyTarget(msg)}>Trả lời</button>
+                            <button type="button" className="group-message-action-btn" aria-label="Lưu tin nhắn" onClick={() => handleFeatureAction('save', msg.id)}>Lưu</button>
+                            {isOwner && <button type="button" className="group-message-action-btn" aria-label="Ghim tin nhắn" onClick={() => handleFeatureAction('pin', msg.id)}>Ghim</button>}
                             {canEdit && (
                               <button
                                 type="button"
@@ -1038,6 +1206,7 @@ function ServerWorkspace({ serverId }) {
                         )}
 
                         <div className="group-message-body">
+                          {msg.replyTo && <blockquote className="message-reply-preview" aria-label="Tin nhắn được trả lời">{msg.replyTo.content}</blockquote>}
                           {!isGrouped && (
                             <div className="group-message-header">
                               <span className={`group-message-author ${author.isOwn ? 'group-message-author--own' : ''}`}>
@@ -1152,13 +1321,15 @@ function ServerWorkspace({ serverId }) {
             </section>
           )}
         </div>
+        {replyTarget && <div className="message-reply-draft" role="status">Đang trả lời: {replyTarget.content}
+          <Button size="small" aria-label="Hủy trả lời" onClick={() => setReplyTarget(null)}>Hủy</Button></div>}
         <MessageInput
           key={`${serverId}-${activeChannel?.id || 'none'}`}
           channelId={activeChannel?.id}
           channelName={activeChannel?.name}
           disabled={!activeChannel}
           onSend={handleSendMessage}
-          onSent={handleSentMessage}
+          onSent={(message, channelId) => { handleSentMessage(message, channelId); setReplyTarget(null); }}
         />
       </main>
       {screens.xl && membersVisible && (

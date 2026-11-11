@@ -12,6 +12,9 @@ export function getMessageValidationError(content) {
 }
 
 export function getMessageSendError(error) {
+  if (error?.deliveryUncertain) {
+    return 'Chưa xác nhận được tin nhắn đã gửi. Nội dung được giữ lại; hãy kiểm tra lịch sử trước khi gửi lại.';
+  }
   // Keep infrastructure details out of the UI, including raw backend errors.
   switch (error?.response?.status) {
     case 400: return 'Nội dung chưa hợp lệ. Hãy kiểm tra và gửi lại.';

@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.denhub.domain.User;
@@ -29,6 +31,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findOneWithAuthoritiesByEmail(String email);
 
     Optional<User> findOneByEmail(String email);
+
+    // Scalar, non-cacheable read: authentication must see bulk session updates and revocations,
+    // not a User retained in Spring's usersByEmail cache or Hibernate's entity caches.
+    @Query("select u.sessionId from User u where u.email = :email and u.activated = true")
+    @QueryHints(@QueryHint(name = "org.hibernate.cacheable", value = "false"))
+    Optional<String> findCurrentSessionIdByEmail(@Param("email") String email);
 
     List<User> findAllByActivatedIsFalseAndActivationKeyNotNullAndCreatedDateBefore(Instant createdDateBefore);
 

@@ -43,6 +43,9 @@ public class Message extends AbstractAuditingEntity<Long> implements Serializabl
     @Column(name = "type")
     private String type;
 
+    @Column(name = "reply_to_message_id")
+    private Long replyToMessageId;
+
     @Column(name = "content", columnDefinition = "NVARCHAR(MAX)")
     private String content;
 
@@ -85,6 +88,13 @@ public class Message extends AbstractAuditingEntity<Long> implements Serializabl
         this.width = width;
         this.height = height;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
+    }
+
+    public Message(Long id, Long channelId, Long authorId, Long senderId, Long conversationId,
+                   String type, Long replyToMessageId, String content, String mediaUrl, String fileName,
+                   Long fileSize, Integer width, Integer height, Instant createdAt) {
+        this(id, channelId, authorId, senderId, conversationId, type, content, mediaUrl, fileName, fileSize, width, height, createdAt);
+        this.replyToMessageId = replyToMessageId;
     }
 
     @Override

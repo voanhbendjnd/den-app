@@ -647,6 +647,156 @@ class MessageSecurityIT {
                         .header(HttpHeaders.AUTHORIZATION, bearer())), 404);
     }
 
+    @Autowired private com.denhub.repository.MessagePinRepository featurePins;
+    @Autowired private com.denhub.repository.SavedMessageRepository featureSaved;
+    @Autowired private com.denhub.repository.ChannelNotificationPreferenceRepository featurePreferences;
+
+    @Test
+    void searchEscapesWildcardsFiltersChannelAndPaginates() throws Exception {
+        Message first=createMessage(sender,"Needle 100% _ [x]!");
+        Message second=createMessage(sender,"NEEDLE newer");
+        createMessage(sender,"No match");
+        mvc.perform(get("/api/channels/{id}/messages/search",channel.getId()).param("q","needle").param("limit","1")
+                .header(HttpHeaders.AUTHORIZATION,bearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(second.getId())).andExpect(jsonPath("$.data.hasMore").value(true));
+        mvc.perform(get("/api/channels/{id}/messages/search",channel.getId()).param("q","needle").param("before",second.getId().toString())
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].id").value(first.getId()));
+        mvc.perform(get("/api/channels/{id}/messages/search",channel.getId()).param("q","100% _ [x]!")
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1));
+    }
+
+    @Test
+    void searchRejectsInvalidQueryAndMissingMembership() throws Exception {
+        for(String q:List.of(" ","x".repeat(201))) mvc.perform(get("/api/channels/{id}/messages/search",channel.getId())
+                .param("q",q).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/channels/{id}/messages/search",channel.getId()).param("q","text").param("limit","101")
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isBadRequest());
+        members.delete(membership); members.flush();
+        mvc.perform(get("/api/channels/{id}/messages/search",channel.getId()).param("q","text")
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void pinIsOwnerOnlyAndIdempotent() throws Exception {
+        Message message=createMessage(sender,"Important");
+        String path="/api/messages/"+message.getId()+"/pin";
+        for(int i=0;i<2;i++) mvc.perform(put(path).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        assertEquals(1,featurePins.count());
+        mvc.perform(get("/api/channels/{id}/pins",channel.getId()).header(HttpHeaders.AUTHORIZATION,bearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].id").value(message.getId()));
+        User other=createAnotherMember();
+        mvc.perform(delete(path).header(HttpHeaders.AUTHORIZATION,"Bearer "+tokenForUser(other))).andExpect(status().isForbidden());
+        for(int i=0;i<2;i++) mvc.perform(delete(path).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        assertEquals(0,featurePins.count());
+    }
+
+    @Test
+    void savedListIsPrivateIdempotentAndFiltersRevokedMembership() throws Exception {
+        Message message=createMessage(sender,"Private bookmark");
+        String path="/api/messages/"+message.getId()+"/saved";
+        for(int i=0;i<2;i++) mvc.perform(put(path).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        assertEquals(1,featureSaved.count());
+        User other=createAnotherMember();
+        mvc.perform(get("/api/messages/saved").header(HttpHeaders.AUTHORIZATION,"Bearer "+tokenForUser(other)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(0));
+        mvc.perform(get("/api/messages/saved").header(HttpHeaders.AUTHORIZATION,bearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].content").value("Private bookmark"));
+        members.delete(membership); members.flush();
+        mvc.perform(get("/api/messages/saved").header(HttpHeaders.AUTHORIZATION,bearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(0));
+        mvc.perform(delete(path).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void preferenceIsPerAccountAndValidated() throws Exception {
+        String path="/api/channels/"+channel.getId()+"/notification-preference";
+        mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk()).andExpect(jsonPath("$.data.muted").value(false));
+        for(int i=0;i<2;i++) mvc.perform(put(path).header(HttpHeaders.AUTHORIZATION,bearer()).contentType(MediaType.APPLICATION_JSON).content("{\"muted\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.muted").value(true));
+        assertEquals(1,featurePreferences.count());
+        User other=createAnotherMember();
+        mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION,"Bearer "+tokenForUser(other)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.muted").value(false));
+        mvc.perform(put(path).header(HttpHeaders.AUTHORIZATION,bearer()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void replyValidatesSameChannelAndDetachesOnDelete() throws Exception {
+        Message target=createMessage(sender,"Original quote");
+        var response=mvc.perform(request(channel.getId(),mapper.writeValueAsString(Map.of("content","Reply","replyToMessageId",target.getId())))
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.replyTo.id").value(target.getId()))
+                .andExpect(jsonPath("$.data.replyTo.content").value("Original quote")).andReturn();
+        long replyId=mapper.readTree(response.getResponse().getContentAsString()).path("data").path("id").asLong();
+        mvc.perform(delete("/api/messages/{id}",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isNoContent());
+        entityManager.flush(); entityManager.clear();
+        assertNull(messages.findById(replyId).orElseThrow().getReplyToMessageId());
+        assertEquals("Reply",messages.findById(replyId).orElseThrow().getContent());
+    }
+
+    @Test
+    void replyRejectsDifferentChannelDeletedTargetAndDirectMessages() throws Exception {
+        Message target=createMessage(sender,"Other channel");
+        Channel another=new Channel(); another.setName("another"); another.setServerId(channel.getServerId()); another=channels.saveAndFlush(another);
+        mvc.perform(request(another.getId(),mapper.writeValueAsString(Map.of("content","Reply","replyToMessageId",target.getId())))
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isBadRequest());
+        target.setConversationId(999L); messages.saveAndFlush(target);
+        mvc.perform(request(channel.getId(),mapper.writeValueAsString(Map.of("content","Reply","replyToMessageId",target.getId())))
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isBadRequest());
+        mvc.perform(request(channel.getId(),"{\"content\":\"Reply\",\"replyToMessageId\":9999999}")
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deletingMessageCleansPinsAndBookmarks() throws Exception {
+        Message target=createMessage(sender,"Cleanup");
+        mvc.perform(put("/api/messages/{id}/pin",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        mvc.perform(put("/api/messages/{id}/saved",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        mvc.perform(delete("/api/messages/{id}",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isNoContent());
+        entityManager.flush();
+        assertEquals(0,featurePins.count()); assertEquals(0,featureSaved.count());
+    }
+
+    @Test
+    void featureEndpointsRequireAuthentication() throws Exception {
+        mvc.perform(get("/api/messages/saved")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/channels/{id}/pins",channel.getId())).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/channels/{id}/notification-preference",channel.getId())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deletingServerCleansAllNewFeatureRows() throws Exception {
+        Message target=createMessage(sender,"Delete server cleanup");
+        mvc.perform(put("/api/messages/{id}/pin",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        mvc.perform(put("/api/messages/{id}/saved",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        mvc.perform(put("/api/channels/{id}/notification-preference",channel.getId()).header(HttpHeaders.AUTHORIZATION,bearer())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"muted\":true}")).andExpect(status().isOk());
+        mvc.perform(request(channel.getId(),mapper.writeValueAsString(Map.of("content","Reply remains scoped","replyToMessageId",target.getId())))
+                .header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isCreated());
+        mvc.perform(delete("/api/v1/servers/{id}",channel.getServerId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isNoContent());
+        entityManager.flush(); entityManager.clear();
+        assertEquals(0,featurePins.count()); assertEquals(0,featureSaved.count()); assertEquals(0,featurePreferences.count());
+        assertFalse(messages.findById(target.getId()).isPresent());
+    }
+
+    @Test
+    void deletingChannelCleansFeaturesAndKeepsGeneral() throws Exception {
+        Channel extra=new Channel(); extra.setServerId(channel.getServerId()); extra.setName("extra"); extra=channels.saveAndFlush(extra);
+        Message target=new Message(); target.setAuthorId(sender.getId()); target.setChannelId(extra.getId()); target.setContent("Channel cleanup"); target=messages.saveAndFlush(target);
+        mvc.perform(put("/api/messages/{id}/pin",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        mvc.perform(put("/api/messages/{id}/saved",target.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isOk());
+        mvc.perform(put("/api/channels/{id}/notification-preference",extra.getId()).header(HttpHeaders.AUTHORIZATION,bearer())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"muted\":true}")).andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/channels/{id}",extra.getId()).header(HttpHeaders.AUTHORIZATION,bearer())).andExpect(status().isNoContent());
+        entityManager.flush(); entityManager.clear();
+        assertEquals(0,featurePins.count()); assertEquals(0,featureSaved.count()); assertEquals(0,featurePreferences.count());
+        assertTrue(channels.findById(channel.getId()).isPresent());
+    }
+
     private Message createMessage(User author, String content) {
         Message msg = new Message();
         msg.setChannelId(channel.getId());

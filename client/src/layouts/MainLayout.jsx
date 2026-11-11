@@ -262,22 +262,29 @@ export default function MainLayout() {
                                     width: 48,
                                     height: 48,
                                     borderRadius: location.pathname === '/' ? 16 : 24,
-                                    background: location.pathname === '/'
-                                        ? 'linear-gradient(135deg, #6366F1 0%, #00F2FE 100%)'
-                                        : 'var(--color-bg-surface)',
+                                    background: '#1e1f2b',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     cursor: 'pointer',
                                     transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                                     boxShadow: location.pathname === '/' ? '0 4px 16px rgba(0, 242, 254, 0.35)' : 'none',
-                                    border: location.pathname === '/' ? 'none' : '1px solid var(--border-subtle)',
+                                    border: location.pathname === '/' ? '2px solid #00F2FE' : '1px solid var(--border-subtle)',
+                                    overflow: 'hidden',
+                                    padding: 0,
                                 }}
                             >
-                                <ThunderboltFilled style={{
-                                    fontSize: 22,
-                                    color: location.pathname === '/' ? '#fff' : '#00F2FE'
-                                }} />
+                                <img
+                                    src="/den-logo.png"
+                                    alt="DenHub Logo"
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        borderRadius: location.pathname === '/' ? 14 : 22,
+                                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                                    }}
+                                />
                             </Link>
                         </Tooltip>
                     </div>

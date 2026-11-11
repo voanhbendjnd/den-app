@@ -212,6 +212,15 @@ Hiện trạng đã đọc từ source sau gộp:
 - `PATCH /api/users/me`: Cập nhật display name, avatar
 - `GET /api/users/search?q={query}`: Tìm kiếm người dùng theo tên
 
+### 5.1.1 Kiểm phiên REST đọc trạng thái hiện tại (2026-11-11)
+
+- Đợt 1 sửa lỗi session được duyệt bằng “ok làm đi”; người dùng yêu cầu kiểm chứng gọn, không test sâu các module khác. Không đổi endpoint/DTO, JWT signing, schema, role hoặc mật khẩu.
+- `SessionManager.isValidSessionIdByEmail` từ chối email/session null hoặc blank, chuẩn hóa email như trước và so sánh session như chuỗi opaque, không trim session để chấp nhận một giá trị khác. Thiếu User, session null, tài khoản inactive hoặc session sai đều không hợp lệ, không gây NullPointerException.
+- `UserRepository.findCurrentSessionIdByEmail` SELECT scalar `sessionId` của User active, tắt Hibernate query cache cho truy vấn này. Không lấy phiên từ User trong `usersByEmail` hoặc Hibernate entity cache. Việc kiểm token phải thấy session mới sau bulk update, phiên đã bị thu hồi và tài khoản đã bị khóa; đánh đổi là một truy vấn database cho mỗi lần kiểm phiên REST. Cache User dùng cho nghiệp vụ khác giữ nguyên.
+- `CustomJwtAuthenticationConverter` kiểm mọi access token thông thường, kể cả token thiếu subject/session claim; không hợp lệ trả 401 Problem Details qua entry point hiện có. Ngoại lệ duy nhất là token guest nội bộ (`anonymous_token`, subject `anonymousUser`, alg `none`) do `GuestAwareJwtDecoder` tạo khi bearer không decode được trên public URL; guest không có authority. Bearer sai trên protected URL vẫn bị decoder từ chối. Không nới quyền public hoặc sửa STOMP trong đợt này.
+- Regression với cache Spring `simple` và Hibernate L2 bật: cache User giữ session null trước login, HTTP login ghi session mới rồi account/profile vẫn 200; login lần hai làm token cũ 401, token mới 200; revoke/inactive và token thiếu/sai claim trả 401 an toàn; public login với bearer hỏng vẫn hoạt động. 21/21 targeted tests PASS. Không chạy lại full suite theo yêu cầu kiểm nhanh.
+- UI smoke sau compile/reload: Home tải được danh sách Server và bài QA, Hồ sơ tải được dữ liệu thay cho lỗi Java. Không coi đây là xác nhận mọi chức năng hoặc hai tài khoản đã PASS.
+
 ### 5.2 Server & Member Management
 - `GET /api/v1/servers`: Lấy danh sách server người dùng sở hữu/tham gia; có `visibility` theo mục 23. Đường dẫn thiết kế cũ `/api/servers` không phải alias hiện có.
 - `POST /api/v1/servers`: Tạo server mới (transactional với `#general` channel và Owner), `visibility` mặc định `PRIVATE`; xem mục 23.
@@ -259,7 +268,7 @@ Hiện trạng đã đọc từ source sau gộp:
 
 ## 6. Quy chuẩn WebSocket / STOMP Real-time Contract (`CONFIRMED`)
 
-WebSocket là task sau, không triển khai trong Task 1.07 hoặc 1.12. Các destination dưới đây giữ vai trò contract cho giai đoạn real-time.
+Các destination dưới đây là contract cho giai đoạn real-time. **Backend và frontend đã đồng bộ contract kết quả gửi (2026-11-11), còn QA hai tài khoản trên backend thật:** `/app/channels/{channelId}/send` (`ChannelChatController` → `MessageService.sendMessageFromWebSocket`, danh tính lấy từ STOMP Principal, kiểm tra membership, lưu SQL Server). Cả REST và STOMP publish một sự kiện `ChannelMessageDelivery.Created` trong transaction; listener `AFTER_COMMIT` mới broadcast `MessageResponse` tới `/topic/channels/{channelId}`. Rollback không broadcast; controller không broadcast lần thứ hai. Sửa/xóa vẫn dùng REST; sau commit broadcast cập nhật và xóa theo mục 6.1. Frontend thực hiện mục 6.1; browser regression dùng broker giả lập, chưa xác minh xuyên luồng với backend/SQL Server thật.
 
 - **Handshake Endpoint:** `/ws`
 - **Authentication:** Header `Authorization: Bearer <jwt-token>` trong frame STOMP `CONNECT`.
@@ -276,6 +285,7 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 | Destination | Action | Mục đích | Trạng thái |
 | :--- | :---: | :--- | :---: |
 | `/app/channels/{channelId}/send` | `SEND` | Gửi tin nhắn văn bản vào channel | `CONFIRMED` |
+| `/user/queue/channel-message-results` | `SUBSCRIBE` | Kết quả gửi Channel theo requestId, chỉ về session đã gửi | `CONFIRMED` (duyệt 2026-11-11; backend/frontend đã tích hợp, còn QA thật) |
 | `/topic/channels/{channelId}` | `SUBSCRIBE` | Nhận sự kiện tin nhắn (`CREATED`, `UPDATED`, `DELETED`) | `CONFIRMED` |
 | `/topic/channels/{channelId}/reactions` | `SUBSCRIBE` | Nhận sự kiện reaction (`ADDED`, `REMOVED`) | `TBD` |
 | `/topic/servers/{serverId}` | `SUBSCRIBE` | Nhận sự kiện quản trị server (kênh mới, thành viên bị kick) | `TBD` |
@@ -291,6 +301,21 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 > [!NOTE]
 > **Định danh WebSocket Principal & Private Queue Routing:**  
 > Trong `WebSocketConfig`, STOMP `Principal.getName()` được trích xuất từ JWT claim `user.id` (dạng chuỗi, fallback về `jwt.getSubject()` email) để các lệnh `convertAndSendToUser(userId, ...)` như trong `NotificationFriendshipRequest` có thể định tuyến chính xác vào session của người nhận. Đồng thời, `NotificationFriendshipRequest` thực hiện dual-delivery (gửi cho cả numeric User ID và email) để đảm bảo 100% không bị thất lạc sự kiện.
+
+### 6.1 Kết quả gửi Channel và bảo vệ phiên (2026-11-11)
+
+- **Sửa/xóa realtime (duyệt cả hai):** PATCH/PUT sửa phát MessageResponse có updatedAt tới topic Channel sau commit; DELETE phát `{eventType:"DELETED",id,channelId}` sau commit. Không phát cho tin direct, không đổi quyền chỉ tác giả hay schema. Sửa flush trước dựng response để lấy timestamp audit; history trả updatedAt. Rollback không phát; lỗi broker sau commit không đảo kết quả lưu/xóa. Frontend gộp bản sửa theo updatedAt, ID chuẩn hóa; ghi nhớ ID đã xóa trong lần mở kênh để chặn history/frame cũ làm hiện lại tin. Không có replay/outbox; xóa khi offline có thể cần tải lại trang để đồng bộ đầy đủ phần lịch sử đã giữ.
+
+- **Binding khi chạy IDE (2026-11-11):** ChannelChatController ghi rõ `@DestinationVariable("channelId")` để không phụ thuộc compiler `-parameters`. Bytecode IDE trước sửa thiếu MethodParameters trong khi Gradle có; regression dùng bytecode controller thật bỏ metadata và Spring argument resolver đã FAIL trước/PASS sau. Destination/DTO/quyền giữ nguyên; tests chưa xác nhận gửi qua backend/SQL Server thật.
+
+- **Frontend đã triển khai:** transport tạo UUID request-id, subscribe queue kết quả trước SEND, Promise chờ 201 đúng request/channel rồi trả MessageResponse cho composer. Lỗi giữ draft; timeout 15 giây/close báo chưa rõ kết quả và không tự retry qua STOMP/REST. REST fallback chỉ khi chưa phát frame. Đọc token trước mỗi reconnect, subscribe lại và reload history; merge/dedup ID dạng string, bỏ frame phiên/kênh cũ và giữ tin realtime khi history trả muộn. Có 11 unit/transport regressions và 3 browser regressions mới với broker giả lập; chưa xác minh backend thật bằng hai tài khoản.
+
+- Người dùng duyệt kế hoạch hoàn thiện bằng `ok`. STOMP SEND giữ body `SendMessageRequest` (`content`) và thêm native header `request-id`: 1–100 ký tự ASCII `[A-Za-z0-9_-]` (UUID hợp lệ). Thiếu/sai header: không lưu, trả 400. `requestId` chỉ dùng đối chiếu kết quả; chưa có idempotency lưu database, không tự gửi lại sau timeout/mất kết nối.
+- Client phải subscribe `/user/queue/channel-message-results` trước khi gửi. Backend trả `{requestId, channelId, statusCode, message, detail}`: thành công `201` kèm `MessageResponse` tại `message`, `detail: null`; thất bại `400/401/403/404/500`, `message: null` và mô tả an toàn. JSON không đọc được trả `400` qua exception handler. Lỗi không lộ SQL, raw exception hoặc nội dung nhạy cảm.
+- Kết quả dùng `convertAndSendToUser(sessionId, ...)` cùng header `simpSessionId`; chỉ tab gửi nhận được, không gửi cho tất cả tab cùng tài khoản. Chưa chốt và không sử dụng `/user/queue/errors` chung. Client chỉ xóa draft khi nhận kết quả thành công tương ứng; timeout hoặc đóng kết nối là chưa biết kết quả, phải giữ draft và kiểm tra lịch sử trước khi gửi lại.
+- `ChannelMessageDelivery` bắt lỗi broker sau commit để không báo sai rằng lưu thất bại. Broadcast/kết quả là best effort, không có outbox hoặc replay; reconnect cần tải lại lịch sử để bù khoảng mất kết nối. Chưa có test hai tài khoản qua WebSocket thật trong lượt backend.
+- Inbound kiểm membership khi subscribe topic Channel cụ thể; từ chối wildcard ở namespace broker, channel ID sai/tràn số, subscribe queue vật lý của kết quả và SEND trực tiếp vào `/topic/`, `/queue/`, `/user/` để ngăn giả mạo event. Các destination DM/feed cụ thể giữ hành vi hiện có.
+- Lưu identity/expiry đã decode khi CONNECT theo session; xóa khi DISCONNECT hoặc `SessionDisconnectEvent`. Outbound kiểm lại User active và membership cho mỗi phiên nhận tin Channel; phiên hết hạn, đã rời/kick hoặc kiểm quyền lỗi không nhận tin. Không sửa membership, schema hoặc quyền DM/feed.
 
 ### 6.3 Định dạng WebSocket Payload gửi lên 1-1 (`SendMessageReq`) (`CONFIRMED`)
 ```json
@@ -1043,7 +1068,7 @@ Ngay sau khi thành viên bị loại thành công:
 
 ### 20.2 Ranh giới REST và WebSocket/STOMP đối với Member
 - Phân quyền Server Member được áp dụng nhất quán trên toàn bộ REST endpoints (Server, Member, Channel, Channel Message).
-- Inbound STOMP WebSocket (`/ws`) trong kiến trúc DenHub chỉ phục vụ tin nhắn riêng 1-1 (`/app/conversations/send`) và bảng tin bài viết (`/app/post`). Gửi tin nhắn kênh chat Server sử dụng REST POST (`/api/channels/{channelId}/messages`), tại đây `MessageService` bắt buộc kiểm tra sự tồn tại của membership qua `serverMemberRepository.existsByServerIdAndUserId`.
+- Cập nhật 2026-11-11: inbound STOMP `/ws` bổ sung gửi Channel (`/app/channels/{channelId}/send`) bên cạnh chat 1-1 (`/app/conversations/send`) và feed (`/app/post`). REST POST `/api/channels/{channelId}/messages` vẫn được hỗ trợ. Cả hai đường gửi Channel dùng chung kiểm tra active User/membership và publish sau commit theo mục 6–6.1. Quy định “chỉ DM/feed” trước đây mô tả trạng thái trước tích hợp, không còn giới hạn STOMP Channel đã được duyệt.
 
 ---
 
@@ -1190,3 +1215,18 @@ Ngay sau khi thành viên bị loại thành công:
 - `formatMemberDisplayName(member)` áp dụng thứ tự ưu tiên: `nickname.trim() > name.trim() > username.trim() > 'Thành viên'`.
 - Chuỗi chỉ chứa khoảng trắng rỗng (`"   "`, `"\t"`) được loại bỏ hoàn toàn, không hiển thị khoảng trắng vô nghĩa trên giao diện và đảm bảo ký tự viết tắt đại diện (`initial`) luôn hợp lệ.
 - So sánh vai trò `role` được chuẩn hóa không phân biệt chữ hoa/thường (`toUpperCase()`), bảo đảm ngăn chặn loại nhầm chủ sở hữu (`OWNER` / `owner`).
+
+
+## 26. Năm UC Channel — code đã triển khai, chờ hoàn thiện schema/QA runtime (2026-11-11–12)
+
+- Scope: tìm kiếm trong Channel; ghim chỉ Owner; saved cá nhân; reply cùng Channel; notification preference cá nhân. User duyệt kế hoạch cả 5 và bổ sung tất cả realtime bằng hai lần “ok”. Không thêm DM/thread/push/offline notification.
+- REST mới: GET /api/channels/{channelId}/messages/search?q=&before=&limit=; GET /api/channels/{channelId}/pins?before=&limit=; GET /api/messages/saved?before=&limit=. Cursor theo ID Message giảm dần, limit mặc định 30, 1–100. Search trim, 1–200 UTF-16, case-insensitive, escape LIKE !/%/_/[; chưa tìm không dấu.
+- PUT/DELETE /api/messages/{messageId}/pin: Owner ghim/bỏ ghim, idempotent. PUT/DELETE /api/messages/{messageId}/saved: lưu/bỏ lưu của tài khoản JWT, idempotent. GET/PUT /api/channels/{channelId}/notification-preference: {channelId,muted}; PUT body {muted:boolean}, mặc định false. Các GET/PUT có dữ liệu dùng wrapper hiện có; thao tác pin/saved không có response body.
+- SendMessageRequest thêm replyToMessageId nullable, positive; MessageResponse thêm replyTo nullable {id,senderId,content}. REST và STOMP cùng kiểm tra tin gốc tồn tại, không là DM và cùng kênh; khi xóa tin gốc detach FK và gỡ quote, giữ câu trả lời. Không lưu snapshot nội dung đã xóa.
+- Sau commit: /topic/channels/{channelId} thêm invalidation {eventType:PINS_CHANGED,channelId}. Client reload panel search/pins/saved khi có sự kiện Channel (new/update/delete/pins) với request generation/debounce để bỏ response cũ. Quote theo ID cập nhật khi nhận sửa/xóa tin gốc.
+- SUBSCRIBE /user/queue/channel-features: private invalidation {eventType:SAVED_CHANGED,channelId:null} hoặc {eventType:PREFERENCE_CHANGED,channelId}. Phát cho các phiên cùng Principal user ID (fallback email). Không gửi nội dung tin hoặc danh sách người nhận trong event. Chặn subscribe queue vật lý/namespace người khác; kiểm active User và expiry trước nhận. Client reload danh sách saved/preference khi reconnect hoặc nhận invalidation.
+- Membership là bắt buộc để đọc/search/pin/save/preference. Saved query lọc membership trước phân trang, không lộ nội dung Server đã rời. Owner không thay thế membership khi đọc nội dung. Chỉ servers.owner_id cấp quyền ghim; không dựng thêm role hierarchy.
+- Notification chỉ tin mới từ người khác ở Channel đang mở, tab không focus; không ping history/edit/delete/own/duplicate. Cấu hình muted áp dụng sau xác nhận, đồng bộ bằng private invalidation; lỗi tải preference thì tạm im lặng. Không chặn nhận tin khi muted; browser có thể chặn audio.
+- Schema phải review/apply trước khi backend mới chạy trên SQL Server. server/scripts/sql/2026-11-11-channel-features.sql mặc định preview, không gắn vào startup. Cấu hình local ddl-auto=update được phát hiện, đã yêu cầu dừng IDE backend trong khi chuẩn bị; chưa cho phép tự apply.
+
+- Verification mới nhất và schema runtime: xem docs/00 log FIVE-CHANNEL-USE-CASES. Local ddl-auto=update đã tự tạo bảng/cột; agent chỉ chạy SQL preview. Có script reconcile preview cho constraint/index còn thiếu, chưa được duyệt apply. Không coi có bảng là deployment hoặc schema integration đã hoàn tất.

@@ -58,6 +58,7 @@ class MessageServiceTest {
     @Mock private ServerMemberRepository serverMemberRepository;
     @Mock private UserRepository userRepository;
     @Mock private com.denhub.repository.ServerRepository serverRepository;
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
 
     private MessageService messageService;
 
@@ -75,7 +76,7 @@ class MessageServiceTest {
     void setUp() {
         SecurityContextHolder.clearContext();
         messageService = new MessageService(messageRepository, channelRepository,
-                serverMemberRepository, userRepository, validatorFactory.getValidator(), serverRepository);
+                serverMemberRepository, userRepository, validatorFactory.getValidator(), serverRepository, events);
     }
 
     @AfterEach
@@ -104,6 +105,9 @@ class MessageServiceTest {
         String content = "  Hello mọi người!\nDòng thứ hai 🙂  ";
 
         MessageResponse response = messageService.sendMessage(CHANNEL_ID, new SendMessageRequest(content));
+        verify(events).publishEvent(argThat((Object event) ->
+                event instanceof com.denhub.service.realtime.ChannelMessageDelivery.Created created
+                        && created.getMessage() == response));
 
         ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
         verify(messageRepository).save(messageCaptor.capture());
@@ -531,6 +535,8 @@ class MessageServiceTest {
 
     @Test
     void updateMessage_Success_WhenAuthor() {
+        stubChannel(true);
+        when(messageRepository.existsById(101L)).thenReturn(true);
         authenticate(EMAIL);
         stubSender();
 
@@ -542,7 +548,7 @@ class MessageServiceTest {
         message.setCreatedDate(CREATED_AT);
 
         when(messageRepository.findById(101L)).thenReturn(Optional.of(message));
-        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.saveAndFlush(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         MessageResponse response = messageService.updateMessage(101L, new UpdateMessageRequest("New edited content"));
 
@@ -552,7 +558,7 @@ class MessageServiceTest {
         assertEquals(CHANNEL_ID, response.channelId());
         assertEquals(SENDER_ID, response.senderId());
         assertEquals(CREATED_AT, response.createdAt());
-        verify(messageRepository).save(message);
+        verify(messageRepository).saveAndFlush(message);
     }
 
     @Test
@@ -673,6 +679,8 @@ class MessageServiceTest {
 
     @Test
     void deleteMessage_Success_WhenAuthor() {
+        stubChannel(true);
+        when(messageRepository.existsById(101L)).thenReturn(true);
         authenticate(EMAIL);
         stubSender(); // User ID 2L
 

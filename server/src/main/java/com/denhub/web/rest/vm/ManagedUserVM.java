@@ -8,7 +8,7 @@ import com.denhub.service.dto.UserDTO;
 @Getter
 @Setter
 public class ManagedUserVM extends UserDTO {
-    public static final int PASSWORD_MIN_LENGTH = 4;
+    public static final int PASSWORD_MIN_LENGTH = 3;
 
     public static final int PASSWORD_MAX_LENGTH = 100;
 
