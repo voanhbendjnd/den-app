@@ -138,6 +138,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                 throw new MessageDeliveryException("Không có quyền subscribe Channel này");
                             }
                         }
+                        if ((destination.contains("channel-features") && destination.startsWith("/queue/"))
+                                || (destination.startsWith("/user/") && destination.contains("channel-features")
+                                && (!destination.equals("/user/queue/channel-features") || !activeSession(accessor.getSessionId())))) {
+                            throw new MessageDeliveryException("Không có quyền subscribe tùy chọn cá nhân");
+                        }
                         if (destination.startsWith("/queue/channel-message-results")
                                 || (destination.startsWith("/user/")
                                 && destination.contains("channel-message-results")
@@ -160,6 +165,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 org.springframework.messaging.simp.SimpMessageHeaderAccessor headers =
                         org.springframework.messaging.simp.SimpMessageHeaderAccessor.wrap(message);
                 String destination = headers.getDestination();
+                if (destination != null && destination.contains("/queue/channel-features") && !activeSession(headers.getSessionId())) return null;
                 if (destination != null && destination.startsWith("/topic/channels")) {
                     Long id = channelId(destination);
                     if (id == null || !canReceive(id, headers.getSessionId())) return null;
@@ -176,6 +182,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private boolean activeSession(String id) {
+        return validSession(id) && messageService.isActivePrincipal(channelSessions.get(id).getName());
     }
 
     private boolean validSession(String id) {
