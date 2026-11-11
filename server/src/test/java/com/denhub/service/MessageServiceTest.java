@@ -546,7 +546,7 @@ class MessageServiceTest {
         message.setCreatedDate(CREATED_AT);
 
         when(messageRepository.findById(101L)).thenReturn(Optional.of(message));
-        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.saveAndFlush(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         MessageResponse response = messageService.updateMessage(101L, new UpdateMessageRequest("New edited content"));
 
@@ -556,7 +556,7 @@ class MessageServiceTest {
         assertEquals(CHANNEL_ID, response.channelId());
         assertEquals(SENDER_ID, response.senderId());
         assertEquals(CREATED_AT, response.createdAt());
-        verify(messageRepository).save(message);
+        verify(messageRepository).saveAndFlush(message);
     }
 
     @Test

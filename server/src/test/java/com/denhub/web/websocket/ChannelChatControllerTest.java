@@ -18,6 +18,16 @@ import java.util.Map;
 import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.converter.MessageConversionException;
+import org.springframework.asm.ClassReader;
+import org.springframework.asm.ClassVisitor;
+import org.springframework.asm.ClassWriter;
+import org.springframework.asm.MethodVisitor;
+import org.springframework.asm.Opcodes;
+import org.springframework.core.DefaultParameterNameDiscoverer;
+import org.springframework.core.MethodParameter;
+import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.messaging.handler.annotation.support.DestinationVariableMethodArgumentResolver;
+import org.springframework.messaging.support.MessageBuilder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,6 +43,60 @@ class ChannelChatControllerTest {
     @InjectMocks private ChannelChatController controller;
 
     private final Principal principal = () -> "2";
+
+    @Test
+    void resolvesChannelAndSendsWhenCompiledWithoutParameterNames() throws Exception {
+        // Reproduce the IDE build: retain the real controller bytecode and annotations,
+        // but remove MethodParameters, which Gradle normally adds with -parameters.
+        ClassReader reader;
+        try (var bytes = ChannelChatController.class.getResourceAsStream("ChannelChatController.class")) {
+            assertNotNull(bytes);
+            reader = new ClassReader(bytes);
+        }
+        ClassWriter writer = new ClassWriter(0);
+        reader.accept(new ClassVisitor(Opcodes.ASM9, writer) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                             String signature, String[] exceptions) {
+                return new MethodVisitor(Opcodes.ASM9,
+                        super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                    @Override
+                    public void visitParameter(String name, int access) {
+                        // Deliberately omit parameter-name metadata.
+                    }
+                };
+            }
+        }, 0);
+        byte[] compiled = writer.toByteArray();
+        Class<?> ideController = new ClassLoader(ChannelChatController.class.getClassLoader()) {
+            Class<?> defineController() {
+                return defineClass(ChannelChatController.class.getName(), compiled, 0, compiled.length);
+            }
+        }.defineController();
+        var method = ideController.getMethod("sendChannelMessage", Long.class, SendMessageRequest.class,
+                Principal.class, String.class, String.class);
+        assertFalse(method.getParameters()[0].isNamePresent());
+        MethodParameter channel = new MethodParameter(method, 0);
+        channel.initParameterNameDiscovery(new DefaultParameterNameDiscoverer());
+        var resolver = new DestinationVariableMethodArgumentResolver(new DefaultConversionService());
+        var frame = MessageBuilder.withPayload("{\"content\":\"Hello\"}")
+                .setHeader(DestinationVariableMethodArgumentResolver.DESTINATION_TEMPLATE_VARIABLES_HEADER,
+                        Map.of("channelId", "5"))
+                .build();
+        Object resolvedChannel = resolver.resolveArgument(channel, frame);
+        assertEquals(5L, resolvedChannel);
+
+        SendMessageRequest request = new SendMessageRequest("Hello");
+        MessageResponse saved = new MessageResponse(101L, 5L, 2L, "Hello", Instant.now());
+        when(messageService.sendMessageFromWebSocket(5L, request, "2")).thenReturn(saved);
+        Object instance = ideController.getConstructor(MessageService.class, SimpMessagingTemplate.class)
+                .newInstance(messageService, messagingTemplate);
+        method.invoke(instance, resolvedChannel, request, principal, "ide-session", "ide-request");
+        Map<?, ?> result = captureResult("ide-session");
+        assertEquals(201, result.get("statusCode"));
+        assertSame(saved, result.get("message"));
+        assertEquals("ide-request", result.get("requestId"));
+    }
 
     @Test
     void acknowledgesCommittedMessageOnlyToOriginatingSessionWithoutSecondBroadcast() {

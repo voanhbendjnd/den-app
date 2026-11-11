@@ -212,6 +212,15 @@ Hiện trạng đã đọc từ source sau gộp:
 - `PATCH /api/users/me`: Cập nhật display name, avatar
 - `GET /api/users/search?q={query}`: Tìm kiếm người dùng theo tên
 
+### 5.1.1 Kiểm phiên REST đọc trạng thái hiện tại (2026-11-11)
+
+- Đợt 1 sửa lỗi session được duyệt bằng “ok làm đi”; người dùng yêu cầu kiểm chứng gọn, không test sâu các module khác. Không đổi endpoint/DTO, JWT signing, schema, role hoặc mật khẩu.
+- `SessionManager.isValidSessionIdByEmail` từ chối email/session null hoặc blank, chuẩn hóa email như trước và so sánh session như chuỗi opaque, không trim session để chấp nhận một giá trị khác. Thiếu User, session null, tài khoản inactive hoặc session sai đều không hợp lệ, không gây NullPointerException.
+- `UserRepository.findCurrentSessionIdByEmail` SELECT scalar `sessionId` của User active, tắt Hibernate query cache cho truy vấn này. Không lấy phiên từ User trong `usersByEmail` hoặc Hibernate entity cache. Việc kiểm token phải thấy session mới sau bulk update, phiên đã bị thu hồi và tài khoản đã bị khóa; đánh đổi là một truy vấn database cho mỗi lần kiểm phiên REST. Cache User dùng cho nghiệp vụ khác giữ nguyên.
+- `CustomJwtAuthenticationConverter` kiểm mọi access token thông thường, kể cả token thiếu subject/session claim; không hợp lệ trả 401 Problem Details qua entry point hiện có. Ngoại lệ duy nhất là token guest nội bộ (`anonymous_token`, subject `anonymousUser`, alg `none`) do `GuestAwareJwtDecoder` tạo khi bearer không decode được trên public URL; guest không có authority. Bearer sai trên protected URL vẫn bị decoder từ chối. Không nới quyền public hoặc sửa STOMP trong đợt này.
+- Regression với cache Spring `simple` và Hibernate L2 bật: cache User giữ session null trước login, HTTP login ghi session mới rồi account/profile vẫn 200; login lần hai làm token cũ 401, token mới 200; revoke/inactive và token thiếu/sai claim trả 401 an toàn; public login với bearer hỏng vẫn hoạt động. 21/21 targeted tests PASS. Không chạy lại full suite theo yêu cầu kiểm nhanh.
+- UI smoke sau compile/reload: Home tải được danh sách Server và bài QA, Hồ sơ tải được dữ liệu thay cho lỗi Java. Không coi đây là xác nhận mọi chức năng hoặc hai tài khoản đã PASS.
+
 ### 5.2 Server & Member Management
 - `GET /api/v1/servers`: Lấy danh sách server người dùng sở hữu/tham gia; có `visibility` theo mục 23. Đường dẫn thiết kế cũ `/api/servers` không phải alias hiện có.
 - `POST /api/v1/servers`: Tạo server mới (transactional với `#general` channel và Owner), `visibility` mặc định `PRIVATE`; xem mục 23.
@@ -259,7 +268,7 @@ Hiện trạng đã đọc từ source sau gộp:
 
 ## 6. Quy chuẩn WebSocket / STOMP Real-time Contract (`CONFIRMED`)
 
-Các destination dưới đây là contract cho giai đoạn real-time. **Backend cập nhật (2026-11-11), frontend chờ tích hợp contract kết quả gửi:** `/app/channels/{channelId}/send` (`ChannelChatController` → `MessageService.sendMessageFromWebSocket`, danh tính lấy từ STOMP Principal, kiểm tra membership, lưu SQL Server). Cả REST và STOMP publish một sự kiện `ChannelMessageDelivery.Created` trong transaction; listener `AFTER_COMMIT` mới broadcast `MessageResponse` tới `/topic/channels/{channelId}`. Rollback không broadcast; controller không broadcast lần thứ hai. Chỉ có tin mới; `UPDATED`/`DELETED` vẫn qua REST và chưa broadcast. Không coi frontend hiện tại đã hoàn thiện hoặc triển khai backend/frontend riêng lẻ khi chưa đồng bộ contract tại mục 6.1.
+Các destination dưới đây là contract cho giai đoạn real-time. **Backend và frontend đã đồng bộ contract kết quả gửi (2026-11-11), còn QA hai tài khoản trên backend thật:** `/app/channels/{channelId}/send` (`ChannelChatController` → `MessageService.sendMessageFromWebSocket`, danh tính lấy từ STOMP Principal, kiểm tra membership, lưu SQL Server). Cả REST và STOMP publish một sự kiện `ChannelMessageDelivery.Created` trong transaction; listener `AFTER_COMMIT` mới broadcast `MessageResponse` tới `/topic/channels/{channelId}`. Rollback không broadcast; controller không broadcast lần thứ hai. Sửa/xóa vẫn dùng REST; sau commit broadcast cập nhật và xóa theo mục 6.1. Frontend thực hiện mục 6.1; browser regression dùng broker giả lập, chưa xác minh xuyên luồng với backend/SQL Server thật.
 
 - **Handshake Endpoint:** `/ws`
 - **Authentication:** Header `Authorization: Bearer <jwt-token>` trong frame STOMP `CONNECT`.
@@ -276,7 +285,7 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 | Destination | Action | Mục đích | Trạng thái |
 | :--- | :---: | :--- | :---: |
 | `/app/channels/{channelId}/send` | `SEND` | Gửi tin nhắn văn bản vào channel | `CONFIRMED` |
-| `/user/queue/channel-message-results` | `SUBSCRIBE` | Kết quả gửi Channel theo requestId, chỉ về session đã gửi | `CONFIRMED` (duyệt 2026-11-11; backend có, frontend chờ tích hợp) |
+| `/user/queue/channel-message-results` | `SUBSCRIBE` | Kết quả gửi Channel theo requestId, chỉ về session đã gửi | `CONFIRMED` (duyệt 2026-11-11; backend/frontend đã tích hợp, còn QA thật) |
 | `/topic/channels/{channelId}` | `SUBSCRIBE` | Nhận sự kiện tin nhắn (`CREATED`, `UPDATED`, `DELETED`) | `CONFIRMED` |
 | `/topic/channels/{channelId}/reactions` | `SUBSCRIBE` | Nhận sự kiện reaction (`ADDED`, `REMOVED`) | `TBD` |
 | `/topic/servers/{serverId}` | `SUBSCRIBE` | Nhận sự kiện quản trị server (kênh mới, thành viên bị kick) | `TBD` |
@@ -294,6 +303,12 @@ Server ──[PRIVATE]────> /user/queue/direct-messages ─────�
 > Trong `WebSocketConfig`, STOMP `Principal.getName()` được trích xuất từ JWT claim `user.id` (dạng chuỗi, fallback về `jwt.getSubject()` email) để các lệnh `convertAndSendToUser(userId, ...)` như trong `NotificationFriendshipRequest` có thể định tuyến chính xác vào session của người nhận. Đồng thời, `NotificationFriendshipRequest` thực hiện dual-delivery (gửi cho cả numeric User ID và email) để đảm bảo 100% không bị thất lạc sự kiện.
 
 ### 6.1 Kết quả gửi Channel và bảo vệ phiên (2026-11-11)
+
+- **Sửa/xóa realtime (duyệt cả hai):** PATCH/PUT sửa phát MessageResponse có updatedAt tới topic Channel sau commit; DELETE phát `{eventType:"DELETED",id,channelId}` sau commit. Không phát cho tin direct, không đổi quyền chỉ tác giả hay schema. Sửa flush trước dựng response để lấy timestamp audit; history trả updatedAt. Rollback không phát; lỗi broker sau commit không đảo kết quả lưu/xóa. Frontend gộp bản sửa theo updatedAt, ID chuẩn hóa; ghi nhớ ID đã xóa trong lần mở kênh để chặn history/frame cũ làm hiện lại tin. Không có replay/outbox; xóa khi offline có thể cần tải lại trang để đồng bộ đầy đủ phần lịch sử đã giữ.
+
+- **Binding khi chạy IDE (2026-11-11):** ChannelChatController ghi rõ `@DestinationVariable("channelId")` để không phụ thuộc compiler `-parameters`. Bytecode IDE trước sửa thiếu MethodParameters trong khi Gradle có; regression dùng bytecode controller thật bỏ metadata và Spring argument resolver đã FAIL trước/PASS sau. Destination/DTO/quyền giữ nguyên; tests chưa xác nhận gửi qua backend/SQL Server thật.
+
+- **Frontend đã triển khai:** transport tạo UUID request-id, subscribe queue kết quả trước SEND, Promise chờ 201 đúng request/channel rồi trả MessageResponse cho composer. Lỗi giữ draft; timeout 15 giây/close báo chưa rõ kết quả và không tự retry qua STOMP/REST. REST fallback chỉ khi chưa phát frame. Đọc token trước mỗi reconnect, subscribe lại và reload history; merge/dedup ID dạng string, bỏ frame phiên/kênh cũ và giữ tin realtime khi history trả muộn. Có 11 unit/transport regressions và 3 browser regressions mới với broker giả lập; chưa xác minh backend thật bằng hai tài khoản.
 
 - Người dùng duyệt kế hoạch hoàn thiện bằng `ok`. STOMP SEND giữ body `SendMessageRequest` (`content`) và thêm native header `request-id`: 1–100 ký tự ASCII `[A-Za-z0-9_-]` (UUID hợp lệ). Thiếu/sai header: không lưu, trả 400. `requestId` chỉ dùng đối chiếu kết quả; chưa có idempotency lưu database, không tự gửi lại sau timeout/mất kết nối.
 - Client phải subscribe `/user/queue/channel-message-results` trước khi gửi. Backend trả `{requestId, channelId, statusCode, message, detail}`: thành công `201` kèm `MessageResponse` tại `message`, `detail: null`; thất bại `400/401/403/404/500`, `message: null` và mô tả an toàn. JSON không đọc được trả `400` qua exception handler. Lỗi không lộ SQL, raw exception hoặc nội dung nhạy cảm.

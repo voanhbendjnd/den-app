@@ -289,6 +289,68 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 
 ## 10. CURRENT PROJECT PROGRESS
 
+### UI smoke gửi tin thật (2026-11-11, 23:06)
+
+- Theo yêu cầu “gửi kko dc test man hinh di”, thao tác trực tiếp cửa sổ Chrome đang đăng nhập tại localhost:3000/servers/1, #general. Nhập QA_TEST_chat_20261111_2305 và kiểm tra Enter; nhập QA_TEST_button_20261111_2306 rồi bấm Gửi. Cả hai xuất hiện trong danh sách, ô nhập trống và bộ đếm 0/4000; screenshot xác nhận. Không tái hiện lỗi gửi tại thời điểm smoke. Không khẳng định transport là STOMP vì chưa đọc network frame; không kiểm hai tài khoản.
+- Hai tin QA còn trong kênh, không tự xóa. Không sửa application code, không chạy lại suite cho task chỉ kiểm UI, không commit/push. Lỗi nhãn “đã chỉnh sửa” trên tin cũ vẫn thấy, chưa xử lý trong lượt smoke.
+
+
+### Sửa/xóa tin Channel realtime (2026-11-11)
+
+- User duyệt cả hai bằng “ok”. REST PATCH/PUT/DELETE giữ nguyên quyền tác giả; broadcast sau commit qua topic Channel. Update dùng MessageResponse + updatedAt; delete dùng eventType DELETED/id/channelId. Không thay schema/dependency.
+- Frontend cập nhật theo ID, giữ phiên bản updatedAt mới hơn, loại tin xóa và chặn history/frame cũ khôi phục ID đã xóa trong lần mở kênh. Giữ các thay đổi có trước; chưa commit/push.
+- Verification: từ server `.\gradlew.bat test --tests com.denhub.service.MessageServiceTest --tests com.denhub.config.ChannelMessagingTest --tests com.denhub.web.rest.MessageSecurityIT check --no-daemon`: 125 tests PASS và check PASS. Lần đầu 1 test fail do fixture timestamp gọi saved() hai lần; giữ cùng fixture và chạy lại PASS, chạy lại sau bổ sung updatedAt history cũng PASS.
+- Từ client `npm test` 144 PASS; `npm run build` PASS (cảnh báo bundle lớn). `node --test --test-name-pattern='WebSocket edit and delete' tests/group-chat.browser.test.mjs` với NODE_PATH runtime bundled: 1 browser test PASS, gồm sửa realtime, không trùng, bỏ update cũ, xóa và bỏ frame đến muộn.
+- Tests thêm: 2 transaction-event tests commit/rollback; 1 browser regression. Chưa kiểm hai tài khoản với backend thật; broker/API browser giả lập. Xóa trong lúc offline có thể cần reload trang để loại tin cũ đang giữ; không có event replay.
+- Docs/02 mục 6–6.1 đồng bộ payload; đã đối chiếu docs/01,03,04 không đổi business/schema/layout. Git diff/diff --check được review, không stage/commit/push.
+
+
+### Sửa binding Channel STOMP khi chạy IDE — code/regression PASS (2026-11-11)
+
+- Kế hoạch bổ sung backend được user duyệt bằng “ok”: chỉ ghi rõ DestinationVariable channelId, regression không có parameter names, chạy test/check và cập nhật docs. Không đổi endpoint/DTO/schema/quyền hoặc frontend.
+- Bytecode IDE trước sửa không có MethodParameters, bản Gradle có; controller cũ không khai báo tên annotation. Regression tái hiện IllegalArgumentException trước service; sau sửa @DestinationVariable("channelId") giải quyết binding và trả 201 trong test.
+- 40/40 tests controller/messaging/service WebSocket PASS; check PASS. javap xác nhận IDE tự biên dịch lại annotation có value="channelId". Chưa xác minh gửi trên backend thật hoặc hai tài khoản; không khẳng định đây là lỗi duy nhất còn lại từ ảnh runtime.
+- Chưa stage/commit/push, bảo toàn toàn bộ thay đổi cũ. Xem log FIX-CHANNEL-STOMP-IDE-BINDING.
+
+
+### Sửa frontend chat nhóm — code và regression PASS (2026-11-11)
+
+- Người dùng duyệt kế hoạch bằng “sửa lại”. Đã đồng bộ request-id và queue kết quả với backend: chỉ xóa draft sau 201 đúng request, giữ draft khi lỗi/timeout/đóng kết nối, không tự retry. REST fallback chỉ khi chưa phát frame.
+- Reconnect đọc token hiện tại, subscribe lại và tải bù lịch sử; gộp history/REST/topic theo ID chuẩn hóa, bỏ frame phiên/kênh cũ. Tăng độ rõ placeholder và xác minh màu chữ nhập trên trình duyệt.
+- Verification: npm test 144/144 PASS; npm run build PASS; 21 browser regression PASS và 1 regression history/realtime mới PASS. Broker/REST trong browser tests được giả lập, STOMP client/hook/UI thật. Chưa xác minh hai tài khoản trên backend/SQL Server thật; không đánh dấu task QA tích hợp DONE.
+- Giữ nguyên các thay đổi Login/session/backend/test isolation có trước; không đổi database/dependency/branch, chưa commit/push. Xem log CHANNEL-WS-RELIABILITY-FRONTEND.
+
+
+### UI redesign — 2 ảnh đề xuất, chờ duyệt (2026-11-11)
+
+- Người dùng yêu cầu xem Discord làm tham khảo và vẽ ảnh trước khi sửa DenHub; sau đó yêu cầu bỏ qua trang login. Link kênh Discord chuyển tới đăng nhập nên chưa xem được kênh riêng, không nhận đã sao chép đúng giao diện kênh đó.
+- Đã dựng bằng built-in image_gen hai preview: chat nhóm (dock Server, sidebar Channel, chat và thành viên) và Home (Server + bảng tin). Giữ chức năng DenHub, nền graphite/điểm nhấn teal; không thêm voice/video/Meeting, không sửa appcode hoặc duyệt lại business/API.
+- Ảnh chỉ dùng xem trước trong `$CODEX_HOME/generated_images/01a1ca39-7d0b-7a00-9325-41a737494b5a/`: chat `exec-6dd3b4be-047f-460b-9f59-a8c5078eab93.png`, Home `exec-1a275769-c530-4700-93fa-4eb1fb114709.png`. Chưa chọn làm asset production hoặc thay docs/04 design contract. Chờ người dùng duyệt/chỉnh ảnh rồi mới lập kế hoạch implementation; không commit/push.
+
+### Đợt 1 sửa session/login — DONE phạm vi đã duyệt (2026-11-11)
+
+- Người dùng duyệt “ok làm đi”, sau đó yêu cầu “sửa nhanh ko cần test sâu”. Chỉ sửa kiểm phiên REST: SessionManager null-safe, query scalar không cache đọc session hiện tại của User active, converter trả 401 cho token thiếu/sai phiên và giữ public guest fallback. Không sửa FE, STOMP, schema, role hoặc mật khẩu.
+- `SessionSecurityIT` bật cache runtime đã tái hiện lỗi trước sửa (11 ca, 10 FAIL): SQL có session mới nhưng User trong cache vẫn null. Sau sửa, `SessionManagerTest` 10/10 + `SessionSecurityIT` 11/11 **PASS 21/21**. Compile Java/test Java PASS trong lệnh targeted. **Không chạy lại full suite/check/build frontend** theo yêu cầu giảm kiểm thử; 609/609 full suite là kết quả đợt trước.
+- UI smoke thật sau compile/reload: Home tải được danh sách Server (0), feed hiển thị bài PRIVATE QA đã tạo trước đó; Hồ sơ tải dữ liệu bình thường, không còn lỗi getSessionId/null ở luồng đã xem. Ảnh Home sau sửa lưu `system-qa/11-home-after-session-fix.jpg` ngoài repo. Không tự đăng nhập bằng credential người dùng, không đổi/reset account.
+- Bài `QA_TEST_20261111_bai_viet_rieng_tu` đã xác nhận đọc lại được trên UI sau sửa, chưa xóa. Không thấy Server nào trong danh sách hiện tại; chưa thực hiện cleanup theo ID đoán. Các lỗi UI, fake fallback, Google, toast DM và frontend Channel còn thuộc đợt sau; chưa đánh dấu toàn hệ thống/chat hoàn thành.
+- Docs đồng bộ: docs/02 mục 5.1.1, báo cáo QA follow-up, progress/log/handoff ở đây. Các thay đổi đợt này và test isolation trước đó vẫn chưa commit/push.
+
+### System QA trên máy người dùng — bị chặn bởi phiên REST (2026-11-11)
+
+- Người dùng yêu cầu kiểm thử toàn hệ thống qua giao diện, tự đăng nhập phiên có menu Admin và cho phép dữ liệu `QA_TEST` riêng. Đã thực hiện khảo sát UI thật, validation, điều hướng, thao tác tạo Server/bài viết QA, mobile Home và 404; báo cáo chi tiết tại [QA-SYSTEM-2026-11-11.md](./QA-SYSTEM-2026-11-11.md).
+- **P1 runtime:** sau login, nhiều REST request lỗi; Hồ sơ hiển thị NullPointerException tại `SessionManager.isValidSessionIdByEmail` vì `User.getSessionId()` null. Home/Server/discovery/feed/DM bị ảnh hưởng. Có nghi vấn User cache cũ sau bulk update session; chưa xác nhận độc lập, chưa sửa auth hoặc dữ liệu thật.
+- Ghi nhận thêm raw Java error trên UI Hồ sơ, dữ liệu mẫu che lỗi API ở Notifications/Rooms, hai toast lỗi DM, Google origin không được phép. Validation đã kiểm đạt không đồng nghĩa toàn bộ module PASS.
+- Các luồng Channel/chat hai tài khoản/CRUD/permission/upload còn bị chặn hoặc chưa kiểm đủ; **không đánh dấu các task Duy hoàn thành**. 609 test/backend check PASS là lượt tự động trước đó, không thay thế QA runtime này. Hai marker Server/bài viết QA cần xác minh persistence và cleanup đúng dữ liệu sau khi gỡ blocker.
+- Chỉ thêm báo cáo và cập nhật progress/log/handoff trong lượt QA; không sửa application code, schema, credentials hoặc dependencies. Ảnh bằng chứng lưu local ngoài repo; không sửa Google Sheets, không commit/push.
+
+### Backend test isolation và loại cấu hình mock khỏi app scan — DONE code/tests (2026-11-11)
+
+- Người dùng duyệt kế hoạch cô lập H2/CacheManager bằng `ok`. Mỗi Spring test context có database H2 đặt tên riêng và Ehcache provider/manager riêng; giữ cache L2 bật trong ServerCacheIT và giữ Spring context reuse. Chỉ thay test infrastructure, không đổi production API/schema, dependency hoặc tài khoản.
+- Đã sửa thêm lỗi IDE startup được người dùng báo: `ChannelMessagingTest.TestConfig` có `@Configuration` khiến app scan nạp bean mock `messaging` khi test output lọt vào classpath. Các helper không còn stereotype component; được đăng ký tường minh bằng SpringJUnitConfig, ContextCustomizer hoặc ApplicationContextRunner. Không thêm `@Primary`/`@Qualifier` vào service thật để che lỗi.
+- Regression quét app thông thường đã FAIL trước sửa và PASS sau sửa. `IsolatedPersistenceContextTest` có 3 ca: database/cache độc lập khi đóng peer context, factory tự được Spring Test tải và vẫn reuse context, không quét nhầm helper test khi test class nằm trên classpath.
+- Verification mới nhất: `.\gradlew.bat test check --no-daemon` **609/609 PASS**, 0 failure/error/skipped; `check` PASS. Lượt 608/608 trước đó đã PASS nhưng `check` bị ngắt theo yêu cầu dừng của người dùng; không dùng kết quả cũ để nhận đã kiểm khởi động IDE.
+- Nhánh `feature/edit-message-api`, các thay đổi đợt này chưa commit/push. Người dùng cần Stop/Run backend bằng IDE sau khi biên dịch source mới; nếu IDE giữ class trong `server/bin/main` cũ thì clean/rebuild Java workspace trước khi Run. Chưa xác minh trực tiếp IDE launch sau sửa, đăng nhập thật hoặc chat hai tài khoản; các task UI Duy chưa được đánh dấu hoàn thành.
+
 ### Hoàn thiện chat nhóm WebSocket — backend đã kiểm thử, task chưa hoàn tất (2026-11-11)
 
 - **UI QA sau yêu cầu kiểm thử trên màn hình (2026-11-11):** các task Duy trong ảnh là 3.07 (history theo Channel), 3.12 (chống trùng), 3.17 (UI chat/history), 3.22 (gửi/sửa/xóa với hai tài khoản). Đã mở DenHub `http://localhost:3000/login` bằng trình duyệt và thao tác nút demo/đăng nhập thật trên UI; chưa vào được chat, không đánh dấu các task này DONE.
@@ -298,8 +360,8 @@ _Không phải task nào cũng sửa cả 3 file, chỉ cập nhật file thực
 
 - Kế hoạch backend/frontend và queue kết quả `/user/queue/channel-message-results` được duyệt bằng `ok`. Nhánh giữ `feature/edit-message-api`, bảo toàn các thay đổi chưa commit đã có. Không đổi database, dependency, branch, không commit/push.
 - Backend: REST/STOMP phát tin qua cùng event sau commit; kết quả gửi có request-id và chỉ về tab gốc; chặn wildcard/giả mạo broker và kiểm membership/active User/expiry trước mỗi lần nhận tin Channel. Contract chi tiết tại docs/02 mục 6.1.
-- Verification: 91/91 test liên quan PASS; toàn bộ backend 606 test, 21 FAIL ở ServerCacheIT/ServerDiscoveryIT; chạy riêng hai lớp 21/21 PASS. Không coi toàn bộ backend PASS hoặc lỗi có sẵn đã được xác minh baseline.
-- **IN PROGRESS / DỪNG theo AGENTS.md mục 15, 27:** lỗi suite ngoài phạm vi chưa giải quyết. Frontend hiện vẫn là bản cũ, không gửi request-id hoặc xử lý queue kết quả mới; gửi STOMP sẽ bị backend mới từ chối 400 và UI cũ có thể xóa draft. Chưa triển khai/chạy riêng backend mới với frontend cũ. Cần xử lý blocker và hoàn tất đợt frontend đã duyệt trước khi coi chat nhóm sử dụng được.
+- Verification lịch sử: 91 test liên quan PASS, full suite ban đầu 606 test với 21 FAIL ở Cache/Discovery. **Blocker test đã được gỡ trong đợt isolation riêng phía trên: full suite mới nhất 609/609 PASS và check PASS.**
+- **Lịch sử trước lượt sửa frontend (xem progress/handoff mới nhất phía trên) — frontend còn dang dở:** frontend hiện vẫn là bản cũ, không gửi request-id hoặc xử lý queue kết quả mới; gửi STOMP sẽ bị backend mới từ chối 400 và UI cũ có thể xóa draft. Cần hoàn tất frontend và kiểm thử xuyên luồng trước khi coi chat nhóm sử dụng được. Gỡ lỗi suite backend không đồng nghĩa đăng nhập hoặc UI chat đã được kiểm chứng.
 
 Bảng này phản ánh chính xác trạng thái thực tế của code và tài liệu trong dự án.\
 _(Không đánh dấu DONE chỉ vì đã tạo file rỗng hay class chưa hoàn chỉnh)._
@@ -493,6 +555,93 @@ Kết quả 58 tests/build/Auth dưới đây thuộc lượt gộp code trướ
 - PRE-EXISTING ISSUE: Channel hiện cho Owner/Member tạo kênh, khác contract Owner/Admin; các đường dẫn /api/v1 vẫn khác chuẩn mục 5 của kiến trúc. Wrapper đã được chốt theo mục 4.1. Giữ hành vi hiện có theo phạm vi được duyệt, không tự đổi contract hoặc quyền.
 
 ## 11. COMPLETED WORK LOG
+
+### UI smoke gửi tin thật (2026-11-11, 23:06)
+
+- Theo yêu cầu “gửi kko dc test man hinh di”, thao tác trực tiếp cửa sổ Chrome đang đăng nhập tại localhost:3000/servers/1, #general. Nhập QA_TEST_chat_20261111_2305 và kiểm tra Enter; nhập QA_TEST_button_20261111_2306 rồi bấm Gửi. Cả hai xuất hiện trong danh sách, ô nhập trống và bộ đếm 0/4000; screenshot xác nhận. Không tái hiện lỗi gửi tại thời điểm smoke. Không khẳng định transport là STOMP vì chưa đọc network frame; không kiểm hai tài khoản.
+- Hai tin QA còn trong kênh, không tự xóa. Không sửa application code, không chạy lại suite cho task chỉ kiểm UI, không commit/push. Lỗi nhãn “đã chỉnh sửa” trên tin cũ vẫn thấy, chưa xử lý trong lượt smoke.
+
+
+### Sửa/xóa tin Channel realtime (2026-11-11)
+
+- User duyệt cả hai bằng “ok”. REST PATCH/PUT/DELETE giữ nguyên quyền tác giả; broadcast sau commit qua topic Channel. Update dùng MessageResponse + updatedAt; delete dùng eventType DELETED/id/channelId. Không thay schema/dependency.
+- Frontend cập nhật theo ID, giữ phiên bản updatedAt mới hơn, loại tin xóa và chặn history/frame cũ khôi phục ID đã xóa trong lần mở kênh. Giữ các thay đổi có trước; chưa commit/push.
+- Verification: từ server `.\gradlew.bat test --tests com.denhub.service.MessageServiceTest --tests com.denhub.config.ChannelMessagingTest --tests com.denhub.web.rest.MessageSecurityIT check --no-daemon`: 125 tests PASS và check PASS. Lần đầu 1 test fail do fixture timestamp gọi saved() hai lần; giữ cùng fixture và chạy lại PASS, chạy lại sau bổ sung updatedAt history cũng PASS.
+- Từ client `npm test` 144 PASS; `npm run build` PASS (cảnh báo bundle lớn). `node --test --test-name-pattern='WebSocket edit and delete' tests/group-chat.browser.test.mjs` với NODE_PATH runtime bundled: 1 browser test PASS, gồm sửa realtime, không trùng, bỏ update cũ, xóa và bỏ frame đến muộn.
+- Tests thêm: 2 transaction-event tests commit/rollback; 1 browser regression. Chưa kiểm hai tài khoản với backend thật; broker/API browser giả lập. Xóa trong lúc offline có thể cần reload trang để loại tin cũ đang giữ; không có event replay.
+- Docs/02 mục 6–6.1 đồng bộ payload; đã đối chiếu docs/01,03,04 không đổi business/schema/layout. Git diff/diff --check được review, không stage/commit/push.
+
+
+### [2026-11-11] FIX-CHANNEL-STOMP-IDE-BINDING — Ghi rõ tên destination variable
+
+- Approval: user “ok” sau kế hoạch bổ sung backend. Chỉ đổi một annotation trong ChannelChatController: @DestinationVariable("channelId"). Không đổi STOMP destination/body, queue, quyền, MessageService hoặc database.
+- Evidence: javap trước sửa cho thấy IDE bin/main thiếu MethodParameters, Gradle build/classes/java/main có MethodParameters; annotation cũ không ghi tên. Regression đọc bytecode controller thật, loại MethodParameters bằng ASM đi kèm Spring, dùng Spring DestinationVariableMethodArgumentResolver để bind channelId và gọi controller với service mock. Không thêm dependency hoặc helper @Configuration có thể bị app scan.
+- Từ server: `.\gradlew.bat test --tests 'com.denhub.web.websocket.ChannelChatControllerTest.resolvesChannelAndSendsWhenCompiledWithoutParameterNames' --no-daemon` trước sửa FAIL 1/1: IllegalArgumentException, không có tên đối số Long, yêu cầu compiler -parameters. Đây là lỗi được tái hiện của task.
+- Sau sửa: `.\gradlew.bat test --tests com.denhub.web.websocket.ChannelChatControllerTest --tests com.denhub.config.ChannelMessagingTest --tests com.denhub.service.MessageServiceWebSocketTest check --no-daemon` PASS 40/40 (controller 10, messaging 24, service 6), 0 failures/errors/skips; check PASS; compileJava/compileTestJava PASS. Không chạy full backend suite hoặc chạy lại frontend vì không sửa frontend trong đợt này.
+- javap sau sửa xác nhận bin/main của IDE đã tự biên dịch annotation value="channelId". Chưa restart/chưa gửi tin thật hoặc kiểm hai tài khoản trên SQL Server; không coi mock service xác nhận persistence runtime.
+- Docs impact: docs/00 progress/log/handoff, docs/02 mục 6.1. Đã đối chiếu docs/01,03,04: không đổi nghiệp vụ, schema hoặc UI nên giữ nguyên. Review git diff và diff --check, không stage/commit/push; bảo toàn các thay đổi đã có.
+
+
+### [2026-11-11] CHANNEL-WS-RELIABILITY-FRONTEND — Sửa gửi/hiển thị chat nhóm
+
+- Phạm vi: useChannelChat và transport mới channelChatTransport.js; GroupChatPage chờ kết quả lưu, reload khi connect/reconnect và merge history với tin đang có; chuẩn hóa key ID, thông báo kết quả chưa rõ và màu composer. Không đổi contract backend, schema hoặc quyền.
+- Tests mới: 11 transport/merge regression trong channelChatTransport.test.mjs, đưa vào npm test; 3 browser tests sử dụng STOMP client thật và broker giả lập: giữ draft/403/201/dedup/màu chữ, disconnect/reconnect/history, tin realtime không mất khi history trả muộn. Các test browser cũ về composer, đổi Server/Channel, lịch sử, phân trang, sửa/xóa vẫn PASS.
+- Lệnh thực tế từ client:
+  - `npm test`: 144/144 PASS.
+  - `npm run build`: PASS; còn cảnh báo chunk >500 kB, không refactor ngoài phạm vi.
+  - `node --test tests/group-chat.browser.test.mjs`: lần đầu không chạy được do MODULE_NOT_FOUND playwright. Dùng NODE_PATH trỏ đến node_modules của runtime Codex 26.1110.11613 sẵn có, không cài dependency.
+  - `node --test --test-name-pattern="pagination|history|composer|message|messages" tests/group-chat.browser.test.mjs`: 19/19 PASS trước khi thêm browser tests mới.
+  - `node --test --test-name-pattern="WebSocket composer|WebSocket disconnect" tests/group-chat.browser.test.mjs`: 2/2 PASS.
+  - `node --test --test-name-pattern="pagination|history|composer|message|messages|WebSocket" tests/group-chat.browser.test.mjs`: 21/21 PASS.
+  - `node --test --test-name-pattern="WebSocket message received" tests/group-chat.browser.test.mjs`: 1/1 PASS sau khi thêm regression race cuối.
+- Browser commands sau lần thiếu module dùng `$env:NODE_PATH = 'C:\Program Files\WindowsApps\OpenAI.CodexPrimaryRuntime.v26-1110-973-0_26.1110.973.0_x64__3k8sg7r9htsxt\dependencies\node\node_modules'`. Có cảnh báo Ant Design/deprecated props và unsupported style property trong UI khác đã tồn tại; không có pageerror trong các assertions liên quan.
+- Documentation impact: cập nhật docs/00 progress/log/handoff và docs/02 trạng thái tích hợp mục 6–6.1; kiểm docs/01,03,04 không thay business/schema hoặc thiết kế bố cục nên giữ nguyên.
+- Giới hạn: mock broker/API không chứng minh lưu SQL Server hoặc phân quyền hai tài khoản thật. Không chạy lại backend suite vì không sửa backend. Giữ nguyên các thay đổi có sẵn. Chưa stage/commit/push.
+
+
+### [2026-11-11] UI-REDESIGN-PREVIEW — Vẽ ảnh Chat/Home trước khi sửa giao diện
+
+- User scope: yêu cầu thay giao diện DenHub, nhưng phải dựng ảnh cho xem trước; bỏ qua login. Đã đọc imagegen skill và docs/04; mở link Discord nhưng bị yêu cầu đăng nhập, không thao tác credential hoặc đọc kênh riêng.
+- Deliverables: hai ảnh high-fidelity bằng built-in image_gen, palette graphite/teal, UI tiếng Việt, bố cục giao tiếp lấy cảm hứng Discord và giữ DenHub. Tham khảo brand/context từ screenshot Home sau fix session; ảnh là concept mới, không chỉnh screenshot thành bằng chứng runtime. Đã kiểm ảnh/text/composition trực tiếp khi tool trả về.
+- Prompts lưu local ngoài repo tại thư mục visualization của chat, file `denhub-redesign-prompts-v1.md`; ảnh ở thư mục generated_images được ghi trong progress. Preview-only, chưa được duyệt/đưa vào source. Không chạy test/build vì không thay application code. Không sửa schema, API, dependencies hoặc các thay đổi auth/test đang có; chưa commit/push.
+
+### [2026-11-11] FIX-REST-SESSION-CACHE — Sửa đợt 1, kiểm nhanh theo yêu cầu
+
+- Approved: “ok làm đi” cho đợt 1 của kế hoạch; “sửa nhanh ko cần test sâu” giới hạn verification ở targeted auth tests và UI smoke. Không triển khai đợt UI/WebSocket khác hoặc sửa dữ liệu thật.
+- Root cause reproduced: regression HTTP login với Spring `simple` cache và Hibernate L2 bật làm nóng `usersByEmail` khi User.sessionId null; login bulk-update SQL session nhưng cached Entity vẫn null. Code cũ gọi `.equals` trên null nên protected request lỗi. Test cũng phát hiện signed token thiếu session được 200, thiếu subject được 400 thay vì 401.
+- Implemented: query scalar non-cacheable `UserRepository.findCurrentSessionIdByEmail` lọc User active; SessionManager guard null/blank và so sánh session hiện tại trong read-only transaction. Converter luôn kiểm access token, trả BadCredentials vào 401 handler hiện có khi không hợp lệ; giữ nhận diện guest token nội bộ của GuestAwareJwtDecoder cho public login khi bearer hỏng. Không đổi SecurityConfiguration, AuthService, JWT ký, Entity/schema hoặc cache cho nghiệp vụ khác.
+- Tests new: `SessionManagerTest` 10 ca cho email normalization, opaque nonce, null/blank inputs, missing/null stored value và không đọc cached User; `SessionSecurityIT` 11 ca qua JWT/filter/login/controller/JPA thật với cache bật, gồm login/cache null, login lại, revoke, inactive, missing/blank/wrong claims, public guest fallback và wrong password. Dữ liệu fixture H2 trong test transaction rollback, không đổi account local thật.
+- Commands thực sự chạy từ server:
+  - `.\gradlew.bat test --tests com.denhub.web.rest.SessionSecurityIT --no-daemon`: trước sửa **11 ca, 10 FAIL**, đúng lỗi NPE/401 expectation; log tạm ngoài repo.
+  - `.\gradlew.bat test --tests com.denhub.security.SessionManagerTest --tests com.denhub.web.rest.SessionSecurityIT --no-daemon`: sau sửa **21/21 PASS**, compileJava/compileTestJava PASS. Log tạm ngoài repo, không công bố token/password.
+  - Không chạy lại full suite/check hoặc frontend tests/build sau yêu cầu kiểm nhanh. UI reload Home thành công (Server list không còn error, bài QA đã đọc lại được); Hồ sơ hiển thị dữ liệu thật. Không nhận đã test sâu/re-login toàn hệ thống hoặc sửa UI raw-error formatter.
+- Documentation: docs/02 mục 5.1.1 ghi query/security behavior; QA report thêm follow-up, giữ nguyên bằng chứng baseline; docs/00 cập nhật trạng thái/handoff. Đã kiểm docs/01,03,04: không đổi business/schema/UI design nên không sửa. Review diff, git diff --check; không stage/commit/push. Giữ các thay đổi test isolation đang có từ lượt trước.
+- Limits: thêm truy vấn DB cho mỗi lần kiểm phiên để không dùng session cache cũ. Thay đổi chỉ REST; không suy ra STOMP revocation đã được thay đổi. Cần tiếp tục các đợt UI/Channel và cleanup đúng QA markers sau khi có phê duyệt tương ứng.
+
+### [2026-11-11] SYSTEM-UI-QA — Khảo sát hệ thống trên máy người dùng, chưa đạt end-to-end
+
+- Scope: người dùng yêu cầu dùng máy kiểm tra toàn hệ thống, cung cấp phiên đăng nhập và duyệt dữ liệu QA_TEST riêng. Thao tác qua in-app browser với frontend/backend local thật; không mock API hoặc chèn JWT/localStorage để vượt đăng nhập.
+- Executed: Home/retry, Server create validation và submit QA riêng tư, Khám phá/tìm, invite empty/invalid format, Hồ sơ, Admin form required fields, Friends tabs, Direct/errors/search QA, Notifications/Rooms, post whitespace/121-character/private publish, mobile 375×812 và 404/Go Home. Đã reset viewport, đóng tab phụ và giữ phiên người dùng ở Home.
+- Found: runtime NullPointerException do sessionId null, ảnh hưởng REST; raw lỗi Java bị đưa lên Hồ sơ; API lỗi nhưng Notifications/Rooms gán dữ liệu dev; hai toast lỗi hội thoại; console Google origin không hợp lệ. Đã đối chiếu SessionManager/UserRepository/AuthService và frontend fallback/publish; nghi vấn cache session cũ chưa được xác minh độc lập.
+- Verification artifacts: 8 ảnh local ngoài repo và matrix kết quả tại [QA-SYSTEM-2026-11-11.md](./QA-SYSTEM-2026-11-11.md). Có thao tác tạo Server QA chưa có response/ID và publish một bài QA PRIVATE có success toast nhưng không chờ server ack; chưa khẳng định đã lưu và chưa dọn theo ID đoán. Không thay/xóa dữ liệu thật.
+- Không chạy lại backend suite/Node/build trong lượt UI; không nhận mọi chức năng đã PASS. Không chạy OAuth consent, tạo credentials, thay role hoặc kiểm đủ hai tài khoản vì chưa có peer QA/REST đang lỗi. Meeting ngoài scope tài liệu, không tạo tính năng này.
+- Docs impact: thêm báo cáo, cập nhật docs/00; không đổi business/API/schema/UI contract của docs/01–04. Chưa sửa appcode hoặc commit/push; giữ nguyên các thay đổi test isolation từ lượt trước. Cần kế hoạch auth/session fix riêng rồi chạy lại matrix và cleanup đúng markers QA.
+
+### [2026-11-11] BE-TEST-CONTEXT-ISOLATION — H2/cache độc lập và không nạp mock khi chạy IDE
+
+- Approval: người dùng yêu cầu chạy BE/sửa lỗi và duyệt kế hoạch test isolation bằng `ok`; sau đó cung cấp lỗi startup có hai SimpMessagingTemplate. Sửa cấu hình helper để không bị quét nhầm thuộc cùng phạm vi cô lập test. Giữ source application, API, Entity/schema, dependencies và nhánh hiện tại.
+- Root cause test suite: application.properties test dùng chung H2 `testdb` với `create-drop`; nhiều ApplicationContext có EntityManagerFactory riêng nhưng chia sẻ database/cache mặc định. Context mới reset dữ liệu trong khi cache Authority còn dữ liệu cũ, gây FK ROLE_USER lúc initialize; context bị lỗi đóng CacheManager dùng chung làm Discovery gặp Cache is closed. Trước sửa: `.\gradlew.bat test --no-daemon` 606 test, 21 FAIL (4 CacheIT, 17 DiscoveryIT).
+- Implemented: `IsolatedPersistenceContextCustomizerFactory` đăng ký qua `src/test/resources/META-INF/spring.factories`; cấp một database-name UUID ổn định cho mỗi context và đăng ký một container @Bean lite tạo EhcacheCachingProvider riêng. HibernatePropertiesCustomizer gắn manager riêng vào Hibernate; context đóng provider của chính mình. Customizer enum singleton giữ equality/hash ổn định, không phá context cache reuse. Test application.properties chỉ thay H2 URL để dùng tên được cấp; các setting khác giữ nguyên.
+- IDE issue: app log cho thấy `ChannelMessagingTest$TestConfig` được quét từ IDE output và tạo mock bean `messaging`, trùng `brokerMessagingTemplate` thật. Đã loại `@Configuration` khỏi helper đó, cùng mọi stereotype khỏi hai helper mới. Chúng vẫn được explicit-register trong test, không xuất hiện trong scan thông thường ngay cả khi test classes có trên classpath. Không sửa NotificationFriendshipRequest/FriendshipService hoặc chọn mock bằng Primary/Qualifier.
+- Regression `IsolatedPersistenceContextTest`: tạo hai context JPA/H2 thật cùng lúc, commit/warm ROLE_USER ở một bên, xác nhận bên kia không đọc nhầm row/cache, rồi đóng context đầu; bên kia vẫn có row và L2 cache hit thật. Kiểm thêm đăng ký SpringFactories/context equality và scan component thông thường không tìm thấy ba helper (có positive control WebSocketConfig thật).
+- Lệnh đã chạy từ `server/`:
+  - `.\gradlew.bat test --tests com.denhub.config.IsolatedPersistenceContextTest --tests com.denhub.web.rest.ServerCacheIT --tests com.denhub.web.rest.ServerDiscoveryIT --no-daemon`: **23/23 PASS**.
+  - `.\gradlew.bat test --no-daemon`: sau isolation **608/608 PASS**; người dùng yêu cầu dừng nên lượt `.\gradlew.bat check --no-daemon` tiếp theo đã bị ngắt, không nhận PASS.
+  - `.\gradlew.bat test --tests com.denhub.config.IsolatedPersistenceContextTest.ordinaryApplicationScanDoesNotDiscoverTestHelpers --no-daemon`: trước bỏ stereotype **FAIL 1/1**, đúng assertion phát hiện mock cấu hình được quét.
+  - `.\gradlew.bat test --tests com.denhub.config.IsolatedPersistenceContextTest --tests com.denhub.config.ChannelMessagingTest --no-daemon`: sau sửa scan **27/27 PASS**.
+  - `.\gradlew.bat test check --no-daemon`: **609/609 PASS**, 0 fail/error/skip; check PASS. Compile Java/test Java PASS hoặc UP-TO-DATE theo Gradle; không cài dependencies.
+- Runtime quan sát trước sửa scan: GET `http://127.0.0.1:8080/api/account` không token trả 401 (backend trả lời và bảo vệ endpoint), không phải bằng chứng đăng nhập thành công. Chưa thao tác Clean/Run IDE của người dùng hoặc xác minh startup đó sau sửa. Source mới cần được IDE biên dịch; class cũ ở bin/main cần clean/rebuild nếu còn gây lỗi.
+- Documentation impact: cập nhật docs/00 progress/log/handoff; đối chiếu docs/01–04 không thay business/API/DB/UI hoặc architecture runtime nên giữ nguyên. Đã review diff/file mới; thay đổi chưa stage/commit/push. Phần frontend/result Promise và UI test hai tài khoản vẫn chưa hoàn thiện.
 
 ### [2026-11-11] CHANNEL-WS-RELIABILITY-BACKEND — Hoàn thiện backend, dừng tại lỗi suite ngoài phạm vi
 
@@ -3378,10 +3527,59 @@ Docs Updated:
 
 ## 12. CURRENT WORK / HANDOFF
 
-### Handoff — Hoàn thiện chat nhóm WebSocket, backend dừng tại full-suite blocker (2026-11-11)
+### UI smoke gửi tin thật (2026-11-11, 23:06)
+
+- Theo yêu cầu “gửi kko dc test man hinh di”, thao tác trực tiếp cửa sổ Chrome đang đăng nhập tại localhost:3000/servers/1, #general. Nhập QA_TEST_chat_20261111_2305 và kiểm tra Enter; nhập QA_TEST_button_20261111_2306 rồi bấm Gửi. Cả hai xuất hiện trong danh sách, ô nhập trống và bộ đếm 0/4000; screenshot xác nhận. Không tái hiện lỗi gửi tại thời điểm smoke. Không khẳng định transport là STOMP vì chưa đọc network frame; không kiểm hai tài khoản.
+- Hai tin QA còn trong kênh, không tự xóa. Không sửa application code, không chạy lại suite cho task chỉ kiểm UI, không commit/push. Lỗi nhãn “đã chỉnh sửa” trên tin cũ vẫn thấy, chưa xử lý trong lượt smoke.
+
+
+### Sửa/xóa tin Channel realtime (2026-11-11)
+
+- User duyệt cả hai bằng “ok”. REST PATCH/PUT/DELETE giữ nguyên quyền tác giả; broadcast sau commit qua topic Channel. Update dùng MessageResponse + updatedAt; delete dùng eventType DELETED/id/channelId. Không thay schema/dependency.
+- Frontend cập nhật theo ID, giữ phiên bản updatedAt mới hơn, loại tin xóa và chặn history/frame cũ khôi phục ID đã xóa trong lần mở kênh. Giữ các thay đổi có trước; chưa commit/push.
+- Verification: từ server `.\gradlew.bat test --tests com.denhub.service.MessageServiceTest --tests com.denhub.config.ChannelMessagingTest --tests com.denhub.web.rest.MessageSecurityIT check --no-daemon`: 125 tests PASS và check PASS. Lần đầu 1 test fail do fixture timestamp gọi saved() hai lần; giữ cùng fixture và chạy lại PASS, chạy lại sau bổ sung updatedAt history cũng PASS.
+- Từ client `npm test` 144 PASS; `npm run build` PASS (cảnh báo bundle lớn). `node --test --test-name-pattern='WebSocket edit and delete' tests/group-chat.browser.test.mjs` với NODE_PATH runtime bundled: 1 browser test PASS, gồm sửa realtime, không trùng, bỏ update cũ, xóa và bỏ frame đến muộn.
+- Tests thêm: 2 transaction-event tests commit/rollback; 1 browser regression. Chưa kiểm hai tài khoản với backend thật; broker/API browser giả lập. Xóa trong lúc offline có thể cần reload trang để loại tin cũ đang giữ; không có event replay.
+- Docs/02 mục 6–6.1 đồng bộ payload; đã đối chiếu docs/01,03,04 không đổi business/schema/layout. Git diff/diff --check được review, không stage/commit/push.
+
+
+### Handoff — Channel STOMP binding không còn phụ thuộc -parameters (2026-11-11)
+
+- Controller khai báo tên channelId tường minh, regression thiếu MethodParameters FAIL trước/PASS sau; 40 tests và check PASS. IDE bin/main đã biên dịch lại annotation (javap).
+- Cần xác minh lần gửi thực tế sau khi runtime nạp class mới; nếu IDE vẫn giữ process/class cũ thì Stop/Run backend, giữ cấu hình JWT hiện tại và đăng nhập lại nếu token không hợp lệ. Chưa xác nhận ảnh lỗi runtime đã hết; nếu còn lỗi cần lấy response/log mới, không mặc định tất cả là binding hoặc JWT.
+- Không đổi frontend/database/API/quyền; không stage/commit/push. Các thay đổi frontend và session/test có trước được giữ nguyên.
+
+
+### Handoff — Frontend chat nhóm đã đồng bộ kết quả gửi (2026-11-11)
+
+- Thay thế ghi chú “frontend còn dang dở” bên dưới: frontend đã gửi request-id, subscribe queue kết quả trước SEND, chờ 201 rồi xóa draft; timeout 15 giây/close giữ draft và yêu cầu kiểm lịch sử, không auto-retry. Reconnect tải history, merge/dedup ID và bỏ frame cũ đã có test.
+- 144 frontend unit tests, build, 21 browser regression + 1 race regression PASS; browser dùng STOMP client thật với broker/API giả lập và Playwright bundled runtime qua NODE_PATH. Không thêm dependency.
+- Còn cần QA hai tài khoản trên backend đang chạy bản contract docs/02 mục 6.1 và SQL Server thật. Nếu timeout, kiểm lịch sử trước khi gửi lại vì tin có thể đã lưu; không có idempotency/outbox.
+- Giữ nguyên các thay đổi login/session/test isolation và tài liệu có trước, không commit/push. Source frontend mới không đồng nghĩa bản frontend đã deploy; reload trình duyệt nếu đang dùng Vite.
+
+
+### Handoff — Chờ duyệt ảnh redesign DenHub (2026-11-11)
+
+- Hai ảnh Chat/Home đã dựng; login không thuộc preview theo yêu cầu mới nhất. User cần duyệt/chỉ điểm sửa ảnh trước. Không coi việc duyệt concept là tự động duyệt implementation plan; trước khi sửa UI source vẫn cần kiểm code/phạm vi file và trình kế hoạch theo AGENTS.md.
+- Chưa sửa appcode, chưa thay docs/04 hoặc tính năng; giữ nguyên các thay đổi session/test chưa commit. Link Discord chưa truy cập được kênh riêng, chỉ dùng mô hình tổ chức Discord làm cảm hứng. Không thêm tính năng Discord ngoài scope DenHub.
+
+### Handoff — Đợt 1 REST session đã sửa, còn các đợt UI/Channel (2026-11-11)
+
+- 21/21 test auth targeted PASS, Home/Hồ sơ đã kiểm nhanh trên UI thật sau sửa. Đợt full suite 609/609 là trước fix session; không gắn kết quả đó với code mới. Người dùng yêu cầu không test sâu nên chưa rerun full suite/check.
+- Source đổi: SessionManager, UserRepository và CustomJwtAuthenticationConverter; endpoint/schema/role/password/FE giữ nguyên. Đọc docs/02 mục 5.1.1 về scalar session query và ngoại lệ public guest. Chưa commit/push, giữ test isolation từ lượt trước.
+- Báo cáo QA có follow-up: blocker session của lượt smoke đã gỡ; các lỗi UI raw formatter, Notifications/Rooms fake fallback, DM toast, Google và hoàn thiện frontend Channel chưa sửa. Bài PRIVATE QA đã xác nhận tồn tại qua feed, chưa xóa; không dọn theo ID đoán.
+
+### Handoff — System UI QA bị chặn bởi lỗi sessionId null (2026-11-11)
+
+- Đọc [QA-SYSTEM-2026-11-11.md](./QA-SYSTEM-2026-11-11.md) trước khi đánh dấu task đạt hoặc sửa runtime. Phiên Admin đã vào Home nhưng REST lỗi tại SessionManager; **backend listening/test PASS không đồng nghĩa login và nghiệp vụ tích hợp đạt**.
+- Cần lập/duyệt kế hoạch sửa kiểm phiên null/cache sau login và regression; không reset mật khẩu, tự đổi dữ liệu hoặc tắt kiểm quyền để tiếp tục test. Sau sửa, kiểm lại hai tài khoản/role, CRUD Server/Channel/Message, feed, friend/DM, upload và reconnect.
+- QA data cần kiểm và dọn chính xác: Server PRIVATE `QA_TEST_20261111_01` (chưa có ID/receipt), bài PRIVATE `QA_TEST_20261111_bai_viet_rieng_tu` (client publish/optimistic success, chưa xác nhận persistence). Không submit lặp/xóa theo ID đoán. Tất cả dữ liệu không mang marker QA phải được giữ nguyên.
+- Đã trả viewport mặc định, đóng tab phụ, giữ tab chính ở Home và không đăng xuất. Không cập nhật task Google Sheets thành DONE; application code không đổi trong lượt QA. Các file test isolation đang chưa commit vẫn được bảo toàn.
+
+### Handoff — Backend đã gỡ blocker test; chat nhóm còn frontend (2026-11-11)
 
 - Người dùng duyệt kế hoạch cả BE/FE bằng `ok`. Đợt backend trong 10 file (4 application, 4 test, 2 docs) đã làm; không sửa các file frontend từ snapshot đầu đợt. Giữ nguyên toàn bộ thay đổi có sẵn trong worktree.
-- Cần quyết định xử lý 21 lỗi full suite ở Cache/Discovery trước khi tiếp tục theo stop condition của repo. 91 test Message/WebSocket PASS; 21 test Cache/Discovery chạy riêng PASS. Đừng gọi lỗi có sẵn đã xác minh nếu chưa có baseline độc lập.
+- Đã duyệt và sửa test isolation trong đợt BE-TEST-CONTEXT-ISOLATION: full suite **609/609 PASS**, check PASS. Không còn blocker 21 lỗi Cache/Discovery; regression còn ngăn helper mock bị nạp khi IDE runtime classpath có test output. Stop/Run IDE với source đã biên dịch, clean/rebuild nếu giữ class cũ; chưa tự kiểm launch IDE sau sửa.
 - Backend mới yêu cầu native header `request-id` và thêm queue kết quả session riêng; **frontend cũ chưa tương thích**. Không chạy/deploy riêng backend mới như bản chat nhóm hoàn chỉnh. Xem docs/02 mục 6.1 để nối frontend đúng contract.
 - Phần frontend đã nằm trong kế hoạch duyệt nhưng chưa thực hiện: Promise chờ kết quả rồi mới xóa draft, timeout/đóng kết nối giữ draft và không auto-retry, resubscribe/reload lịch sử khi reconnect, merge/dedup ID đồng nhất, bỏ frame cũ, tests hook/browser cho lỗi/race/REST+WS.
 - Chưa commit/push; không đổi dependency hoặc database. Chưa kiểm STOMP qua hai tài khoản hoặc SQL Server thật.
