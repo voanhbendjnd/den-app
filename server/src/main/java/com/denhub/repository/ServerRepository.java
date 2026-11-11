@@ -42,5 +42,16 @@ public interface ServerRepository extends JpaRepository<Server, Long> {
 
     @Query("SELECT DISTINCT s FROM Server s WHERE s.ownerId = :userId OR s.id IN (SELECT sm.serverId FROM ServerMember sm WHERE sm.userId = :userId) ORDER BY s.id DESC")
     List<Server> findAllByUserIdOrOwnerId(@Param("userId") Long userId);
+
+    List<Server> findAllByOwnerIdOrderByIdAsc(Long ownerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Server s WHERE s.ownerId = :ownerId ORDER BY s.id ASC")
+    List<Server> findAllByOwnerIdForUpdate(@Param("ownerId") Long ownerId);
+
+    long countByOwnerId(Long ownerId);
+
+    @Query("SELECT s.ownerId, COUNT(s) FROM Server s WHERE s.ownerId IN :ownerIds GROUP BY s.ownerId")
+    List<Object[]> countByOwnerIds(@Param("ownerIds") List<Long> ownerIds);
 }
 

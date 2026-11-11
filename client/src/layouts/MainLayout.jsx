@@ -12,6 +12,7 @@ import {
     CompassOutlined,
     TeamOutlined,
     SearchOutlined,
+    SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import CreateServerModal from '../components/common/CreateServerModal';
@@ -27,7 +28,7 @@ const { Text } = Typography;
 export default function MainLayout() {
     useGlobalFriendNotification();
     const [pendingFriendCount, setPendingFriendCount] = useState(0);
-    const { currentUser, logout } = useAuth();
+    const { currentUser, role, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const creationRoute = useMemo(() => ({ key: location.key }), [location.key]);
@@ -159,6 +160,12 @@ export default function MainLayout() {
             label: 'Hồ sơ cá nhân',
             onClick: () => navigate('/profile'),
         },
+        ...(role === 'ADMIN' ? [{
+            key: 'admin-users',
+            icon: <SafetyCertificateOutlined />,
+            label: 'Quản trị tài khoản',
+            onClick: () => navigate('/admin/users'),
+        }] : []),
         { type: 'divider' },
         {
             key: 'logout',
@@ -204,6 +211,11 @@ export default function MainLayout() {
                 </Link>
             )
         },
+        ...(role === 'ADMIN' ? [{
+            key: '/admin/users',
+            icon: <SafetyCertificateOutlined style={{ fontSize: 16, color: '#00F2FE' }} />,
+            label: <Link to="/admin/users" style={{ fontWeight: 600 }}>Quản Trị Tài Khoản</Link>
+        }] : []),
     ];
 
     return (
